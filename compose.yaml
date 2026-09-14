@@ -1,0 +1,24 @@
+name: capture_viewer
+
+services:
+  viewer:
+    build: .
+    container_name: idrecapture-viewer
+    restart: unless-stopped
+    ports:
+      - "10.1.1.49:8769:8080"
+    volumes:
+      - /mnt5/auto-ekyc/idrecapture:/data
+      - ingestion_state:/state
+      - /mnt5/auto-ekyc/idrecapture/capture_viewer/ingestion_logs:/logs
+    secrets:
+      - delete_token
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+secrets:
+  delete_token:
+    file: /mnt5/auto-ekyc/idrecapture/capture_viewer/.delete_pin
+
+volumes:
+  ingestion_state:

@@ -1,0 +1,7 @@
+viewer_password.txt
+__pycache__
+
+.delete_pin
+delete_token.txt
+
+ingestion_logs/
