@@ -2,8 +2,8 @@
   "name": "datacollector-review-platform",
   "private": true,
   "scripts": {
-    "format": "prettier --write '*.html' '*.js' '*.css'",
-    "format:check": "prettier --check '*.html' '*.js' '*.css'",
+    "format": "prettier --write 'web/**/*.{html,js,css}'",
+    "format:check": "prettier --check 'web/**/*.{html,js,css}'",
     "test:frontend": "node scripts/check_frontend.cjs"
   },
   "devDependencies": {

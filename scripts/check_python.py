@@ -17,7 +17,7 @@ def main():
     failures = []
     paths = sorted(
         [
-            *PROJECT.glob("*.py"),
+            *(PROJECT / "app").rglob("*.py"),
             *(PROJECT / "tests").rglob("*.py"),
             *(PROJECT / "scripts").glob("*.py"),
         ]

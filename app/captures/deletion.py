@@ -10,8 +10,8 @@ import re
 import tempfile
 from pathlib import Path
 
-from capture_data import INDEX_NAME
-from settings import DEFAULT_DATA_ROOT
+from .catalog import INDEX_NAME
+from ..settings import DEFAULT_DATA_ROOT
 
 SAFE_FOLDER = re.compile(r"[A-Za-z0-9_.-]+")
 IMAGES = {".jpg", ".jpeg", ".png", ".webp"}

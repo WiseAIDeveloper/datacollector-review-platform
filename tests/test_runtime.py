@@ -8,10 +8,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import PROJECT, dataset
-from ingestion import IngestionLog
-from server import create_server
-from settings import Settings
+from tests.support import PROJECT, application_module, dataset, load_application
+
+IngestionLog = load_application("ingestion").IngestionLog
+create_server = load_application("server").create_server
+Settings = load_application("settings").Settings
 
 
 class RuntimeTests(unittest.TestCase):
@@ -36,12 +37,12 @@ class RuntimeTests(unittest.TestCase):
 
     def test_server_import_has_no_runtime_side_effects(self):
         """Importing the server must not read secrets, open databases, or start threads."""
-        script = """
+        script = f"""
 from unittest.mock import patch
 with patch('sqlite3.connect', side_effect=AssertionError('database opened')):
     with patch('threading.Thread.start', side_effect=AssertionError('thread started')):
         with patch('socket.socket', side_effect=AssertionError('socket opened')):
-            import server
+            import {application_module("server")}
 """
         environment = {
             key: value for key, value in os.environ.items() if key != "DELETE_TOKEN"

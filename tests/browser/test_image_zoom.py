@@ -1,6 +1,7 @@
 import shutil
 import os
 from pathlib import Path
+from tests.support import asset_path
 from playwright.sync_api import sync_playwright
 
 src = Path(os.environ["REVIEW_SOURCE"])
@@ -13,7 +14,7 @@ with sync_playwright() as p:
     page.set_content(
         "<dialog id=\"zoom\"><button id=\"close\">Close</button><img alt=\"fixture\" src=\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='400'%3E%3Crect width='600' height='400' fill='green'/%3E%3C/svg%3E\"></dialog>"
     )
-    page.add_script_tag(content=(src / "image_zoom.js").read_text())
+    page.add_script_tag(content=asset_path(src, "image_zoom.js").read_text())
     page.evaluate('document.getElementById("zoom").showModal()')
     page.wait_for_function('document.querySelector("img").naturalWidth>0')
     viewport = page.locator(".zoom-viewport")
@@ -38,7 +39,7 @@ with sync_playwright() as p:
     )
     assert page.locator("img").get_attribute("data-zoom") == "1"
     for name in ["quality.html", "index.html", "coverage.html"]:
-        assert 'src="/image_zoom.js"' in (src / name).read_text()
+        assert 'src="/image_zoom.js"' in asset_path(src, name).read_text()
     b.close()
 print(
     "PASS wheel zoom in/out, 100–800% bounds, drag pan, reset, reopen reset, all three review pages wired."

@@ -18,7 +18,7 @@ class Settings:
     delete_token: str = field(repr=False)
     host: str = "0.0.0.0"
     port: int = 8080
-    static_root: ClassVar[Path] = Path(__file__).resolve().parent
+    static_root: ClassVar[Path] = Path(__file__).resolve().parents[1] / "web"
 
     @classmethod
     def from_environment(cls, environment=None):

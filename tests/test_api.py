@@ -5,7 +5,14 @@ import json
 import unittest
 from urllib.parse import quote
 
-from tests.support import IMAGE, INDEXES, MATRIX_NAME, SOURCE, running_server
+from tests.support import (
+    IMAGE,
+    INDEXES,
+    MATRIX_NAME,
+    SOURCE,
+    asset_path,
+    running_server,
+)
 
 
 class ApiTests(unittest.TestCase):
@@ -41,7 +48,7 @@ class ApiTests(unittest.TestCase):
             with self.subTest(path=path):
                 status, body, headers = self.client.request(path)
                 self.assertEqual(status, 200)
-                self.assertEqual(body, (SOURCE / filename).read_bytes())
+                self.assertEqual(body, asset_path(SOURCE, filename).read_bytes())
                 self.assertEqual(int(headers["Content-Length"]), len(body))
         status, rows, _ = self.client.request("/api/captures")
         self.assertEqual(status, 200)
