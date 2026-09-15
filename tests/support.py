@@ -1,0 +1,156 @@
+"""Disposable datasets and HTTP servers shared by regression tests."""
+
+import base64
+import csv
+import json
+import os
+import secrets
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from contextlib import contextmanager
+from pathlib import Path
+
+PROJECT = Path(__file__).resolve().parents[1]
+SOURCE = Path(os.environ.get("REVIEW_SOURCE", PROJECT)).resolve()
+sys.path.insert(0, str(SOURCE))
+MATRIX_NAME = "internal_colour_print_enhancement_2"
+INDEXES = ("index_annotation_.csv", "index_annotation_mykadfront.csv")
+IMAGE = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
+)
+
+
+def write_csv(path, rows, fields=None):
+    """Write fixture rows with deterministic CSV headers and line endings."""
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields or list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def dataset(root, count=5):
+    """Create synthetic captures, images, annotations, and dashboard definitions."""
+    folder = root / "genuine"
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for index in range(count):
+        uuid = f"capture-{index}"
+        row = dict(
+            uuid=uuid,
+            filename=f"{uuid}.jpg",
+            subject="fixture",
+            lighting="dark",
+            capture_device="iphone-13",
+            input_sensor="",
+            user="fixture-user",
+            ori_path=f"mykadfront/orig/{uuid}.jpg",
+            ocr_path=f"mykadfront/crop/{uuid}.png",
+            test_plan_name="colour_print_enhancement_2",
+            creation_time="2026-01-01T00:00:00Z",
+        )
+        rows.append(row)
+        for field in ("ori_path", "ocr_path"):
+            image = folder / row[field]
+            image.parent.mkdir(parents=True, exist_ok=True)
+            image.write_bytes(IMAGE)
+        annotation = folder / "mykadfront/datacollector_annotation" / f"{uuid}.json"
+        annotation.parent.mkdir(parents=True, exist_ok=True)
+        annotation.write_text(json.dumps({"lighting": "office-white", "uuid": uuid}))
+    write_csv(folder / INDEXES[0], rows)
+    write_csv(folder / INDEXES[1], [{k: r[k] for k in ("uuid", "ori_path", "ocr_path")} for r in rows])
+    write_csv(root / f"{MATRIX_NAME}.csv", [dict(
+        matrix_name=MATRIX_NAME, folder="genuine", lighting="dark", sdk="web",
+        device="iphone-13", expected_count_per_identity=str(count),
+    )])
+    write_csv(root / f"{MATRIX_NAME}_batches.csv", [dict(
+        batch_name="genuine", test_plan_name="colour_print_enhancement_2",
+        expected_lighting="dark;office-white;office-yellow",
+        expected_identities="fixture;another", expected_web_devices="iphone-13",
+    )])
+    return rows
+
+
+class Client:
+    """Send requests directly to an isolated test server without ambient proxies."""
+
+    def __init__(self, base, token, root, rows):
+        """Retain the fixture address and disposable authentication value."""
+        self.base, self.token, self.root, self.rows = base, token, root, rows
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def request(self, path, payload=None, token=None, raw=None, method=None, headers=None):
+        """Return status, decoded response, and headers for success or failure."""
+        data = json.dumps(payload).encode() if payload is not None else raw
+        request_headers = dict(headers or {})
+        if data is not None:
+            request_headers.setdefault("Content-Type", "application/json")
+            request_headers.setdefault("X-Delete-Token", self.token if token is None else token)
+        request = urllib.request.Request(self.base + path, data=data, headers=request_headers, method=method)
+        try:
+            response = self.opener.open(request, timeout=10)
+        except urllib.error.HTTPError as error:
+            response = error
+        with response:
+            body = response.read()
+            if response.headers.get_content_type() == "application/json":
+                body = json.loads(body)
+            return response.status, body, response.headers
+
+
+@contextmanager
+def running_server(source=SOURCE):
+    """Run either the original or current app against disposable data only."""
+    with tempfile.TemporaryDirectory(prefix="review-test-") as temporary:
+        root = Path(temporary)
+        rows = dataset(root)
+        token = secrets.token_hex(24)
+        pin = root / "pin"
+        pin.write_text(token)
+        pin.chmod(0o600)
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+        source_text = (source / "server.py").read_text()
+        # The original server has no settings or import guard; adapt only its paths and port.
+        legacy = "ThreadingHTTPServer(('0.0.0.0',8080)" in source_text
+        script = source / "server.py"
+        if legacy:
+            script = root / "legacy_server.py"
+            script.write_text(source_text.replace(
+                "'/run/secrets/delete_token'", repr(str(pin))
+            ).replace("'/logs/ingestion.jsonl'", repr(str(root / "ingestion.jsonl"))).replace(
+                "('0.0.0.0',8080)", repr(("127.0.0.1", port))
+            ).replace("/app/", str(source) + "/"))
+        environment = {
+            **os.environ, "DATA_ROOT": str(root), "INGESTION_DB": str(root / "history.sqlite"),
+            "INGESTION_LOG": str(root / "ingestion.jsonl"), "DELETE_TOKEN": token,
+            "HOST": "127.0.0.1", "PORT": str(port), "PYTHONPATH": str(source),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        }
+        process = subprocess.Popen([sys.executable, str(script)], cwd=source, env=environment,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        client = Client(f"http://127.0.0.1:{port}", token, root, rows)
+        try:
+            for attempt in range(100):
+                if process.poll() is not None:
+                    raise RuntimeError("Fixture server exited during startup")
+                try:
+                    if client.request("/health")[0] == 200:
+                        break
+                except OSError:
+                    time.sleep(0.05)
+            else:
+                raise RuntimeError("Fixture server did not become ready")
+            yield client
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
