@@ -37,3 +37,19 @@ These practices apply to the `datacollector-review-platform` repository.
 
 - Run checks appropriate to the change before committing, including relevant tests, linting, or builds where available.
 - Resolve failures caused by the change and report any checks that could not be run.
+
+## Code Quality
+
+- Keep code clean and concise, with descriptive names and small functions focused on one responsibility.
+- Add a clear, concise docstring or comment to every function explaining its purpose; explain non-obvious constraints without narrating each line.
+- Preserve existing behavior during refactoring. Add characterization tests for original functions before changing them, then run the same tests against the refactored implementation.
+- Use disposable fixtures for tests, especially edits and deletions. Tests must not modify the live dataset.
+- Before deploying a refactor, build and start its Docker image, verify behavior against the previous version, and preserve existing data and persistent volumes.
+
+## Secrets and Sensitive Information
+
+- Never expose passwords, PINs, tokens, credentials, or other sensitive information in source code, comments, tests, documentation, logs, commits, pull requests, or chat output.
+- Store local secrets in `.env`, restrict its permissions, and exclude it from Git and Docker build contexts.
+- Commit only `.env.example` with empty or clearly non-sensitive example values.
+- Inject secrets at runtime. Do not hardcode them, pass them as Docker build arguments, or copy them into images or image layers.
+- Use generated, disposable credentials in tests and check staged files and built images for accidental secret inclusion.
