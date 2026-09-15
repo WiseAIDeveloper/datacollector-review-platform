@@ -1,123 +1,114 @@
 # Datacollector Review Platform
 
-Review captures, compare identity coverage, correct metadata, and record quality decisions. The five pages share the same capture dataset and persistent ingestion history.
+Review capture images, check identity coverage, correct metadata, and track quality
+decisions from one shared dataset.
 
-- **Capture review:** filter and compare captures, then mark Keep, Remove, Correct metadata, or Undecided. Drafts stay in browser storage.
-- **Coverage dashboard:** compare each identity against the configured matrix and inspect missing or excess captures.
-- **Quality review:** mark captures as pass, error, or unreviewed and save the decisions to both annotation indexes.
-- **Ingestion logs:** inspect capture detections and recent edit/deletion actions. The worker scans every five seconds, independently of browser visits.
-- **Image search:** find a capture by UUID or filename and open its metadata editor.
+**First stable release: [v1.0.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0)**
+· Python + browser JavaScript · Docker Compose
 
-Reading the application requires no login. Writes require the runtime PIN and user confirmation. Executing a removal deletes matching CSV rows and image files; collection JSON and ingestion history remain. Metadata edits use an expected snapshot to reject stale changes.
+[Quick start](#quick-start) · [Features](#features) · [Versions](#versions)
+· [Development](docs/development.md) · [Deployment](docs/deployment.md)
 
-## Runtime configuration
+## Features
 
-Store deployment settings and credentials in a local `.env` file:
+| Page                   | What you can do                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| **Capture review**     | Filter and compare captures; draft Keep, Remove, Correct metadata, or Undecided decisions. |
+| **Coverage dashboard** | Compare identities against the collection matrix and inspect missing or excess captures.   |
+| **Quality review**     | Mark captures as pass, error, or unreviewed and save decisions to both annotation indexes. |
+| **Ingestion logs**     | Inspect newly detected captures and recent edit or deletion actions.                       |
+| **Image search**       | Find captures by UUID or filename and open their metadata editor.                          |
+
+Reading requires no login. Writes require the runtime PIN and confirmation.
+Review drafts stay in browser storage; saved decisions and ingestion history persist
+on the server. Metadata edits reject stale snapshots to prevent overwriting newer changes.
+
+> **Removing a capture deletes its matching CSV rows and image files.** Collection
+> JSON and ingestion history remain. Use disposable data when testing writes.
+
+## Quick start
+
+**You need:** Docker with Compose, an existing capture dataset, and a writable log
+directory. The application itself uses the Python standard library.
+
+### 1. Choose your source
+
+Use the current repository checkout for development. For the exact first stable
+version, create a separate checkout:
+
+```sh
+git fetch origin tag v1.0.0
+git worktree add --detach ../datacollector-review-platform-v1.0.0 v1.0.0
+cd ../datacollector-review-platform-v1.0.0
+```
+
+`main` can contain changes newer than the latest release. The [changelog](CHANGELOG.md)
+keeps those changes under **Unreleased**.
+
+### 2. Configure privately
+
+For a new checkout:
 
 ```sh
 cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` privately to set `DELETE_TOKEN`, `DATASET_PATH`, `LOGS_PATH`, and the desired bind address and port. For an existing deployment, preserve its current credential, paths, and port. Never paste credentials into source, documentation, logs, or pull requests.
+Edit `.env` locally. For an existing deployment, retain its `.env`, credential,
+paths, and port instead of replacing them.
 
-Compose reads `.env` and passes only `DELETE_TOKEN` into the container at runtime. Both Git and the Docker build context exclude `.env` and its variants. `.env.example` contains no credential. The image copies an explicit list of application files and receives no secrets during the build.
+| Setting               | Purpose                                               | Default              |
+| --------------------- | ----------------------------------------------------- | -------------------- |
+| `DELETE_TOKEN`        | Private PIN required for writes                       | Required; no default |
+| `DATASET_PATH`        | Absolute path to the capture dataset                  | Required             |
+| `LOGS_PATH`           | Absolute path to persistent review and ingestion logs | Required             |
+| `VIEWER_BIND_ADDRESS` | Host address exposed by Docker                        | `127.0.0.1`          |
+| `VIEWER_PORT`         | Host port for the web interface                       | `8769`               |
 
-The server also accepts `DATA_ROOT`, `INGESTION_DB`, `INGESTION_LOG`, `HOST`, and `PORT` when run directly. Docker uses `/data`, `/state/ingestion.sqlite`, `/logs/ingestion.jsonl`, and port 8080. Importing `server` starts no worker, opens no database, and requires no credential.
+The example paths must be replaced with real directories. `.env` is excluded from
+Git and Docker build contexts; credentials enter the container only at runtime.
 
-## Deploy
+### 3. Start and check
 
 ```sh
 docker compose config --quiet
 docker compose up -d --build --wait
 docker compose ps
-docker compose logs --tail 50
 ```
 
-Open the address configured by `VIEWER_BIND_ADDRESS` and `VIEWER_PORT`. `/health` returns `{"ok":true}` and is checked by Docker.
+With the default address, open **[http://127.0.0.1:8769](http://127.0.0.1:8769)**.
+Otherwise, use your configured host and port. `/health` returns `{"ok":true}` when
+the server is responding, and Docker checks it automatically.
 
-The Compose project remains `capture_viewer`, the container remains `idrecapture-viewer`, and ingestion history remains in `capture_viewer_ingestion_state`. Preserve that volume when deploying; `docker compose down -v` deletes it. The dataset and log directories use the paths in `.env`. The container retains a read-only root filesystem, drops Linux capabilities, and disallows privilege escalation.
+For upgrades, follow [deployment verification](docs/deployment.md#verify-a-deployment)
+before replacing the running image.
 
-Each unique batch/UUID/filename is recorded once after its CSV row and nonempty original image exist. Initial detections are `existing`; subsequent detections are `ingested`. Detection time is distinct from upload time. Deleted captures stay in history. API responses overlay current metadata while preserving the original detection records.
+## Versions
 
-## Development
+The working deployment is preserved as **v1.0.0**, with a Git tag and a matching
+Docker image tag on the deployment host. The source tag identifies the exact
+verified code; it does not include the dataset or private configuration.
 
-Follow [AGENTS.md](AGENTS.md): use a feature branch, commit each focused change with a concise message, document every function, and open a pull request for the user to review and decide whether to merge.
+- **What changed:** [Changelog](CHANGELOG.md)
+- **Release notes and source:** [GitHub Releases](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases)
+- **Version numbers, release checklist, and rollback:** [Release guide](docs/releases.md)
+- **First-release test and data comparison results:** [Validation report](docs/refactor-validation.md)
 
-| Module | Responsibility |
-| --- | --- |
-| `settings.py` | Validate runtime configuration and keep credentials out of representations. |
-| `capture_data.py` | Read captures, collection annotations, and coverage definitions. |
-| `server.py` | Handle HTTP requests and coordinate application startup and shutdown. |
-| `delete_capture.py` | Validate and remove selected CSV rows and images. |
-| `edit_capture.py` | Validate metadata edits and restore indexes after failed writes. |
-| `quality_reviews.py` | Persist quality decisions and synchronize annotation statuses. |
-| `ingestion.py` | Scan captures, retain history, and export action logs. |
+We use [Semantic Versioning](https://semver.org/spec/v2.0.0.html): `1.0.1` for a
+compatible fix, `1.1.0` for a compatible feature, and `2.0.0` for a breaking change.
+Each change gets a changelog entry; each release gets a version bump. `VERSION`
+tracks the latest release until the next release PR is prepared.
 
-The frontend keeps its existing standalone HTML and JavaScript architecture. Formatting and function comments preserve the original executable JavaScript, checked against its parsed syntax tree.
+## Contributing
 
-### Install test tools
+Start a feature branch, make focused commits with concise messages, document each
+function, and run the relevant checks. Open a pull request with a summary,
+verification results, and version impact. **The user reviews and decides whether
+to merge.**
 
-The application uses the Python standard library. Python 3.12 is used for development tooling; the Docker suite also verifies the app on its existing Python 3.10 runtime.
-
-```sh
-python -m pip install -r requirements-dev.txt
-python -m playwright install chromium
-npm ci
-```
-
-Browser tests use `CHROME_PATH` if set, otherwise an installed Google Chrome or Playwright Chromium.
-
-### Run checks
-
-```sh
-python -m unittest discover -s tests -t . -v
-python -m tests.run_browser
-python scripts/check_python.py
-npm run format:check
-npm run test:frontend
-```
-
-The Python suite exercises reads, searches, authentication, pagination, edits, deletions, conflicts, rollback, CSV byte preservation, ingestion, configuration, and worker lifecycle. The browser suite checks review workflows, filters, zoom, refresh, and desktop/mobile layouts.
-
-All tests use synthetic temporary datasets. Browser write requests are mocked. Tests never modify the live dataset or use its credential.
-
-### Verify against the original implementation
-
-```sh
-python scripts/test_original.py
-python scripts/test_original.py --browser
-```
-
-These commands export revision `808746d` into temporary storage and run the same compatibility scenarios against it. `--revision` selects another baseline. The original server requires a small test adapter for its hardcoded paths and port; its request and storage logic are unchanged.
-
-For visual comparisons, export the original revision to a temporary directory and run:
-
-```sh
-python -m tests.browser_parity /path/to/original-source
-```
-
-This compares all five pages at desktop and mobile widths using identical synthetic API responses. Only sparse one-level antialiasing differences are permitted. Screenshots are saved under ignored `artifacts/browser-parity/`.
-
-### Verify a Docker deployment
-
-Before replacing the running service, preserve its image with a rollback tag and take a snapshot:
-
-```sh
-python scripts/verify_deployment.py snapshot --container idrecapture-viewer --url http://configured-host:8769 --output artifacts/before.json
-```
-
-After building, check the image for credentials and secret files:
-
-```sh
-python scripts/audit_image.py capture_viewer-viewer
-```
-
-After deployment, take another snapshot and compare:
-
-```sh
-python scripts/verify_deployment.py snapshot --container idrecapture-viewer --url http://configured-host:8769 --output artifacts/after.json
-python scripts/verify_deployment.py compare artifacts/before.json artifacts/after.json
-```
-
-Snapshots contain hashes and counts, not credentials or raw capture metadata. Comparison checks API responses, image samples, the full ingestion/action database contents, log files, storage mounts, ports, and container restrictions. Concurrent legitimate dataset changes can produce differences; inspect them before attributing them to a deployment.
+| Guide                              | Covers                                                               |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| [Development](docs/development.md) | Architecture, test setup, and compatibility checks                   |
+| [Deployment](docs/deployment.md)   | Runtime settings, persistent storage, and safe upgrades              |
+| [Releases](docs/releases.md)       | Changelog entries, version bumps, tags, and rollback                 |
+| [AGENTS.md](AGENTS.md)             | Required development, review, release, and secret-handling practices |
