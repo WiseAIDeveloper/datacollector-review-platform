@@ -13,11 +13,23 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Grouped Python application code under `app/`, capture operations under
+  `app/captures/`, HTML under `web/pages/`, and shared assets under `web/static/`.
+  Docker and developer tools now follow the package layout; public web routes,
+  configuration variables, and stored data formats stay compatible.
+- Changed direct source entry points to `python -m app` for the server and
+  `python -m app.captures.deletion` for the deletion CLI. Existing CLI arguments
+  are unchanged; update any scripts that invoke the former root-level files.
 - Centralized configuration defaults and reused shared capture, deletion, and ingestion
   helpers (`65de613`). This cleanup is newer than the `v1.0.0` deployment.
 - Reorganized the README into a quick start, feature overview, and links to detailed
   development, deployment, and release instructions.
 - Required changelog updates and release version checks in `AGENTS.md`.
+
+### Fixed
+
+- Made the frozen-header browser test read from its disposable fixture server
+  instead of a hardcoded deployment address.
 
 ## [1.0.0] - 2026-09-15
 

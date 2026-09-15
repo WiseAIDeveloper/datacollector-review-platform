@@ -58,6 +58,15 @@ These practices apply to the `datacollector-review-platform` repository.
 - Use disposable fixtures for tests, especially edits and deletions. Tests must not modify the live dataset.
 - Before deploying a refactor, build and start its Docker image, verify behavior against the previous version, and preserve existing data and persistent volumes.
 
+## Project Structure
+
+- Keep application code in `app/`, with capture-specific catalog, editing, deletion, and quality logic in `app/captures/`. Group related responsibilities before adding new modules or packages.
+- Keep HTML pages in `web/pages/`, shared JavaScript in `web/static/js/`, and stylesheets in `web/static/css/`. Preserve public URLs when moving files unless a behavior change is explicitly requested.
+- Keep tests in `tests/`, browser scenarios in `tests/browser/`, developer and verification commands in `scripts/`, and detailed guides in `docs/`.
+- Reserve the repository root for project metadata, entry-point documentation, dependency manifests, and Docker configuration. Do not scatter application modules or web assets at the root.
+- Use package imports and `python -m app` to start the service. When moving code, update imports, Docker COPY rules and build exclusions, static routes, test source adapters, tooling, and documentation together.
+- Keep tests usable against historical release layouts, and verify both the packaged application and the original behavior with disposable fixtures.
+
 ## Secrets and Sensitive Information
 
 - Never expose passwords, PINs, tokens, credentials, or other sensitive information in source code, comments, tests, documentation, logs, commits, pull requests, or chat output.

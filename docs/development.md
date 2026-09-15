@@ -7,19 +7,43 @@ user to review and decide whether to merge. Add relevant changes to
 
 ## Architecture
 
-| Module               | Responsibility                                                              |
-| -------------------- | --------------------------------------------------------------------------- |
-| `settings.py`        | Validate runtime configuration and keep credentials out of representations. |
-| `capture_data.py`    | Read captures, collection annotations, and coverage definitions.            |
-| `server.py`          | Handle HTTP requests and coordinate application startup and shutdown.       |
-| `delete_capture.py`  | Validate and remove selected CSV rows and images.                           |
-| `edit_capture.py`    | Validate metadata edits and restore indexes after failed writes.            |
-| `quality_reviews.py` | Persist quality decisions and synchronize annotation statuses.              |
-| `ingestion.py`       | Scan captures, retain history, and export action logs.                      |
+| Module                                                  | Responsibility                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [app/settings.py](../app/settings.py)                   | Validate runtime configuration and keep credentials out of representations. |
+| [app/captures/catalog.py](../app/captures/catalog.py)   | Read captures, collection annotations, and coverage definitions.            |
+| [app/server.py](../app/server.py)                       | Handle HTTP requests and coordinate application startup and shutdown.       |
+| [app/captures/deletion.py](../app/captures/deletion.py) | Validate and remove selected CSV rows and images.                           |
+| [app/captures/editing.py](../app/captures/editing.py)   | Validate metadata edits and restore indexes after failed writes.            |
+| [app/captures/quality.py](../app/captures/quality.py)   | Persist quality decisions and synchronize annotation statuses.              |
+| [app/ingestion.py](../app/ingestion.py)                 | Scan captures, retain history, and export action logs.                      |
 
 The frontend uses standalone HTML, JavaScript, and CSS. The refactor preserved
 executable JavaScript behavior, checked against its parsed syntax tree. Importing
-`server` starts no worker, opens no database, and requires no credential.
+`app.server` starts no worker, opens no database, and requires no credential.
+
+HTML lives in `web/pages/`; shared assets live in `web/static/js/` and
+`web/static/css/`. `app.server.STATIC_FILES` maps the existing public URLs to these
+locations, keeping internal package files outside the public routes.
+
+### Entry points
+
+After exporting the runtime credential and paths documented in
+[deployment configuration](deployment.md#runtime-configuration), start the service
+from the repository root:
+
+```sh
+python -m app
+```
+
+Inspect the deletion CLI without modifying any captures:
+
+```sh
+python -m app.captures.deletion --help
+```
+
+These replace `python server.py` and `python delete_capture.py` in direct source
+invocations. The deletion arguments and application environment variables are
+unchanged. Docker uses the module entry point automatically.
 
 ## Install test tools
 
@@ -93,3 +117,6 @@ under ignored `artifacts/browser-parity/`.
 Use the [release checklist](releases.md#prepare-the-next-release) to choose a
 version, update release notes, and record the verified source and image. For
 application releases, also follow [deployment verification](deployment.md#verify-a-deployment).
+
+The [structure validation report](structure-validation.md) records checks for the
+current folder reorganization and its Docker candidate.

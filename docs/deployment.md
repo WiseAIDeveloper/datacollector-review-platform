@@ -1,6 +1,6 @@
 # Deployment
 
-Start with the [README quick start](../README.md#quick-start). Run the commands
+Start with the [README setup](../README.md#run-with-docker). Run the commands
 below from the repository root. For version selection and image rollback, see the
 [release guide](releases.md).
 

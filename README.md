@@ -1,114 +1,66 @@
 # Datacollector Review Platform
 
-Review capture images, check identity coverage, correct metadata, and track quality
-decisions from one shared dataset.
+A web app for reviewing capture images, correcting metadata, and tracking collection
+quality.
 
-**First stable release: [v1.0.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0)**
-· Python + browser JavaScript · Docker Compose
+## What it does
 
-[Quick start](#quick-start) · [Features](#features) · [Versions](#versions)
-· [Development](docs/development.md) · [Deployment](docs/deployment.md)
+- Browse, filter, and compare captures.
+- Check identity coverage and find missing captures.
+- Edit metadata, record quality decisions, or remove selected captures.
+- Search by image ID and view ingestion history.
 
-## Features
+Saving changes requires a PIN. Removing a capture deletes its image files and
+matching CSV rows.
 
-| Page                   | What you can do                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------ |
-| **Capture review**     | Filter and compare captures; draft Keep, Remove, Correct metadata, or Undecided decisions. |
-| **Coverage dashboard** | Compare identities against the collection matrix and inspect missing or excess captures.   |
-| **Quality review**     | Mark captures as pass, error, or unreviewed and save decisions to both annotation indexes. |
-| **Ingestion logs**     | Inspect newly detected captures and recent edit or deletion actions.                       |
-| **Image search**       | Find captures by UUID or filename and open their metadata editor.                          |
+## Run with Docker
 
-Reading requires no login. Writes require the runtime PIN and confirmation.
-Review drafts stay in browser storage; saved decisions and ingestion history persist
-on the server. Metadata edits reject stale snapshots to prevent overwriting newer changes.
+You need Docker Compose, a capture dataset, and a directory for logs.
 
-> **Removing a capture deletes its matching CSV rows and image files.** Collection
-> JSON and ingestion history remain. Use disposable data when testing writes.
-
-## Quick start
-
-**You need:** Docker with Compose, an existing capture dataset, and a writable log
-directory. The application itself uses the Python standard library.
-
-### 1. Choose your source
-
-Use the current repository checkout for development. For the exact first stable
-version, create a separate checkout:
-
-```sh
-git fetch origin tag v1.0.0
-git worktree add --detach ../datacollector-review-platform-v1.0.0 v1.0.0
-cd ../datacollector-review-platform-v1.0.0
-```
-
-`main` can contain changes newer than the latest release. The [changelog](CHANGELOG.md)
-keeps those changes under **Unreleased**.
-
-### 2. Configure privately
-
-For a new checkout:
+For a new setup, create your local configuration:
 
 ```sh
 cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` locally. For an existing deployment, retain its `.env`, credential,
-paths, and port instead of replacing them.
+Edit `.env` to set your private `DELETE_TOKEN`, `DATASET_PATH`, and `LOGS_PATH`.
+For an existing deployment, keep its current configuration and storage paths.
 
-| Setting               | Purpose                                               | Default              |
-| --------------------- | ----------------------------------------------------- | -------------------- |
-| `DELETE_TOKEN`        | Private PIN required for writes                       | Required; no default |
-| `DATASET_PATH`        | Absolute path to the capture dataset                  | Required             |
-| `LOGS_PATH`           | Absolute path to persistent review and ingestion logs | Required             |
-| `VIEWER_BIND_ADDRESS` | Host address exposed by Docker                        | `127.0.0.1`          |
-| `VIEWER_PORT`         | Host port for the web interface                       | `8769`               |
-
-The example paths must be replaced with real directories. `.env` is excluded from
-Git and Docker build contexts; credentials enter the container only at runtime.
-
-### 3. Start and check
+Start the app:
 
 ```sh
-docker compose config --quiet
 docker compose up -d --build --wait
-docker compose ps
 ```
 
-With the default address, open **[http://127.0.0.1:8769](http://127.0.0.1:8769)**.
-Otherwise, use your configured host and port. `/health` returns `{"ok":true}` when
-the server is responding, and Docker checks it automatically.
+Open [http://127.0.0.1:8769](http://127.0.0.1:8769), or the address and port set in
+`.env`. See the [deployment guide](docs/deployment.md) for upgrades and storage details.
 
-For upgrades, follow [deployment verification](docs/deployment.md#verify-a-deployment)
-before replacing the running image.
+## Project layout
+
+```text
+app/             Python application
+  captures/      Capture catalog, editing, deletion, and quality
+web/
+  pages/         HTML pages
+  static/js/     Shared JavaScript
+  static/css/    Shared styles
+tests/           Regression tests and browser checks
+scripts/         Development and verification tools
+docs/            Detailed guides
+```
 
 ## Versions
 
-The working deployment is preserved as **v1.0.0**, with a Git tag and a matching
-Docker image tag on the deployment host. The source tag identifies the exact
-verified code; it does not include the dataset or private configuration.
+[v1.0.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0)
+preserves the first verified working version. The folder layout above is part of
+the newer, unreleased changes.
 
-- **What changed:** [Changelog](CHANGELOG.md)
-- **Release notes and source:** [GitHub Releases](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases)
-- **Version numbers, release checklist, and rollback:** [Release guide](docs/releases.md)
-- **First-release test and data comparison results:** [Validation report](docs/refactor-validation.md)
+See the [changelog](CHANGELOG.md) for changes by version and the
+[release guide](docs/releases.md) for versioning and rollback.
 
-We use [Semantic Versioning](https://semver.org/spec/v2.0.0.html): `1.0.1` for a
-compatible fix, `1.1.0` for a compatible feature, and `2.0.0` for a breaking change.
-Each change gets a changelog entry; each release gets a version bump. `VERSION`
-tracks the latest release until the next release PR is prepared.
+## Development
 
-## Contributing
-
-Start a feature branch, make focused commits with concise messages, document each
-function, and run the relevant checks. Open a pull request with a summary,
-verification results, and version impact. **The user reviews and decides whether
-to merge.**
-
-| Guide                              | Covers                                                               |
-| ---------------------------------- | -------------------------------------------------------------------- |
-| [Development](docs/development.md) | Architecture, test setup, and compatibility checks                   |
-| [Deployment](docs/deployment.md)   | Runtime settings, persistent storage, and safe upgrades              |
-| [Releases](docs/releases.md)       | Changelog entries, version bumps, tags, and rollback                 |
-| [AGENTS.md](AGENTS.md)             | Required development, review, release, and secret-handling practices |
+See the [development guide](docs/development.md) for setup and tests, and
+[AGENTS.md](AGENTS.md) for contribution rules. Submit changes through a pull
+request for review.
