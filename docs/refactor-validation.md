@@ -9,7 +9,7 @@ Validated on 2026-09-15 against original source revision `808746d` and the previ
 | Original Python compatibility suite | 42 tests passed on the host and in the preserved original image. |
 | Refactored Python suite | 47 tests passed on the host and in the exact deployed image. |
 | Browser workflows | All 11 scripts passed against both original and refactored applications using disposable fixtures. |
-| Visual comparison | All five pages matched at 1440px and 390px; the final comparison had zero differing pixels. |
+| Visual comparison | All five pages matched at 1440px and 390px. Nine screenshots were identical; desktop coverage differed at 22 pixels by at most one RGB level, within the documented rasterization tolerance. |
 | JavaScript behavior | Parsed executable syntax matched the original in all seven script-bearing files. |
 | Formatting and function documentation | Python and frontend checks passed; a clean `npm ci` installation passed the documented frontend checks. |
 | Live deployment | Container became healthy after `docker compose up -d --build --wait`. |
@@ -21,7 +21,7 @@ Validated on 2026-09-15 against original source revision `808746d` and the previ
 
 Python tests cover the original deletion CLI, CSV byte preservation, metadata validation, optimistic conflicts, rollback, quality persistence across server restarts, ingestion recovery and history, HTTP validation, and the new configuration and lifecycle boundaries. Docker test runs used a read-only root, temporary files, no external network, and no production data mounts.
 
-The existing header browser test assumed an alignment the original CSS no longer provides. It now verifies that Execute stays inside the sticky header and remains visible on desktop and mobile. The separate visual comparison verifies the existing layout against the original. Visual checks permit only sparse, one-level rasterization rounding; no tolerance was needed in the final run.
+The existing header browser test assumed an alignment the original CSS no longer provides. It now verifies that Execute stays inside the sticky header and remains visible on desktop and mobile. The separate visual comparison verifies the existing layout against the original. Visual checks permit a difference of at most one RGB level in no more than 0.01% of pixels, accounting for Chrome's antialiasing rounding between page renders.
 
 ## Deployment details
 
