@@ -120,6 +120,11 @@ print(json.dumps(report))
 
 def compare(before, after):
     """Require identical service restrictions, data responses, and persisted review history."""
+    # Docker does not guarantee mount listing order; destinations define their meaning.
+    before = dict(
+        before, configuration=canonical_configuration(before["configuration"])
+    )
+    after = dict(after, configuration=canonical_configuration(after["configuration"]))
     differences = [
         key
         for key in ("configuration", "api", "capture_count", "persistent_state")
@@ -131,6 +136,14 @@ def compare(before, after):
         raise SystemExit("New deployment is not running and healthy")
     print(
         f"PASS deployment parity: {after['capture_count']} captures, {len(after['api'])} API comparisons, unchanged persistent history and container restrictions."
+    )
+
+
+def canonical_configuration(configuration):
+    """Compare mounts by destination while retaining their sources and access modes."""
+    return dict(
+        configuration,
+        mounts=sorted(configuration["mounts"], key=lambda mount: mount["Destination"]),
     )
 
 
