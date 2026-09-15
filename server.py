@@ -4,6 +4,7 @@ import hmac
 import json
 import logging
 import mimetypes
+import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -301,6 +302,12 @@ def create_server(settings):
 def main():
     """Start the configured service and close its worker and database on shutdown."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    def stop_service(signum, frame):
+        """Let Docker's termination signal run the normal resource cleanup path."""
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop_service)
     server = create_server(Settings.from_environment())
     try:
         server.application.ingestion.start()
