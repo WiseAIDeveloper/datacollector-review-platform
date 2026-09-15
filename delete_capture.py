@@ -10,9 +10,12 @@ import re
 import tempfile
 from pathlib import Path
 
+from capture_data import INDEX_NAME
+from settings import DEFAULT_DATA_ROOT
+
 SAFE_FOLDER = re.compile(r"[A-Za-z0-9_.-]+")
 IMAGES = {".jpg", ".jpeg", ".png", ".webp"}
-INDEXES = ("index_annotation_.csv", "index_annotation_mykadfront.csv")
+INDEXES = (INDEX_NAME, "index_annotation_mykadfront.csv")
 
 
 def remove_row(path, uuid, filename=None):
@@ -142,7 +145,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Delete one reviewed capture from both indexes and image storage."
     )
-    parser.add_argument("--root", default="/data")
+    parser.add_argument("--root", default=DEFAULT_DATA_ROOT)
     parser.add_argument("--folder", required=True)
     parser.add_argument("--uuid", required=True)
     parser.add_argument("--filename", required=True)

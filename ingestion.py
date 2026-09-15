@@ -10,7 +10,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from capture_data import EXCLUDED
+from capture_data import EXCLUDED, INDEX_NAME
 
 
 def now():
@@ -47,7 +47,7 @@ def read_stable_rows(path):
     if not {"uuid", "filename", "ori_path"}.issubset(reader.fieldnames or []):
         raise ValueError("Missing required CSV columns")
     rows = list(reader)
-    if any(None in row or any(v is None for v in row.values()) for row in rows):
+    if any(None in row or None in row.values() for row in rows):
         raise ValueError("Incomplete CSV row; retrying next scan")
     return rows
 
@@ -105,7 +105,7 @@ class IngestionLog:
                 self.status.update(last_scan=detected, scanning=False, errors=[str(e)])
                 return
             for folder in folders:
-                path = folder / "index_annotation_.csv"
+                path = folder / INDEX_NAME
                 if (
                     folder.name in EXCLUDED
                     or not path.is_file()

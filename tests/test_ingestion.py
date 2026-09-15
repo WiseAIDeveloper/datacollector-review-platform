@@ -1,5 +1,4 @@
 from tests import support  # Select the requested original or current source.
-import csv
 import tempfile
 import unittest
 from pathlib import Path
@@ -35,10 +34,7 @@ class IngestionTests(unittest.TestCase):
             )
             for n in names
         ]
-        with (folder / "index_annotation_.csv").open("w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=rows[0])
-            w.writeheader()
-            w.writerows(rows)
+        support.write_csv(folder / "index_annotation_.csv", rows)
         if images:
             (folder / "orig").mkdir(exist_ok=True)
             for n in names:

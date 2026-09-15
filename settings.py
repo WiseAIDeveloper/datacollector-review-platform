@@ -3,6 +3,9 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
+
+DEFAULT_DATA_ROOT = "/data"
 
 
 @dataclass(frozen=True)
@@ -15,7 +18,7 @@ class Settings:
     delete_token: str = field(repr=False)
     host: str = "0.0.0.0"
     port: int = 8080
-    static_root: Path = Path(__file__).resolve().parent
+    static_root: ClassVar[Path] = Path(__file__).resolve().parent
 
     @classmethod
     def from_environment(cls, environment=None):
@@ -28,7 +31,7 @@ class Settings:
         if not 0 <= port <= 65535:
             raise ValueError("PORT must be between 0 and 65535")
         return cls(
-            root=Path(environment.get("DATA_ROOT", "/data")).resolve(),
+            root=Path(environment.get("DATA_ROOT", DEFAULT_DATA_ROOT)).resolve(),
             database=Path(environment.get("INGESTION_DB", "/state/ingestion.sqlite")),
             log_path=Path(environment.get("INGESTION_LOG", "/logs/ingestion.jsonl")),
             delete_token=token,

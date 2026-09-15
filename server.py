@@ -9,7 +9,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from capture_data import batches, matrix, records
+from capture_data import annotation_path, batches, matrix, records
 from delete_capture import delete_capture
 from edit_capture import Conflict, edit_capture
 from ingestion import IngestionLog, with_current_metadata
@@ -30,6 +30,7 @@ STATIC_FILES = {
     "/frozen_panes.css": "frozen_panes.css",
 }
 WRITE_ROUTES = {"/api/apply-decisions", "/api/edit-capture", "/api/quality"}
+CONTENT_TYPES = {"html": "text/html", "js": "text/javascript", "css": "text/css"}
 
 
 class Application:
@@ -166,10 +167,7 @@ class Handler(BaseHTTPRequestHandler):
         """Resolve static pages, collection APIs, and individual capture resources."""
         if path in STATIC_FILES:
             filename = STATIC_FILES[path]
-            suffix = filename.rsplit(".", 1)[-1]
-            kind = {"html": "text/html", "js": "text/javascript", "css": "text/css"}[
-                suffix
-            ]
+            kind = CONTENT_TYPES[filename.rsplit(".", 1)[-1]]
             return self.send(
                 (self.app.settings.static_root / filename).read_bytes(),
                 kind + "; charset=utf-8",
@@ -243,11 +241,7 @@ class Handler(BaseHTTPRequestHandler):
         path = (
             folder / row["metadata"].get("ori_path", "")
             if route == "/api/image"
-            else (
-                folder
-                / "mykadfront/datacollector_annotation"
-                / (row["metadata"]["uuid"] + ".json")
-            )
+            else annotation_path(folder, row["metadata"]["uuid"])
         )
         path = path.resolve()
         if not path.is_relative_to(folder) or not path.is_file():

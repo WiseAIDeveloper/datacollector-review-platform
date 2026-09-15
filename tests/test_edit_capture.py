@@ -22,10 +22,10 @@ class EditTests(unittest.TestCase):
             capture_device="iphone-13",
         )
         for name in INDEXES:
-            with (self.folder / name).open("w", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=self.row)
-                w.writeheader()
-                w.writerows([self.row, dict(self.row, uuid="two", filename="two.jpg")])
+            support.write_csv(
+                self.folder / name,
+                [self.row, dict(self.row, uuid="two", filename="two.jpg")],
+            )
         (self.folder / "one.jpg").write_bytes(b"image")
         (self.folder / "one.json").write_text("{}")
 
@@ -53,10 +53,9 @@ class EditTests(unittest.TestCase):
     def test_secondary_index_without_filename(self):
         """Verify secondary index without filename."""
         fields = ["uuid", "ori_path", "ocr_path", "fraud_type", "batch_name"]
-        with (self.folder / INDEXES[1]).open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fields)
-            writer.writeheader()
-            writer.writerow(
+        support.write_csv(
+            self.folder / INDEXES[1],
+            [
                 dict(
                     uuid="one",
                     ori_path="mykadfront/orig/one.jpg",
@@ -64,7 +63,9 @@ class EditTests(unittest.TestCase):
                     fraud_type="recapture",
                     batch_name="genuine",
                 )
-            )
+            ],
+            fields=fields,
+        )
         edit_capture(
             self.root,
             "genuine",

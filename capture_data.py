@@ -3,16 +3,21 @@
 import ast
 import csv
 import json
-import os
 from pathlib import Path
 
 MATRIX_NAME = "internal_colour_print_enhancement_2"
+INDEX_NAME = "index_annotation_.csv"
 EXCLUDED = {"test", "webcam_genuine", "webcam_replay", "capture_viewer"}
+
+
+def annotation_path(folder, uuid):
+    """Locate a capture's collection annotation JSON within its dataset folder."""
+    return folder / "mykadfront/datacollector_annotation" / (uuid + ".json")
 
 
 def collection_annotation(folder, uuid):
     """Read collection metadata, treating missing or malformed JSON as empty."""
-    path = folder / "mykadfront/datacollector_annotation" / (uuid + ".json")
+    path = annotation_path(folder, uuid)
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -33,12 +38,12 @@ def capture_device(row):
     return "app", device
 
 
-def records(root=None):
+def records(root):
     """Return capture records in batch and CSV order with their original line numbers."""
-    root = Path(root or os.environ.get("DATA_ROOT", "/data")).resolve()
+    root = Path(root).resolve()
     result = []
     for folder in sorted(root.iterdir()):
-        path = folder / "index_annotation_.csv"
+        path = folder / INDEX_NAME
         if folder.name in EXCLUDED or not path.is_file():
             continue
         with path.open(newline="", encoding="utf-8-sig") as stream:
@@ -61,9 +66,9 @@ def records(root=None):
     return result
 
 
-def matrix(root=None):
+def matrix(root):
     """Read only matrix rows belonging to the platform's configured test plan."""
-    root = Path(root or os.environ.get("DATA_ROOT", "/data"))
+    root = Path(root)
     with (root / f"{MATRIX_NAME}.csv").open(newline="", encoding="utf-8-sig") as stream:
         return [
             row
@@ -72,9 +77,9 @@ def matrix(root=None):
         ]
 
 
-def batches(root=None):
+def batches(root):
     """Read batch definitions used for coverage and metadata choices."""
-    root = Path(root or os.environ.get("DATA_ROOT", "/data"))
+    root = Path(root)
     with (root / f"{MATRIX_NAME}_batches.csv").open(
         newline="", encoding="utf-8-sig"
     ) as stream:
