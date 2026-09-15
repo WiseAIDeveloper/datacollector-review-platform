@@ -62,16 +62,35 @@ def dataset(root, count=5):
         annotation.parent.mkdir(parents=True, exist_ok=True)
         annotation.write_text(json.dumps({"lighting": "office-white", "uuid": uuid}))
     write_csv(folder / INDEXES[0], rows)
-    write_csv(folder / INDEXES[1], [{k: r[k] for k in ("uuid", "ori_path", "ocr_path")} for r in rows])
-    write_csv(root / f"{MATRIX_NAME}.csv", [dict(
-        matrix_name=MATRIX_NAME, folder="genuine", lighting="dark", sdk="web",
-        device="iphone-13", expected_count_per_identity=str(count),
-    )])
-    write_csv(root / f"{MATRIX_NAME}_batches.csv", [dict(
-        batch_name="genuine", test_plan_name="colour_print_enhancement_2",
-        expected_lighting="dark;office-white;office-yellow",
-        expected_identities="fixture;another", expected_web_devices="iphone-13",
-    )])
+    write_csv(
+        folder / INDEXES[1],
+        [{k: r[k] for k in ("uuid", "ori_path", "ocr_path")} for r in rows],
+    )
+    write_csv(
+        root / f"{MATRIX_NAME}.csv",
+        [
+            dict(
+                matrix_name=MATRIX_NAME,
+                folder="genuine",
+                lighting="dark",
+                sdk="web",
+                device="iphone-13",
+                expected_count_per_identity=str(count),
+            )
+        ],
+    )
+    write_csv(
+        root / f"{MATRIX_NAME}_batches.csv",
+        [
+            dict(
+                batch_name="genuine",
+                test_plan_name="colour_print_enhancement_2",
+                expected_lighting="dark;office-white;office-yellow",
+                expected_identities="fixture;another",
+                expected_web_devices="iphone-13",
+            )
+        ],
+    )
     return rows
 
 
@@ -83,14 +102,20 @@ class Client:
         self.base, self.token, self.root, self.rows = base, token, root, rows
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def request(self, path, payload=None, token=None, raw=None, method=None, headers=None):
+    def request(
+        self, path, payload=None, token=None, raw=None, method=None, headers=None
+    ):
         """Return status, decoded response, and headers for success or failure."""
         data = json.dumps(payload).encode() if payload is not None else raw
         request_headers = dict(headers or {})
         if data is not None:
             request_headers.setdefault("Content-Type", "application/json")
-            request_headers.setdefault("X-Delete-Token", self.token if token is None else token)
-        request = urllib.request.Request(self.base + path, data=data, headers=request_headers, method=method)
+            request_headers.setdefault(
+                "X-Delete-Token", self.token if token is None else token
+            )
+        request = urllib.request.Request(
+            self.base + path, data=data, headers=request_headers, method=method
+        )
         try:
             response = self.opener.open(request, timeout=10)
         except urllib.error.HTTPError as error:
@@ -121,19 +146,30 @@ def running_server(source=SOURCE):
         script = source / "server.py"
         if legacy:
             script = root / "legacy_server.py"
-            script.write_text(source_text.replace(
-                "'/run/secrets/delete_token'", repr(str(pin))
-            ).replace("'/logs/ingestion.jsonl'", repr(str(root / "ingestion.jsonl"))).replace(
-                "('0.0.0.0',8080)", repr(("127.0.0.1", port))
-            ).replace("/app/", str(source) + "/"))
+            script.write_text(
+                source_text.replace("'/run/secrets/delete_token'", repr(str(pin)))
+                .replace("'/logs/ingestion.jsonl'", repr(str(root / "ingestion.jsonl")))
+                .replace("('0.0.0.0',8080)", repr(("127.0.0.1", port)))
+                .replace("/app/", str(source) + "/")
+            )
         environment = {
-            **os.environ, "DATA_ROOT": str(root), "INGESTION_DB": str(root / "history.sqlite"),
-            "INGESTION_LOG": str(root / "ingestion.jsonl"), "DELETE_TOKEN": token,
-            "HOST": "127.0.0.1", "PORT": str(port), "PYTHONPATH": str(source),
+            **os.environ,
+            "DATA_ROOT": str(root),
+            "INGESTION_DB": str(root / "history.sqlite"),
+            "INGESTION_LOG": str(root / "ingestion.jsonl"),
+            "DELETE_TOKEN": token,
+            "HOST": "127.0.0.1",
+            "PORT": str(port),
+            "PYTHONPATH": str(source),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
-        process = subprocess.Popen([sys.executable, str(script)], cwd=source, env=environment,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        process = subprocess.Popen(
+            [sys.executable, str(script)],
+            cwd=source,
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         client = Client(f"http://127.0.0.1:{port}", token, root, rows)
         try:
             for attempt in range(100):

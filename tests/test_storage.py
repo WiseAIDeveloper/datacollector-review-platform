@@ -29,9 +29,14 @@ class StorageTests(unittest.TestCase):
 
     def edit(self, changes, expected=None):
         """Edit the first capture with its original optimistic-lock snapshot."""
-        return edit_capture.edit_capture(self.root, "genuine", self.row["uuid"],
-                                         self.row["filename"], changes,
-                                         self.row if expected is None else expected)
+        return edit_capture.edit_capture(
+            self.root,
+            "genuine",
+            self.row["uuid"],
+            self.row["filename"],
+            changes,
+            self.row if expected is None else expected,
+        )
 
     def test_remove_row_preserves_bom_multiline_and_other_bytes(self):
         """Remove exactly one CSV record without rewriting retained records."""
@@ -40,7 +45,9 @@ class StorageTests(unittest.TestCase):
         path.write_bytes(original)
         before, after, row = delete_capture.remove_row(path, "one", "one.jpg")
         self.assertEqual(before, original)
-        self.assertEqual(after, b'\xef\xbb\xbfuuid,filename,note\r\ntwo,two.jpg,untouched\r\n')
+        self.assertEqual(
+            after, b"\xef\xbb\xbfuuid,filename,note\r\ntwo,two.jpg,untouched\r\n"
+        )
         self.assertEqual(row["note"], "two\r\nlines")
         self.assertEqual(path.read_bytes(), original)
 
@@ -62,7 +69,9 @@ class StorageTests(unittest.TestCase):
         path = self.root / "atomic.txt"
         delete_capture.atomic_write(path, b"before", 0o640)
         self.assertEqual(path.stat().st_mode & 0o777, 0o640)
-        with patch.object(delete_capture.os, "replace", side_effect=OSError("fixture failure")):
+        with patch.object(
+            delete_capture.os, "replace", side_effect=OSError("fixture failure")
+        ):
             with self.assertRaises(OSError):
                 delete_capture.atomic_write(path, b"after", 0o600)
         self.assertEqual(path.read_bytes(), b"before")
@@ -70,29 +79,51 @@ class StorageTests(unittest.TestCase):
 
     def test_delete_removes_both_rows_and_images_only(self):
         """Delete selected images and index rows while preserving other captures and JSON."""
-        result = delete_capture.delete_capture(self.root, "genuine", self.row["uuid"], self.row["filename"])
+        result = delete_capture.delete_capture(
+            self.root, "genuine", self.row["uuid"], self.row["filename"]
+        )
         self.assertEqual(result["removed_from"], list(INDEXES))
         self.assertEqual(len(result["deleted_images"]), 2)
-        self.assertEqual((result["json_preserved"], result["backup_created"]), (True, False))
+        self.assertEqual(
+            (result["json_preserved"], result["backup_created"]), (True, False)
+        )
         for name in INDEXES:
             with (self.folder / name).open() as stream:
-                self.assertEqual([r["uuid"] for r in csv.DictReader(stream)], [self.rows[1]["uuid"]])
+                self.assertEqual(
+                    [r["uuid"] for r in csv.DictReader(stream)], [self.rows[1]["uuid"]]
+                )
         self.assertTrue((self.folder / self.rows[1]["ori_path"]).exists())
-        self.assertTrue((self.folder / "mykadfront/datacollector_annotation" / f"{self.row['uuid']}.json").exists())
+        self.assertTrue(
+            (
+                self.folder
+                / "mykadfront/datacollector_annotation"
+                / f"{self.row['uuid']}.json"
+            ).exists()
+        )
 
     def test_delete_validation_does_not_modify_indexes(self):
         """Reject invalid folders, filenames, and outside-image paths before deletion."""
         before = (self.folder / INDEXES[0]).read_bytes()
-        for folder, uuid, filename in [("../genuine", "x", "x.jpg"), ("missing", "x", "x.jpg"),
-                                       ("genuine", self.row["uuid"], "different.jpg")]:
+        for folder, uuid, filename in [
+            ("../genuine", "x", "x.jpg"),
+            ("missing", "x", "x.jpg"),
+            ("genuine", self.row["uuid"], "different.jpg"),
+        ]:
             with self.assertRaises(ValueError):
                 delete_capture.delete_capture(self.root, folder, uuid, filename)
         self.assertEqual((self.folder / INDEXES[0]).read_bytes(), before)
 
     def test_edit_validates_fields_values_and_conflicts(self):
         """Reject invalid values, protected columns, and stale metadata snapshots."""
-        for changes in ({}, [], {"ori_path": "outside"}, {"lighting": "invalid"},
-                        {"subject": " "}, {"user": 12}, {"user": "x" * 4097}):
+        for changes in (
+            {},
+            [],
+            {"ori_path": "outside"},
+            {"lighting": "invalid"},
+            {"subject": " "},
+            {"user": 12},
+            {"user": "x" * 4097},
+        ):
             with self.subTest(changes_type=type(changes).__name__):
                 with self.assertRaises(ValueError):
                     self.edit(changes)
@@ -102,8 +133,12 @@ class StorageTests(unittest.TestCase):
     def test_edit_updates_secondary_schema_and_preserves_unrelated_files(self):
         """Add edited columns to the secondary index while keeping images unchanged."""
         before = (self.folder / self.row["ori_path"]).read_bytes()
-        self.assertEqual(self.edit({"lighting": "office-white"}),
-                         dict(updated=True, changes={"lighting": "office-white"}, json_preserved=True))
+        self.assertEqual(
+            self.edit({"lighting": "office-white"}),
+            dict(
+                updated=True, changes={"lighting": "office-white"}, json_preserved=True
+            ),
+        )
         for name in INDEXES:
             with (self.folder / name).open() as stream:
                 rows = list(csv.DictReader(stream))
@@ -126,12 +161,18 @@ class StorageTests(unittest.TestCase):
         with patch.object(edit_capture, "atomic_write", side_effect=fail_second):
             with self.assertRaises(OSError):
                 self.edit({"lighting": "office-white"})
-        self.assertEqual({name: (self.folder / name).read_bytes() for name in INDEXES}, original)
+        self.assertEqual(
+            {name: (self.folder / name).read_bytes() for name in INDEXES}, original
+        )
 
     def test_quality_failure_restores_indexes(self):
         """Restore annotation bytes if persisting the quality review fails."""
         path = self.root / "reviews.json"
-        row = dict(key=f"genuine/{self.row['uuid']}/{self.row['filename']}", folder="genuine", metadata=self.row)
+        row = dict(
+            key=f"genuine/{self.row['uuid']}/{self.row['filename']}",
+            folder="genuine",
+            metadata=self.row,
+        )
         original = {name: (self.folder / name).read_bytes() for name in INDEXES}
         self.assertEqual(quality_reviews.read_reviews(path), {})
         write = quality_reviews.atomic_write
@@ -145,14 +186,18 @@ class StorageTests(unittest.TestCase):
         with patch.object(quality_reviews, "atomic_write", side_effect=fail_review):
             with self.assertRaises(OSError):
                 quality_reviews.save_review(path, row, "pass", "", None, self.root)
-        self.assertEqual({name: (self.folder / name).read_bytes() for name in INDEXES}, original)
+        self.assertEqual(
+            {name: (self.folder / name).read_bytes() for name in INDEXES}, original
+        )
 
     def test_quality_notes_validation(self):
         """Reject oversized or non-text quality notes."""
         row = dict(key="fixture", folder="genuine", metadata=self.row)
         for notes in (None, "x" * 4097):
             with self.assertRaises(ValueError):
-                quality_reviews.save_review(self.root / "reviews.json", row, "pass", notes, None, self.root)
+                quality_reviews.save_review(
+                    self.root / "reviews.json", row, "pass", notes, None, self.root
+                )
 
 
 class IngestionEdgeTests(unittest.TestCase):
@@ -169,22 +214,29 @@ class IngestionEdgeTests(unittest.TestCase):
 
     def test_device_info_fallbacks_and_timestamp(self):
         """Preserve device fallbacks and timezone-aware UTC timestamps."""
-        for row, expected in [({}, ("app", "unknown")), ({"input_sensor": "{}"}, ("app", "unknown")),
-                              ({"input_sensor": "['value']"}, ("app", "['value']")),
-                              ({"capture_device": " device "}, ("web", "device")),
-                              ({"input_sensor": "{'model': 123}"}, ("app", "123"))]:
+        for row, expected in [
+            ({}, ("app", "unknown")),
+            ({"input_sensor": "{}"}, ("app", "unknown")),
+            ({"input_sensor": "['value']"}, ("app", "['value']")),
+            ({"capture_device": " device "}, ("web", "device")),
+            ({"input_sensor": "{'model': 123}"}, ("app", "123")),
+        ]:
             self.assertEqual(ingestion.device_info(row), expected)
         self.assertTrue(ingestion.now().endswith("+00:00"))
 
     def test_export_actions_retry_after_write_failure(self):
         """Keep committed audit events and export them on a later successful scan."""
-        with patch.object(self.log, "export_actions", side_effect=OSError("fixture failure")):
+        with patch.object(
+            self.log, "export_actions", side_effect=OSError("fixture failure")
+        ):
             self.log.record_action("deleted", "genuine", "capture-0", "capture-0.jpg")
         self.assertTrue(self.log.actions_pending)
         self.assertEqual(self.log.snapshot()["action_total"], 1)
         self.log.scan()
         self.assertFalse(self.log.actions_pending)
-        self.assertEqual(json.loads((self.root / "actions.jsonl").read_text())["action"], "deleted")
+        self.assertEqual(
+            json.loads((self.root / "actions.jsonl").read_text())["action"], "deleted"
+        )
         with self.assertRaises(ValueError):
             self.log.record_action("invalid", "genuine", "capture-0", "capture-0.jpg")
 
@@ -193,7 +245,10 @@ class IngestionEdgeTests(unittest.TestCase):
         image = self.root / "genuine/mykadfront/orig/capture-0.jpg"
         image.write_bytes(b"")
         self.log.scan()
-        self.assertEqual((self.log.snapshot()["total"], self.log.snapshot()["pending_images"]), (1, 1))
+        self.assertEqual(
+            (self.log.snapshot()["total"], self.log.snapshot()["pending_images"]),
+            (1, 1),
+        )
         image.unlink()
         outside = self.root / "outside.jpg"
         outside.write_bytes(b"fixture")
