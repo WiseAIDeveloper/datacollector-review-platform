@@ -3,8 +3,8 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from delete_capture import INDEXES, atomic_write
-from edit_capture import Conflict, edit_capture
+from .deletion import INDEXES, atomic_write
+from .editing import Conflict, edit_capture
 
 
 def read_reviews(path):

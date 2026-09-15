@@ -4,8 +4,8 @@ import csv
 import io
 from pathlib import Path
 
-from capture_data import EXCLUDED
-from delete_capture import INDEXES, SAFE_FOLDER, atomic_write
+from .catalog import EXCLUDED
+from .deletion import INDEXES, SAFE_FOLDER, atomic_write
 
 FIELDS = {"subject", "lighting", "capture_device", "input_sensor", "user"}
 LIGHTING = {"dark", "office-white", "office-yellow"}

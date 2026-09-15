@@ -1,12 +1,13 @@
 import shutil
 import os
 from pathlib import Path
+from tests.support import asset_path
 import json
 import urllib.request
 from playwright.sync_api import sync_playwright
 
 src = Path(os.environ["REVIEW_SOURCE"])
-base = "http://10.1.1.49:8769"
+base = os.environ["VIEWER_URL"]
 data = {
     key: json.load(urllib.request.urlopen(base + "/api/" + key))
     for key in ["captures", "matrix", "batches", "quality", "ingestion?limit=100"]
@@ -30,7 +31,7 @@ with sync_playwright() as p:
             r.fulfill(json=data.get(key, {}))
             return
         name = "index.html" if u.path == "/" else u.path[1:]
-        path = src / name
+        path = asset_path(src, name)
         if path.is_file():
             r.fulfill(
                 body=path.read_text(),

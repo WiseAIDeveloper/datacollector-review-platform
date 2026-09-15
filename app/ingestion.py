@@ -10,7 +10,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from capture_data import EXCLUDED, INDEX_NAME
+from .captures.catalog import EXCLUDED, INDEX_NAME
 
 
 def now():

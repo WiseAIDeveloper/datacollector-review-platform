@@ -106,8 +106,8 @@ db.close()
 report['logs'] = {name: hashlib.sha256((Path('/logs') / name).read_bytes()).hexdigest()
                   for name in ('ingestion.jsonl', 'actions.jsonl', 'quality_reviews.json')
                   if (Path('/logs') / name).is_file()}
-report['source'] = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-                    for path in Path('/app').iterdir() if path.suffix in ('.py', '.html', '.css', '.js')}
+report['source'] = {str(path.relative_to('/app')): hashlib.sha256(path.read_bytes()).hexdigest()
+                    for path in Path('/app').rglob('*') if path.suffix in ('.py', '.html', '.css', '.js')}
 print(json.dumps(report))
 """
     state = json.loads(

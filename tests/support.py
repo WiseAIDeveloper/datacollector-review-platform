@@ -2,6 +2,7 @@
 
 import base64
 import csv
+import importlib
 import json
 import os
 import secrets
@@ -18,11 +19,47 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[1]
 SOURCE = Path(os.environ.get("REVIEW_SOURCE", PROJECT)).resolve()
 sys.path.insert(0, str(SOURCE))
+MODULES = {
+    "server": "app.server",
+    "settings": "app.settings",
+    "capture_data": "app.captures.catalog",
+    "delete_capture": "app.captures.deletion",
+    "edit_capture": "app.captures.editing",
+    "quality_reviews": "app.captures.quality",
+    "ingestion": "app.ingestion",
+}
 MATRIX_NAME = "internal_colour_print_enhancement_2"
 INDEXES = ("index_annotation_.csv", "index_annotation_mykadfront.csv")
 IMAGE = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
 )
+
+
+def application_module(name, source=SOURCE):
+    """Resolve the module name for either a packaged or historical flat checkout."""
+    return MODULES[name] if (source / "app").is_dir() else name
+
+
+def load_application(name):
+    """Import the selected implementation so compatibility tests share assertions."""
+    return importlib.import_module(application_module(name))
+
+
+def application_command(name, source=SOURCE):
+    """Launch the packaged entry point or the equivalent historical script."""
+    if (source / "app").is_dir():
+        module = "app" if name == "server" else MODULES[name]
+        return [sys.executable, "-m", module]
+    return [sys.executable, str(source / (name + ".py"))]
+
+
+def asset_path(source, filename):
+    """Locate a public asset without changing its browser URL across source layouts."""
+    if not (source / "web").is_dir():
+        return source / filename
+    suffix = Path(filename).suffix
+    directory = "pages" if suffix == ".html" else "static/" + suffix.lstrip(".")
+    return source / "web" / directory / filename
 
 
 def write_csv(path, rows, fields=None):
@@ -189,10 +226,13 @@ def running_server(source=SOURCE):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
-        source_text = (source / "server.py").read_text()
+        server_path = source / (
+            application_module("server", source).replace(".", "/") + ".py"
+        )
+        source_text = server_path.read_text()
         # The original server has no settings or import guard; adapt only its paths and port.
         legacy = "ThreadingHTTPServer(('0.0.0.0',8080)" in source_text
-        script = source / "server.py"
+        command = application_command("server", source)
         if legacy:
             script = root / "legacy_server.py"
             script.write_text(
@@ -201,6 +241,7 @@ def running_server(source=SOURCE):
                 .replace("('0.0.0.0',8080)", repr(("127.0.0.1", port)))
                 .replace("/app/", str(source) + "/")
             )
+            command = [sys.executable, str(script)]
         environment = {
             **os.environ,
             "DATA_ROOT": str(root),
@@ -217,7 +258,7 @@ def running_server(source=SOURCE):
             token,
             root,
             rows,
-            [sys.executable, str(script)],
+            command,
             source,
             environment,
         )

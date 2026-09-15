@@ -8,13 +8,20 @@ import types
 import unittest
 from pathlib import Path
 
-from tests.support import INDEXES, MATRIX_NAME, SOURCE, dataset, write_csv
+from tests.support import (
+    INDEXES,
+    MATRIX_NAME,
+    SOURCE,
+    dataset,
+    load_application,
+    write_csv,
+)
 
 
 def catalog_for(root):
     """Load original reader functions without running the old server's startup code."""
-    if (SOURCE / "capture_data.py").exists():
-        import capture_data
+    if (SOURCE / "app").is_dir() or (SOURCE / "capture_data.py").exists():
+        capture_data = load_application("capture_data")
 
         return types.SimpleNamespace(
             records=lambda: capture_data.records(root),

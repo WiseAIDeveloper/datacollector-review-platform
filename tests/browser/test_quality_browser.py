@@ -5,6 +5,7 @@ import os
 
 
 from pathlib import Path
+from tests.support import asset_path
 from playwright.sync_api import sync_playwright, expect
 
 src = Path(os.environ["REVIEW_SOURCE"])
@@ -43,13 +44,13 @@ with sync_playwright() as p:
     page.route(
         "**/terminal.css",
         lambda r: r.fulfill(
-            body=(src / "terminal.css").read_text(), content_type="text/css"
+            body=asset_path(src, "terminal.css").read_text(), content_type="text/css"
         ),
     )
     page.route(
         "**/quality.html*",
         lambda r: r.fulfill(
-            body=(src / "quality.html").read_text(), content_type="text/html"
+            body=asset_path(src, "quality.html").read_text(), content_type="text/html"
         ),
     )
     page.route("**/api/captures", lambda r: r.fulfill(json=rows))

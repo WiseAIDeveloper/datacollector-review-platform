@@ -3,8 +3,10 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
-from edit_capture import edit_capture, Conflict
-from delete_capture import INDEXES
+
+edit_capture = support.load_application("edit_capture").edit_capture
+Conflict = support.load_application("edit_capture").Conflict
+INDEXES = support.INDEXES
 
 
 class EditTests(unittest.TestCase):

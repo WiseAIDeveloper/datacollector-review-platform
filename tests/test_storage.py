@@ -3,17 +3,23 @@
 import csv
 import json
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import INDEXES, SOURCE, dataset
-import delete_capture
-import edit_capture
-import ingestion
-import quality_reviews
+from tests.support import (
+    INDEXES,
+    SOURCE,
+    application_command,
+    dataset,
+    load_application,
+)
+
+delete_capture = load_application("delete_capture")
+edit_capture = load_application("edit_capture")
+ingestion = load_application("ingestion")
+quality_reviews = load_application("quality_reviews")
 
 
 class StorageTests(unittest.TestCase):
@@ -106,8 +112,7 @@ class StorageTests(unittest.TestCase):
         """Delete a synthetic capture through the original command-line interface."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(SOURCE / "delete_capture.py"),
+                *application_command("delete_capture"),
                 "--root",
                 str(self.root),
                 "--folder",
@@ -117,6 +122,7 @@ class StorageTests(unittest.TestCase):
                 "--filename",
                 self.row["filename"],
             ],
+            cwd=SOURCE,
             capture_output=True,
             text=True,
             timeout=10,

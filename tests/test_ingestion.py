@@ -2,7 +2,8 @@ from tests import support  # Select the requested original or current source.
 import tempfile
 import unittest
 from pathlib import Path
-from ingestion import IngestionLog
+
+IngestionLog = support.load_application("ingestion").IngestionLog
 
 
 class IngestionTests(unittest.TestCase):
@@ -127,7 +128,9 @@ class IngestionTests(unittest.TestCase):
 
     def test_current_metadata_overlay_preserves_history(self):
         """Verify current metadata overlay preserves history."""
-        from ingestion import with_current_metadata
+        with_current_metadata = support.load_application(
+            "ingestion"
+        ).with_current_metadata
 
         self.write_batch(["one"])
         self.log.scan()
@@ -190,7 +193,7 @@ class IngestionTests(unittest.TestCase):
 
     def test_app_sensor(self):
         """Verify app sensor."""
-        from ingestion import device_info
+        device_info = support.load_application("ingestion").device_info
 
         self.assertEqual(
             device_info({"input_sensor": "{'model':'JNY-LX2'}"}), ("app", "JNY-LX2")

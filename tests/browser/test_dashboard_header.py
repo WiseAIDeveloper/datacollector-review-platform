@@ -1,6 +1,7 @@
 import shutil
 import os
 from pathlib import Path
+from tests.support import asset_path
 import json
 import urllib.request
 from playwright.sync_api import sync_playwright, expect
@@ -22,19 +23,20 @@ with sync_playwright() as p:
     page.route(
         "**/image_zoom.js",
         lambda r: r.fulfill(
-            body=(src / "image_zoom.js").read_text(), content_type="text/javascript"
+            body=asset_path(src, "image_zoom.js").read_text(),
+            content_type="text/javascript",
         ),
     )
     page.route(
         "**/coverage.html",
         lambda r: r.fulfill(
-            body=(src / "coverage.html").read_text(), content_type="text/html"
+            body=asset_path(src, "coverage.html").read_text(), content_type="text/html"
         ),
     )
     page.route(
         "**/terminal.css",
         lambda r: r.fulfill(
-            body=(src / "terminal.css").read_text(), content_type="text/css"
+            body=asset_path(src, "terminal.css").read_text(), content_type="text/css"
         ),
     )
     for width in [1440, 390]:

@@ -9,25 +9,25 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from capture_data import annotation_path, batches, matrix, records
-from delete_capture import delete_capture
-from edit_capture import Conflict, edit_capture
-from ingestion import IngestionLog, with_current_metadata
-from quality_reviews import read_reviews, save_review
-from settings import Settings
+from .captures.catalog import annotation_path, batches, matrix, records
+from .captures.deletion import delete_capture
+from .captures.editing import Conflict, edit_capture
+from .ingestion import IngestionLog, with_current_metadata
+from .captures.quality import read_reviews, save_review
+from .settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_BYTES = 1024 * 1024
 STATIC_FILES = {
-    "/": "index.html",
-    "/coverage.html": "coverage.html",
-    "/quality.html": "quality.html",
-    "/search.html": "search.html",
-    "/ingestion.html": "ingestion.html",
-    "/capture_review.js": "capture_review.js",
-    "/image_zoom.js": "image_zoom.js",
-    "/terminal.css": "terminal.css",
-    "/frozen_panes.css": "frozen_panes.css",
+    "/": "pages/index.html",
+    "/coverage.html": "pages/coverage.html",
+    "/quality.html": "pages/quality.html",
+    "/search.html": "pages/search.html",
+    "/ingestion.html": "pages/ingestion.html",
+    "/capture_review.js": "static/js/capture_review.js",
+    "/image_zoom.js": "static/js/image_zoom.js",
+    "/terminal.css": "static/css/terminal.css",
+    "/frozen_panes.css": "static/css/frozen_panes.css",
 }
 WRITE_ROUTES = {"/api/apply-decisions", "/api/edit-capture", "/api/quality"}
 CONTENT_TYPES = {"html": "text/html", "js": "text/javascript", "css": "text/css"}

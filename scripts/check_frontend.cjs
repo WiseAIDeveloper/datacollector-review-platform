@@ -1,10 +1,16 @@
 /* Verify that frontend cleanup preserves the original JavaScript behavior. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
 const revision = process.argv[2] || "808746d";
+const revisionFiles = new Set(
+  execFileSync("git", ["ls-tree", "-r", "--name-only", revision], {
+    encoding: "utf8",
+  }).split("\n"),
+);
 const files = [
   "capture_review.js",
   "image_zoom.js",
@@ -58,10 +64,17 @@ function scripts(source, filename) {
 }
 
 for (const filename of files) {
-  const original = execFileSync("git", ["show", `${revision}:${filename}`], {
-    encoding: "utf8",
-  });
-  const current = fs.readFileSync(filename, "utf8");
+  const directory = filename.endsWith(".html") ? "pages" : "static/js";
+  const currentPath = path.join("web", directory, filename);
+  const originalPath = revisionFiles.has(currentPath) ? currentPath : filename;
+  const original = execFileSync(
+    "git",
+    ["show", `${revision}:${originalPath}`],
+    {
+      encoding: "utf8",
+    },
+  );
+  const current = fs.readFileSync(currentPath, "utf8");
   const before = scripts(original, filename).map(
     /* Parse the original scripts into comparable syntax trees. */
     (script) => normalize(parser.parse(script)),
