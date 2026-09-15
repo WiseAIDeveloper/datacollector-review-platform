@@ -1,8 +1,349 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Image search</title><style>
-*{box-sizing:border-box}body{margin:0;padding-left:185px;background:#080a0c;color:#c4cbd2;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.app-sidebar{position:fixed;inset:0 auto 0 0;width:185px;padding:16px 10px;background:#101316;border-right:1px solid #272c31}.app-sidebar strong{display:block;margin:0 8px 18px;font-size:13px;color:#f0f3f5}.app-sidebar a{display:block;padding:8px;margin:3px 0;color:#a8b2bc;text-decoration:none}.app-sidebar a[aria-current],.app-sidebar a:hover{background:#222930;color:#96e6b3}main{padding:16px;max-width:1900px;margin:auto}h1{font-size:16px;margin:0 0 8px;color:#96e6b3}h1:before{content:'> '}p{color:#8d98a3;margin:6px 0}.toolbar,.stats{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0}.stats div{display:flex;gap:5px}.stats b{font-size:12px;color:#e6edf3}button{font:inherit;padding:3px 8px;border:1px solid #36404a;border-radius:3px;background:#151a20;color:#c4cbd2;cursor:pointer}button:disabled{opacity:.4;cursor:default}.table-wrap{overflow:auto;border-top:1px solid #272c31}table{border-collapse:collapse;width:100%;font:inherit}th,td{text-align:left;padding:3px 9px;border-bottom:1px solid #15191d;white-space:nowrap}th{color:#8b9aaa;font-weight:normal;background:#101316}td:first-child{color:#96e6b3}tr:hover{background:#141a20}#error{color:#ff8d8d;white-space:pre-wrap}#error:empty{display:none}#status{color:#7d8994}a{color:#96e6b3}@media(max-width:800px){body{padding-left:0}.app-sidebar{position:static;width:100%;display:flex;flex-wrap:wrap;align-items:center;padding:8px;gap:6px}.app-sidebar strong{margin:0 8px 0 0}.app-sidebar a{margin:0;padding:5px}main{padding:10px}}
-dialog{background:#101316;color:#c4cbd2;border:1px solid #36404a;max-width:1000px;width:94vw;max-height:94vh;padding:16px}dialog::backdrop{background:#000c}.review-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}#review-image{width:100%;max-height:65vh;object-fit:contain;background:#060708}.review-fields label{display:grid;gap:4px;margin:8px 0}input,select,textarea{width:100%;font:inherit;background:#080a0c;color:#eee;border:1px solid #36404a;padding:6px}textarea{min-height:70px}#review-error{color:#ff8d8d}#remove-capture{color:#ff8d8d}#all-metadata{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}@media(max-width:700px){.review-layout{grid-template-columns:1fr}}
-</style><nav class="app-sidebar" aria-label="Main navigation"><strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a><a href="/">Capture review</a><a href="/quality.html">Quality review</a><a href="/ingestion.html">Ingestion logs</a><a href="/search.html" aria-current="page">Image search</a></nav><header class="frozen-pane"><h1>Image search</h1><form id="search-form" class="toolbar"><label for="query">Image ID or filename</label><input id="query" placeholder="20260911_155755" style="max-width:380px" required><button type="submit">Search</button></form><p id="search-status" role="status">Enter a full or partial image ID or filename.</p><p id="error" role="alert"></p></header><main><div class="table-wrap"><table><thead><tr><th>Picture</th><th>Batch</th><th>Lighting</th><th>Identity</th><th>SDK</th><th>Device</th><th></th></tr></thead><tbody id="results"></tbody></table></div></main><dialog id="review"><div class="toolbar"><b id="review-title">Capture</b><button id="review-close">Close</button></div><p id="review-error" role="alert"></p><div class="review-layout"><div><img id="review-image" alt="Selected original capture"><p>Original image</p></div><div><p>Current CSV metadata. The physical log preserves the original ingestion history.</p><div id="review-fields" class="review-fields"></div><div class="toolbar"><button id="save-metadata" disabled>Save metadata</button><button id="remove-capture" disabled>Delete capture</button></div><details><summary>All current metadata</summary><pre id="all-metadata"></pre></details></div></div></dialog><script>
-const $=id=>document.getElementById(id);let searchTicket=0;
-async function refresh(){const query=$('query').value.trim();if(!query)return;const ticket=++searchTicket;$('error').textContent='';$('search-status').textContent='Searching…';try{const res=await fetch('/api/search?q='+encodeURIComponent(query));if(!res.ok)throw Error(await res.text());const data=await res.json();if(ticket!==searchTicket)return;$('results').replaceChildren();for(const row of data.results){const tr=document.createElement('tr');for(const value of [row.metadata.filename,row.folder,row.metadata.lighting,row.metadata.subject,row.sdk,row.device]){const td=document.createElement('td');td.textContent=value||'—';tr.append(td)}const td=document.createElement('td'),button=document.createElement('button');button.textContent='View / Edit';button.onclick=()=>openCapture(row.key);td.append(button);tr.append(td);$('results').append(tr)}$('search-status').textContent=data.total+' matching picture(s)'+(data.total>data.results.length?' · Showing first '+data.results.length+'; narrow your search.':'')}catch(e){if(ticket===searchTicket){$('error').textContent=e.message;$('search-status').textContent='Search failed'}}}
-$('search-form').onsubmit=e=>{e.preventDefault();refresh()};
-</script><script src="/capture_review.js"></script><link rel="stylesheet" href="/frozen_panes.css"></html>
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Image search</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding-left: 185px;
+      background: #080a0c;
+      color: #c4cbd2;
+      font:
+        12px/1.5 ui-monospace,
+        SFMono-Regular,
+        Consolas,
+        monospace;
+    }
+    .app-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 185px;
+      padding: 16px 10px;
+      background: #101316;
+      border-right: 1px solid #272c31;
+    }
+    .app-sidebar strong {
+      display: block;
+      margin: 0 8px 18px;
+      font-size: 13px;
+      color: #f0f3f5;
+    }
+    .app-sidebar a {
+      display: block;
+      padding: 8px;
+      margin: 3px 0;
+      color: #a8b2bc;
+      text-decoration: none;
+    }
+    .app-sidebar a[aria-current],
+    .app-sidebar a:hover {
+      background: #222930;
+      color: #96e6b3;
+    }
+    main {
+      padding: 16px;
+      max-width: 1900px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px;
+      color: #96e6b3;
+    }
+    h1:before {
+      content: "> ";
+    }
+    p {
+      color: #8d98a3;
+      margin: 6px 0;
+    }
+    .toolbar,
+    .stats {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    .stats div {
+      display: flex;
+      gap: 5px;
+    }
+    .stats b {
+      font-size: 12px;
+      color: #e6edf3;
+    }
+    button {
+      font: inherit;
+      padding: 3px 8px;
+      border: 1px solid #36404a;
+      border-radius: 3px;
+      background: #151a20;
+      color: #c4cbd2;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .table-wrap {
+      overflow: auto;
+      border-top: 1px solid #272c31;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font: inherit;
+    }
+    th,
+    td {
+      text-align: left;
+      padding: 3px 9px;
+      border-bottom: 1px solid #15191d;
+      white-space: nowrap;
+    }
+    th {
+      color: #8b9aaa;
+      font-weight: normal;
+      background: #101316;
+    }
+    td:first-child {
+      color: #96e6b3;
+    }
+    tr:hover {
+      background: #141a20;
+    }
+    #error {
+      color: #ff8d8d;
+      white-space: pre-wrap;
+    }
+    #error:empty {
+      display: none;
+    }
+    #status {
+      color: #7d8994;
+    }
+    a {
+      color: #96e6b3;
+    }
+    @media (max-width: 800px) {
+      body {
+        padding-left: 0;
+      }
+      .app-sidebar {
+        position: static;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 8px;
+        gap: 6px;
+      }
+      .app-sidebar strong {
+        margin: 0 8px 0 0;
+      }
+      .app-sidebar a {
+        margin: 0;
+        padding: 5px;
+      }
+      main {
+        padding: 10px;
+      }
+    }
+    dialog {
+      background: #101316;
+      color: #c4cbd2;
+      border: 1px solid #36404a;
+      max-width: 1000px;
+      width: 94vw;
+      max-height: 94vh;
+      padding: 16px;
+    }
+    dialog::backdrop {
+      background: #000c;
+    }
+    .review-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    #review-image {
+      width: 100%;
+      max-height: 65vh;
+      object-fit: contain;
+      background: #060708;
+    }
+    .review-fields label {
+      display: grid;
+      gap: 4px;
+      margin: 8px 0;
+    }
+    input,
+    select,
+    textarea {
+      width: 100%;
+      font: inherit;
+      background: #080a0c;
+      color: #eee;
+      border: 1px solid #36404a;
+      padding: 6px;
+    }
+    textarea {
+      min-height: 70px;
+    }
+    #review-error {
+      color: #ff8d8d;
+    }
+    #remove-capture {
+      color: #ff8d8d;
+    }
+    #all-metadata {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 11px;
+    }
+    @media (max-width: 700px) {
+      .review-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <nav class="app-sidebar" aria-label="Main navigation">
+    <strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a
+    ><a href="/">Capture review</a><a href="/quality.html">Quality review</a
+    ><a href="/ingestion.html">Ingestion logs</a
+    ><a href="/search.html" aria-current="page">Image search</a>
+  </nav>
+  <header class="frozen-pane">
+    <h1>Image search</h1>
+    <form id="search-form" class="toolbar">
+      <label for="query">Image ID or filename</label
+      ><input
+        id="query"
+        placeholder="20260911_155755"
+        style="max-width: 380px"
+        required
+      /><button type="submit">Search</button>
+    </form>
+    <p id="search-status" role="status">
+      Enter a full or partial image ID or filename.
+    </p>
+    <p id="error" role="alert"></p>
+  </header>
+  <main>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Picture</th>
+            <th>Batch</th>
+            <th>Lighting</th>
+            <th>Identity</th>
+            <th>SDK</th>
+            <th>Device</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="results"></tbody>
+      </table>
+    </div>
+  </main>
+  <dialog id="review">
+    <div class="toolbar">
+      <b id="review-title">Capture</b><button id="review-close">Close</button>
+    </div>
+    <p id="review-error" role="alert"></p>
+    <div class="review-layout">
+      <div>
+        <img id="review-image" alt="Selected original capture" />
+        <p>Original image</p>
+      </div>
+      <div>
+        <p>
+          Current CSV metadata. The physical log preserves the original
+          ingestion history.
+        </p>
+        <div id="review-fields" class="review-fields"></div>
+        <div class="toolbar">
+          <button id="save-metadata" disabled>Save metadata</button
+          ><button id="remove-capture" disabled>Delete capture</button>
+        </div>
+        <details>
+          <summary>All current metadata</summary>
+          <pre id="all-metadata"></pre>
+        </details>
+      </div>
+    </div>
+  </dialog>
+  <script>
+    const $ = /* Find an element by its page identifier. */ (id) =>
+      document.getElementById(id);
+    let searchTicket = 0;
+    /* Fetch current page data and redraw its results and status. */
+    async function refresh() {
+      const query = $("query").value.trim();
+      if (!query) return;
+      const ticket = ++searchTicket;
+      $("error").textContent = "";
+      $("search-status").textContent = "Searching…";
+      try {
+        const res = await fetch("/api/search?q=" + encodeURIComponent(query));
+        if (!res.ok) throw Error(await res.text());
+        const data = await res.json();
+        if (ticket !== searchTicket) return;
+        $("results").replaceChildren();
+        for (const row of data.results) {
+          const tr = document.createElement("tr");
+          for (const value of [
+            row.metadata.filename,
+            row.folder,
+            row.metadata.lighting,
+            row.metadata.subject,
+            row.sdk,
+            row.device,
+          ]) {
+            const td = document.createElement("td");
+            td.textContent = value || "—";
+            tr.append(td);
+          }
+          const td = document.createElement("td"),
+            button = document.createElement("button");
+          button.textContent = "View / Edit";
+          button.onclick =
+            /* Open the selected search result for metadata review. */ () =>
+              openCapture(row.key);
+          td.append(button);
+          tr.append(td);
+          $("results").append(tr);
+        }
+        $("search-status").textContent =
+          data.total +
+          " matching picture(s)" +
+          (data.total > data.results.length
+            ? " · Showing first " +
+              data.results.length +
+              "; narrow your search."
+            : "");
+      } catch (e) {
+        if (ticket === searchTicket) {
+          $("error").textContent = e.message;
+          $("search-status").textContent = "Search failed";
+        }
+      }
+    }
+    $("search-form").onsubmit =
+      /* Refresh search results without navigating away from the page. */ (
+        e,
+      ) => {
+        e.preventDefault();
+        refresh();
+      };
+  </script>
+  <script src="/capture_review.js"></script>
+  <link rel="stylesheet" href="/frozen_panes.css" />
+</html>
