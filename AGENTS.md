@@ -25,6 +25,14 @@ These practices apply to the `datacollector-review-platform` repository.
 - Examples: `feat: add password validation`, `fix: handle empty search results`, and `docs: define development practices`.
 - Add a short body when the reason for a change needs explanation.
 
+## Pull Requests and Review
+
+- After pushing a completed feature or change, open a GitHub pull request against the repository's default branch.
+- Use a clear, concise title and description explaining what changed, why, and how it was verified.
+- Include a short checklist of changes and checks for the user to review.
+- Share the pull request link with the user and leave it open for their review.
+- The user will review the changes and decide whether to merge. Do not merge or enable automatic merging unless the user explicitly asks.
+
 ## Verification
 
 - Run checks appropriate to the change before committing, including relevant tests, linting, or builds where available.
