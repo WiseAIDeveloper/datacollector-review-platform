@@ -5,20 +5,16 @@ services:
     build: .
     container_name: idrecapture-viewer
     restart: unless-stopped
+    environment:
+      DELETE_TOKEN: ${DELETE_TOKEN:?Set DELETE_TOKEN in .env}
     ports:
-      - "10.1.1.49:8769:8080"
+      - "${VIEWER_BIND_ADDRESS:-127.0.0.1}:${VIEWER_PORT:-8769}:8080"
     volumes:
-      - /mnt5/auto-ekyc/idrecapture:/data
+      - ${DATASET_PATH:?Set DATASET_PATH in .env}:/data
       - ingestion_state:/state
-      - /mnt5/auto-ekyc/idrecapture/capture_viewer/ingestion_logs:/logs
-    secrets:
-      - delete_token
+      - ${LOGS_PATH:?Set LOGS_PATH in .env}:/logs
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-secrets:
-  delete_token:
-    file: /mnt5/auto-ekyc/idrecapture/capture_viewer/.delete_pin
-
 volumes:
   ingestion_state:

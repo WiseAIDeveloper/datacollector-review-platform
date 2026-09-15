@@ -1,7 +1,19 @@
-viewer_password.txt
-__pycache__
-
-.delete_pin
-delete_token.txt
-
-ingestion_logs/
+# Only application assets may enter the build context.
+**
+!Dockerfile
+!server.py
+!settings.py
+!capture_data.py
+!ingestion.py
+!delete_capture.py
+!edit_capture.py
+!quality_reviews.py
+!index.html
+!coverage.html
+!ingestion.html
+!search.html
+!quality.html
+!capture_review.js
+!image_zoom.js
+!terminal.css
+!frozen_panes.css
