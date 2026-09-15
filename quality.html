@@ -1,22 +1,444 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quality review</title><link rel="stylesheet" href="/terminal.css"><style>
-*{box-sizing:border-box}.app-sidebar{position:fixed;inset:0 auto 0 0}.app-sidebar strong,.app-sidebar a{display:block}.app-sidebar a{text-decoration:none}.toolbar{display:flex;flex-wrap:wrap;align-items:end}label{display:grid}#quality-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.quality-card{min-width:0;border:1px solid #52606b}.quality-card h2{overflow-wrap:anywhere}.quality-photo{display:block;width:auto;height:auto;max-width:100%;max-height:420px;margin:0 auto;background:transparent;cursor:zoom-in}.quality-card textarea{width:100%;min-height:70px;margin:12px 0}.quality-card[data-status="error"]{border:2px solid #ed7d8e!important}.quality-card[data-status="pass"]{border:2px solid #69aa80!important}.quality-state{font-weight:bold}.quality-card[data-status="error"] .quality-state{color:#ffacb8}.quality-card[data-status="pass"] .quality-state{color:#96e6b3}.quality-controls{display:flex;gap:10px;flex-wrap:wrap}.quality-message{min-height:20px}#zoom img{max-width:85vw;max-height:80vh}#zoom{max-width:95vw;max-height:95vh}#page-error{color:#ffacb8}
-@media(max-width:700px){#quality-cards{grid-template-columns:1fr}}
-</style><body class="terminal"><nav class="app-sidebar" aria-label="Main navigation"><strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a><a href="/">Capture review</a><a href="/quality.html" aria-current="page">Quality review</a><a href="/ingestion.html">Ingestion logs</a><a href="/search.html">Image search</a></nav><header class="frozen-pane"><h1>Quality review</h1><div class="toolbar"><label>Identity<select id="identity"></select></label><label>Batch<select id="batch"></select></label><label>Quality status<select id="quality-filter"><option value="">All</option><option value="unreviewed">Unreviewed</option><option value="error">Quality errors</option><option value="pass">Passed</option></select></label><button id="save-reviews" disabled>Save reviews (0)</button><button id="refresh-quality">Refresh</button></div><p id="quality-count" role="status"></p><p id="page-error" role="alert"></p></header><main><div id="quality-cards"></div></main><dialog id="zoom"><button id="close">Close</button><img alt="Enlarged capture"></dialog><script>
-const $=id=>document.getElementById(id),el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n};let rows=[],reviews={},drafts={},pin='',saving=0;const query=new URLSearchParams(location.search);let first=true;
-function choose(id,values,previous){const select=$(id);select.replaceChildren();for(const value of ['',...values]){const option=el('option',value||'All');option.value=value;select.append(option)}select.value=values.includes(previous)?previous:''}
-function scoped(){return rows.filter(r=>(!$('identity').value||r.metadata.subject===$('identity').value)&&(!$('batch').value||r.folder===$('batch').value))}
-function render(){updateSave();const scope=scoped(),visible=scope.filter(r=>!$('quality-filter').value||(reviews[r.key]?.status||'unreviewed')===$('quality-filter').value);$('quality-count').textContent=visible.length+' shown / '+scope.length+' captures · '+scope.filter(r=>reviews[r.key]?.status==='error').length+' quality errors · '+scope.filter(r=>reviews[r.key]?.status==='pass').length+' passed';const host=$('quality-cards');host.replaceChildren();for(const r of visible)host.append(card(r));if(!visible.length)host.append(el('p','No captures match these filters.'))}
-function card(r){const existing=reviews[r.key],draft=drafts[r.key]||(drafts[r.key]={status:existing?.status||'unreviewed',notes:existing?.notes||'',expected:existing||null});const box=el('article');box.className='quality-card';box.dataset.status=existing?.status||'unreviewed';box.append(el('h2',r.metadata.filename),el('p',r.folder+' · '+r.metadata.subject),el('p',r.metadata.lighting+' · '+r.sdk.toUpperCase()+' / '+r.device));const img=el('img');img.className='quality-photo';img.loading='lazy';img.alt=r.metadata.filename;img.src='/api/image?key='+encodeURIComponent(r.key);img.onclick=()=>{$('zoom').querySelector('img').src=img.src;$('zoom').showModal()};box.append(img);const state=el('p',existing?'Saved: '+(existing.status==='error'?'Quality error':existing.status==='pass'?'Pass':'Unreviewed'):'Not reviewed');state.className='quality-state';box.append(state);const controls=el('div');controls.className='quality-controls';for(const [value,label]of [['pass','Pass'],['error','Quality error'],['unreviewed','Unreviewed']]){const b=el('button',label);b.classList.toggle('active',draft.status===value);b.onclick=()=>{draft.status=value;for(const x of controls.children)x.classList.toggle('active',x===b);state.textContent='Unsaved: '+label;updateSave()};controls.append(b)}box.append(controls);return box}
-function pendingReviews(){return Object.entries(drafts).filter(([key,d])=>d.status!==(d.expected?.status||'unreviewed')||d.notes!==(d.expected?.notes||''))}
-function updateSave(){const n=pendingReviews().length;$('save-reviews').textContent='Save reviews ('+n+')';$('save-reviews').disabled=saving>0||n===0}
-async function saveAll(){const pending=pendingReviews().map(([key,d])=>({key,...JSON.parse(JSON.stringify(d))}));if(!pending.length||saving)return;
- if(!confirm('Save '+pending.length+' quality reviews?\n'+pending.map(d=>(rows.find(r=>r.key===d.key)?.metadata.filename||d.key)+' — '+(d.status==='error'?'Fail':d.status)).join('\n')))return;
- if(!pin){pin=prompt('Enter PIN to save these reviews:')||'';if(!pin)return}
- saving=1;for(const control of document.querySelectorAll('button,select,textarea'))control.disabled=true;let done=0,error='';
- try{for(const d of pending){const res=await fetch('/api/quality',{method:'POST',headers:{'Content-Type':'application/json','X-Delete-Token':pin},body:JSON.stringify(d)});if(!res.ok){if(res.status===403)pin='';throw Error(await res.text())}const result=await res.json();reviews[d.key]=result;drafts[d.key]={status:result.status,notes:result.notes,expected:result};done++}}
- catch(e){error=e.message}finally{saving=0;for(const control of document.querySelectorAll('button,select,textarea'))control.disabled=false;render();$('page-error').textContent=done+' review(s) saved.'+(error?' Stopped: '+error+'. Remaining reviews are still pending.':'')}
-}
-$('save-reviews').onclick=saveAll;
-async function load(){if(saving)return;if(!first&&Object.keys(drafts).some(k=>drafts[k].status!==(reviews[k]?.status||'unreviewed')||drafts[k].notes!==(reviews[k]?.notes||''))&&!confirm('Discard unsaved quality changes and refresh?'))return;try{const responses=await Promise.all([fetch('/api/captures'),fetch('/api/quality')]);if(responses.some(r=>!r.ok))throw Error('Could not load quality review');[rows,reviews]=await Promise.all(responses.map(r=>r.json()));drafts={};choose('identity',[...new Set(rows.map(r=>r.metadata.subject).filter(Boolean))].sort(),first?query.get('subject'):$('identity').value);choose('batch',[...new Set(rows.map(r=>r.folder))].sort(),first?query.get('batch'):$('batch').value);first=false;$('page-error').textContent='';render()}catch(e){$('page-error').textContent=e.message}}
-for(const id of ['identity','batch','quality-filter'])$(id).onchange=render;$('refresh-quality').onclick=load;$('close').onclick=()=>$('zoom').close();load();
-</script><script src="/image_zoom.js"></script></body><link rel="stylesheet" href="/frozen_panes.css"></html>
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Quality review</title
+  ><link rel="stylesheet" href="/terminal.css" /><style>
+    * {
+      box-sizing: border-box;
+    }
+    .app-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+    }
+    .app-sidebar strong,
+    .app-sidebar a {
+      display: block;
+    }
+    .app-sidebar a {
+      text-decoration: none;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+    label {
+      display: grid;
+    }
+    #quality-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .quality-card {
+      min-width: 0;
+      border: 1px solid #52606b;
+    }
+    .quality-card h2 {
+      overflow-wrap: anywhere;
+    }
+    .quality-photo {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 420px;
+      margin: 0 auto;
+      background: transparent;
+      cursor: zoom-in;
+    }
+    .quality-card textarea {
+      width: 100%;
+      min-height: 70px;
+      margin: 12px 0;
+    }
+    .quality-card[data-status="error"] {
+      border: 2px solid #ed7d8e !important;
+    }
+    .quality-card[data-status="pass"] {
+      border: 2px solid #69aa80 !important;
+    }
+    .quality-state {
+      font-weight: bold;
+    }
+    .quality-card[data-status="error"] .quality-state {
+      color: #ffacb8;
+    }
+    .quality-card[data-status="pass"] .quality-state {
+      color: #96e6b3;
+    }
+    .quality-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .quality-message {
+      min-height: 20px;
+    }
+    #zoom img {
+      max-width: 85vw;
+      max-height: 80vh;
+    }
+    #zoom {
+      max-width: 95vw;
+      max-height: 95vh;
+    }
+    #page-error {
+      color: #ffacb8;
+    }
+    @media (max-width: 700px) {
+      #quality-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <body class="terminal">
+    <nav class="app-sidebar" aria-label="Main navigation">
+      <strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a
+      ><a href="/">Capture review</a
+      ><a href="/quality.html" aria-current="page">Quality review</a
+      ><a href="/ingestion.html">Ingestion logs</a
+      ><a href="/search.html">Image search</a>
+    </nav>
+    <header class="frozen-pane">
+      <h1>Quality review</h1>
+      <div class="toolbar">
+        <label>Identity<select id="identity"></select></label
+        ><label>Batch<select id="batch"></select></label
+        ><label
+          >Quality status<select id="quality-filter">
+            <option value="">All</option>
+            <option value="unreviewed">Unreviewed</option>
+            <option value="error">Quality errors</option>
+            <option value="pass">Passed</option>
+          </select></label
+        ><button id="save-reviews" disabled>Save reviews (0)</button
+        ><button id="refresh-quality">Refresh</button>
+      </div>
+      <p id="quality-count" role="status"></p>
+      <p id="page-error" role="alert"></p>
+    </header>
+    <main><div id="quality-cards"></div></main>
+    <dialog id="zoom">
+      <button id="close">Close</button><img alt="Enlarged capture" />
+    </dialog>
+    <script>
+      const $ = /* Find an element by its page identifier. */ (id) =>
+          document.getElementById(id),
+        el = /* Create a text-only DOM element. */ (tag, text) => {
+          const n = document.createElement(tag);
+          if (text !== undefined) n.textContent = text;
+          return n;
+        };
+      let rows = [],
+        reviews = {},
+        drafts = {},
+        pin = "",
+        saving = 0;
+      const query = new URLSearchParams(location.search);
+      let first = true;
+      /* Rebuild a filter’s options while preserving its selected value. */
+      function choose(id, values, previous) {
+        const select = $(id);
+        select.replaceChildren();
+        for (const value of ["", ...values]) {
+          const option = el("option", value || "All");
+          option.value = value;
+          select.append(option);
+        }
+        select.value = values.includes(previous) ? previous : "";
+      }
+      /* Select captures matching the batch, identity, and quality filters. */
+      function scoped() {
+        return rows.filter(
+          /* Keep items that match the current selection criteria. */ (r) =>
+            (!$("identity").value ||
+              r.metadata.subject === $("identity").value) &&
+            (!$("batch").value || r.folder === $("batch").value),
+        );
+      }
+      /* Render the current filters, review state, and matching captures. */
+      function render() {
+        updateSave();
+        const scope = scoped(),
+          visible = scope.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              !$("quality-filter").value ||
+              (reviews[r.key]?.status || "unreviewed") ===
+                $("quality-filter").value,
+          );
+        $("quality-count").textContent =
+          visible.length +
+          " shown / " +
+          scope.length +
+          " captures · " +
+          scope.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              reviews[r.key]?.status === "error",
+          ).length +
+          " quality errors · " +
+          scope.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              reviews[r.key]?.status === "pass",
+          ).length +
+          " passed";
+        const host = $("quality-cards");
+        host.replaceChildren();
+        for (const r of visible) host.append(card(r));
+        if (!visible.length)
+          host.append(el("p", "No captures match these filters."));
+      }
+      /* Render one capture’s saved or drafted quality decision. */
+      function card(r) {
+        const existing = reviews[r.key],
+          draft =
+            drafts[r.key] ||
+            (drafts[r.key] = {
+              status: existing?.status || "unreviewed",
+              notes: existing?.notes || "",
+              expected: existing || null,
+            });
+        const box = el("article");
+        box.className = "quality-card";
+        box.dataset.status = existing?.status || "unreviewed";
+        box.append(
+          el("h2", r.metadata.filename),
+          el("p", r.folder + " · " + r.metadata.subject),
+          el(
+            "p",
+            r.metadata.lighting +
+              " · " +
+              r.sdk.toUpperCase() +
+              " / " +
+              r.device,
+          ),
+        );
+        const img = el("img");
+        img.className = "quality-photo";
+        img.loading = "lazy";
+        img.alt = r.metadata.filename;
+        img.src = "/api/image?key=" + encodeURIComponent(r.key);
+        img.onclick =
+          /* Open the selected capture in the zoom dialog. */ () => {
+            $("zoom").querySelector("img").src = img.src;
+            $("zoom").showModal();
+          };
+        box.append(img);
+        const state = el(
+          "p",
+          existing
+            ? "Saved: " +
+                (existing.status === "error"
+                  ? "Quality error"
+                  : existing.status === "pass"
+                    ? "Pass"
+                    : "Unreviewed")
+            : "Not reviewed",
+        );
+        state.className = "quality-state";
+        box.append(state);
+        const controls = el("div");
+        controls.className = "quality-controls";
+        for (const [value, label] of [
+          ["pass", "Pass"],
+          ["error", "Quality error"],
+          ["unreviewed", "Unreviewed"],
+        ]) {
+          const b = el("button", label);
+          b.classList.toggle("active", draft.status === value);
+          b.onclick =
+            /* Update the unsaved quality decision and its active button. */ () => {
+              draft.status = value;
+              for (const x of controls.children)
+                x.classList.toggle("active", x === b);
+              state.textContent = "Unsaved: " + label;
+              updateSave();
+            };
+          controls.append(b);
+        }
+        box.append(controls);
+        return box;
+      }
+      /* Select changed quality drafts that are ready to save. */
+      function pendingReviews() {
+        return Object.entries(drafts).filter(
+          /* Keep items that match the current selection criteria. */ ([
+            key,
+            d,
+          ]) =>
+            d.status !== (d.expected?.status || "unreviewed") ||
+            d.notes !== (d.expected?.notes || ""),
+        );
+      }
+      /* Update the save button from pending quality reviews. */
+      function updateSave() {
+        const n = pendingReviews().length;
+        $("save-reviews").textContent = "Save reviews (" + n + ")";
+        $("save-reviews").disabled = saving > 0 || n === 0;
+      }
+      /* Confirm and persist quality drafts while retaining unsaved decisions. */
+      async function saveAll() {
+        const pending = pendingReviews().map(
+          /* Build the corresponding display or request value for each item. */ ([
+            key,
+            d,
+          ]) => ({
+            key,
+            ...JSON.parse(JSON.stringify(d)),
+          }),
+        );
+        if (!pending.length || saving) return;
+        if (
+          !confirm(
+            "Save " +
+              pending.length +
+              " quality reviews?\n" +
+              pending
+                .map(
+                  /* Build the corresponding display or request value for each item. */ (
+                    d,
+                  ) =>
+                    (rows.find(
+                      /* Locate the item matching the selected capture or batch. */ (
+                        r,
+                      ) => r.key === d.key,
+                    )?.metadata.filename || d.key) +
+                    " — " +
+                    (d.status === "error" ? "Fail" : d.status),
+                )
+                .join("\n"),
+          )
+        )
+          return;
+        if (!pin) {
+          pin = prompt("Enter PIN to save these reviews:") || "";
+          if (!pin) return;
+        }
+        saving = 1;
+        for (const control of document.querySelectorAll(
+          "button,select,textarea",
+        ))
+          control.disabled = true;
+        let done = 0,
+          error = "";
+        try {
+          for (const d of pending) {
+            const res = await fetch("/api/quality", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Delete-Token": pin,
+              },
+              body: JSON.stringify(d),
+            });
+            if (!res.ok) {
+              if (res.status === 403) pin = "";
+              throw Error(await res.text());
+            }
+            const result = await res.json();
+            reviews[d.key] = result;
+            drafts[d.key] = {
+              status: result.status,
+              notes: result.notes,
+              expected: result,
+            };
+            done++;
+          }
+        } catch (e) {
+          error = e.message;
+        } finally {
+          saving = 0;
+          for (const control of document.querySelectorAll(
+            "button,select,textarea",
+          ))
+            control.disabled = false;
+          render();
+          $("page-error").textContent =
+            done +
+            " review(s) saved." +
+            (error
+              ? " Stopped: " + error + ". Remaining reviews are still pending."
+              : "");
+        }
+      }
+      $("save-reviews").onclick = saveAll;
+      /* Load current capture data and refresh page controls and results. */
+      async function load() {
+        if (saving) return;
+        if (
+          !first &&
+          Object.keys(drafts).some(
+            /* Check whether any item matches the requested condition. */ (k) =>
+              drafts[k].status !== (reviews[k]?.status || "unreviewed") ||
+              drafts[k].notes !== (reviews[k]?.notes || ""),
+          ) &&
+          !confirm("Discard unsaved quality changes and refresh?")
+        )
+          return;
+        try {
+          const responses = await Promise.all([
+            fetch("/api/captures"),
+            fetch("/api/quality"),
+          ]);
+          if (
+            responses.some(
+              /* Check whether any item matches the requested condition. */ (
+                r,
+              ) => !r.ok,
+            )
+          )
+            throw Error("Could not load quality review");
+          [rows, reviews] = await Promise.all(
+            responses.map(
+              /* Decode the response body as JSON. */ (r) => r.json(),
+            ),
+          );
+          drafts = {};
+          choose(
+            "identity",
+            [
+              ...new Set(
+                rows
+                  .map(
+                    /* Build the corresponding display or request value for each item. */ (
+                      r,
+                    ) => r.metadata.subject,
+                  )
+                  .filter(Boolean),
+              ),
+            ].sort(),
+            first ? query.get("subject") : $("identity").value,
+          );
+          choose(
+            "batch",
+            [
+              ...new Set(
+                rows.map(
+                  /* Build the corresponding display or request value for each item. */ (
+                    r,
+                  ) => r.folder,
+                ),
+              ),
+            ].sort(),
+            first ? query.get("batch") : $("batch").value,
+          );
+          first = false;
+          $("page-error").textContent = "";
+          render();
+        } catch (e) {
+          $("page-error").textContent = e.message;
+        }
+      }
+      for (const id of ["identity", "batch", "quality-filter"])
+        $(id).onchange = render;
+      $("refresh-quality").onclick = load;
+      $("close").onclick = /* Close the image preview dialog. */ () =>
+        $("zoom").close();
+      load();
+    </script>
+    <script src="/image_zoom.js"></script>
+  </body>
+  <link rel="stylesheet" href="/frozen_panes.css" />
+</html>

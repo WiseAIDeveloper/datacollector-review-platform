@@ -1,48 +1,810 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Capture review</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f2f5f9;color:#182333;font:15px system-ui}header,main{max-width:1600px;margin:auto;padding:22px}h1{margin:0 0 8px}p{color:#536278}#filters,.actions,.decisions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px}label{display:grid;gap:5px;font-size:13px}select,input,button,textarea{font:inherit;padding:9px;border:1px solid #cdd6e2;border-radius:6px;background:white;max-width:100%}button{cursor:pointer}button.active{background:#164c80;color:white;border-color:#164c80}#cards{display:grid;grid-template-columns:1fr 1fr;gap:20px}article{min-width:0;background:white;border:1px solid #dce3ec;border-radius:12px;padding:18px}h2{font-size:18px;overflow-wrap:anywhere}.selector{width:100%;margin-bottom:12px}.photo{width:100%;height:430px;object-fit:contain;background:#eaf0f5;cursor:zoom-in}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;vertical-align:top;border-bottom:1px solid #e6ebf0;padding:8px;overflow-wrap:anywhere}th{width:34%;color:#536278}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}details{margin-top:15px}summary{cursor:pointer}dialog{border:0;max-width:96vw;max-height:96vh}dialog img{max-width:90vw;max-height:82vh;display:block}dialog::backdrop{background:#000b}.different{background:#fff4d6}textarea{width:100%;min-height:65px;margin-top:12px}.note{font-size:13px}.corrections{margin-top:12px;display:grid;gap:8px;grid-template-columns:1fr 1fr}.corrections input{width:100%}@media(max-width:800px){#cards{grid-template-columns:1fr}.photo{height:340px}header,main{padding:14px}}
-body{padding-left:210px}.app-sidebar{position:fixed;inset:0 auto 0 0;width:210px;padding:24px 14px;background:#142c46;color:white;z-index:10}.app-sidebar strong{display:block;margin:0 10px 24px;font-size:18px}.app-sidebar a{display:block;padding:12px;margin:6px 0;border-radius:7px;color:#dce8f4;text-decoration:none}.app-sidebar a:hover,.app-sidebar a[aria-current="page"]{background:#28577e;color:white}@media(max-width:800px){body{padding-left:0}.app-sidebar{position:static;width:100%;padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}.app-sidebar strong{margin:0 12px 0 0;font-size:15px}.app-sidebar a{margin:0;padding:9px}}</style><link rel="stylesheet" href="/terminal.css"><body class="terminal"><nav class="app-sidebar" aria-label="Main navigation"><strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a><a href="/" aria-current="page">Capture review</a><a href="/quality.html">Quality review</a><a href="/ingestion.html">Ingestion logs</a><a href="/search.html">Image search</a></nav><header class="frozen-pane"><h1>Capture review</h1><div id="filters"></div><div class="actions"><button id="execute" disabled>Execute decisions (0)</button><button id="refresh">Refresh captures</button></div><p id="status"></p><p id="pending-status" class="note" role="status"></p></header><main><div id="cards"></div></main><dialog id="zoom"><button id="close">Close</button><img alt="Enlarged capture"></dialog><script>
-let rows=[],filtered=[],selected=[],batchDefs=[];const STORAGE='idrecapture-review-v1';let decisions={};try{decisions=JSON.parse(localStorage.getItem(STORAGE)||'{}')}catch(e){}const fields=[['subject','Filter by identity (view only)'],['folder','Folder'],['lighting','Lighting'],['sdk','SDK'],['device','Device']];const defaults={subject:'koh-jia-yi',folder:'psastationery_colour_print_cutout',lighting:'office-yellow',sdk:'web',device:'huawei-nova-7i'};const filters={};
-const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n};const val=(r,k)=>r[k]??r.metadata[k]??'';const url=(type,r)=>'/api/'+type+'?key='+encodeURIComponent(r.key);
-function save(){updateExecute();try{localStorage.setItem(STORAGE,JSON.stringify(decisions))}catch(e){alert('Browser storage unavailable. Keep this tab open.')}}
-
-function correctionChoices(r,k){
- const batch=batchDefs.find(b=>b.batch_name===r.folder&&b.test_plan_name===r.metadata.test_plan_name);
- const split=v=>(v||'').split(';').map(x=>x.trim()).filter(Boolean);
- if(k==='subject'){const configured=split(batch?.expected_identities);return configured.length?configured:[...new Set(rows.filter(x=>x.metadata.test_plan_name===r.metadata.test_plan_name).map(x=>x.metadata.subject).filter(Boolean))].sort()}
- if(k==='lighting')return split(batch?.expected_lighting);
- if(k==='capture_device')return ['',...split(batch?.expected_web_devices)];
- return null;
-}
-
-function decision(r){if(!decisions[r.key])decisions[r.key]={key:r.key,folder:r.folder,filename:r.metadata.filename,uuid:r.metadata.uuid,csv_row_at_review:r.line,subject:r.metadata.subject,lighting:r.metadata.lighting,sdk:r.sdk,device:r.device,decision:'undecided',notes:'',corrections:{},metadata_at_review:{...r.metadata}};decisions[r.key].reviewed_at=new Date().toISOString();return decisions[r.key]}
-function apply(){filtered=rows.filter(r=>fields.every(([k])=>!filters[k].value||val(r,k)===filters[k].value));document.getElementById('status').textContent=filtered.length+' matching captures · showing all '+filtered.length+' · '+rows.length+' total';render()}
-function render(){updateExecute();const host=document.getElementById('cards');host.replaceChildren();if(!filtered.length){host.append(el('p','No captures match these filters.'));return}for(const r of filtered){const other=filtered.length===2?filtered.find(x=>x.key!==r.key):null;const card=el('article');card.append(el('h2',r.metadata.filename),el('p',r.sdk.toUpperCase()+' · '+r.device+' · CSV row '+r.line));const img=el('img');img.className='photo';img.loading='lazy';img.src=url('image',r);img.alt=r.metadata.filename;img.onclick=()=>{const d=document.getElementById('zoom');d.querySelector('img').src=img.src;d.showModal()};card.append(img);const a=el('a','Open original image');a.href=img.src;a.target='_blank';a.rel='noopener';card.append(a);
-const controls=el('div');controls.className='decisions';const current=decisions[r.key]?.decision||'undecided';for(const [v,label]of [['keep','Keep'],['remove','Remove'],['correct_metadata','Correct metadata'],['undecided','Undecided']]){const b=el('button',label);b.classList.toggle('active',current===v);b.onclick=()=>{decision(r).decision=v;save();render()};controls.append(b)}card.append(controls);if(current==='correct_metadata'){const changes=el('div');changes.className='corrections';for(const k of ['subject','lighting','capture_device','input_sensor','user']){const wrap=el('label','Correct '+k),options=correctionChoices(r,k),input=el(options?'select':'input');input.setAttribute('aria-label','Correct '+k);if(options){const current=decisions[r.key]?.corrections?.[k]??r.metadata[k]??'';if(!options.includes(current)){const o=el('option',(current||'(missing)')+' — outside configured choices');o.value=current;input.append(o)}for(const value of [...new Set(options)]){const o=el('option',value||(k==='capture_device'?'App SDK — use input sensor':'(missing)'));o.value=value;input.append(o)}}input.placeholder=val(r,k)||'(blank)';input.value=decisions[r.key]?.corrections?.[k]??r.metadata[k]??'';input.oninput=()=>{const d=decision(r);if(input.value!==(r.metadata[k]||''))d.corrections[k]=input.value;else delete d.corrections[k];save()};wrap.append(input);changes.append(wrap)}card.append(changes)}const notes=el('textarea');notes.placeholder='Reason, duplicate of filename, or other correction details…';notes.setAttribute('aria-label','Review notes for '+r.metadata.filename);notes.value=decisions[r.key]?.notes||'';notes.oninput=()=>{decision(r).notes=notes.value;save()};card.append(notes,el('h3','CSV metadata'));const table=el('table');for(const [k,v]of Object.entries(r.metadata)){const tr=el('tr');if(other&&other.metadata[k]!==v)tr.className='different';tr.append(el('th',k),el('td',v));table.append(tr)}card.append(table);const details=el('details'),pre=el('pre','Loading…');details.append(el('summary','Original collection metadata'),pre);details.addEventListener('toggle',async()=>{if(details.open&&pre.textContent==='Loading…'){try{const res=await fetch(url('annotation',r));pre.textContent=res.ok?JSON.stringify(await res.json(),null,2):'Original metadata unavailable'}catch(e){pre.textContent='Unable to load metadata'}}});card.append(details);host.append(card)}}
-async function load(){try{const [res,defs]=await Promise.all([fetch('/api/captures'),fetch('/api/batches')]);if(!res.ok||!defs.ok)throw Error();rows=await res.json();batchDefs=await defs.json();for(const [k,label]of fields){const prev=filters[k]?.value??defaults[k];if(!filters[k]){const wrap=el('label',label),s=el('select');filters[k]=s;s.onchange=()=>{selected=[];apply()};wrap.append(s);document.getElementById('filters').append(wrap)}const s=filters[k];s.replaceChildren();const all=el('option','All');all.value='';s.append(all);for(const v of [...new Set(rows.map(r=>val(r,k)))].filter(Boolean).sort()){const o=el('option',v);o.value=v;s.append(o)}s.value=[...s.options].some(o=>o.value===prev)?prev:''}apply();save()}catch(e){document.getElementById('status').textContent='Could not load captures. Please refresh.'}}
-function download(data,type,ext){const u=URL.createObjectURL(new Blob([data],{type})),a=el('a');a.href=u;a.download='capture_decisions_'+new Date().toISOString().slice(0,10)+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
-
-let executing=false;
-function pendingDecisions(){return rows.filter(r=>['remove','correct_metadata'].includes(decisions[r.key]?.decision))}
-function updateExecute(){const b=document.getElementById('execute');if(!b)return;b.disabled=executing||!pendingDecisions().length;b.textContent=executing?'Executing…':'Execute decisions ('+pendingDecisions().length+')';document.getElementById('pending-status').textContent=pendingDecisions().length?pendingDecisions().map(r=>r.metadata.filename+' · '+decisions[r.key].decision+(decisions[r.key].corrections?.subject?' → '+decisions[r.key].corrections.subject:'')).join(' | '):'No pending edits or removals in this browser. To edit a capture, use Correct metadata on its card.'}
-async function executeDecisions(){
- const pending=pendingDecisions().map(r=>({r,d:JSON.parse(JSON.stringify(decisions[r.key]))}));if(executing||!pending.length)return;
- const allowed=['subject','lighting','capture_device','input_sensor','user'];
- for(const {r,d} of pending){if(d.decision==='correct_metadata'&&(!Object.keys(d.corrections||{}).length||Object.keys(d.corrections).some(k=>!allowed.includes(k)))){alert('Review corrections for '+r.metadata.filename+'. Enter at least one metadata change. Folder moves are not supported.');return}}
- const lines=pending.map(({r,d})=>r.metadata.subject+' / '+r.folder+' / '+r.metadata.filename+' — '+(d.decision==='remove'?'DELETE':Object.entries(d.corrections).map(([k,v])=>k+': '+(d.metadata_at_review[k]||'(blank)')+' → '+(v||'(blank)')).join(', ')));
- if(!confirm('Execute '+pending.length+' pending decisions?\nIncludes all identities, folders and lighting, regardless of the current filters.\n\n'+lines.join('\n')+'\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.'))return;
- const token=prompt('Enter PIN to execute these decisions:');if(!token)return;
- executing=true;updateExecute();let completed=0;let failure='';
- try{for(const {r,d} of pending){
- const item={key:r.key,folder:r.folder,uuid:r.metadata.uuid,filename:r.metadata.filename};
- const correcting=d.decision==='correct_metadata';
- const res=await fetch(correcting?'/api/edit-capture':'/api/apply-decisions',{method:'POST',headers:{'Content-Type':'application/json','X-Delete-Token':token},body:JSON.stringify(correcting?{...item,changes:d.corrections,expected:d.metadata_at_review}:{confirm_count:1,remove:[item]})});
- if(!res.ok)throw Error(await res.text());await res.json();
- delete decisions[r.key];completed++;save();
- }}catch(e){failure=e.message}finally{executing=false;await load();updateExecute()}
- alert(completed+' decision(s) applied.'+(failure?' Stopped: '+failure+'. Unapplied decisions remain saved.':''));
-}
-document.getElementById('execute').onclick=executeDecisions;
-document.getElementById('refresh').onclick=load;document.getElementById('close').onclick=()=>document.getElementById('zoom').close();load();
-window.addEventListener('storage',e=>{if(e.key===STORAGE&&!executing){try{decisions=JSON.parse(e.newValue||'{}')}catch(err){}render()}});
-window.addEventListener('focus',()=>{if(!executing){try{decisions=JSON.parse(localStorage.getItem(STORAGE)||'{}')}catch(e){}load()}});
-</script><script src="/image_zoom.js"></script><link rel="stylesheet" href="/frozen_panes.css"></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Capture review</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f2f5f9;
+        color: #182333;
+        font: 15px system-ui;
+      }
+      header,
+      main {
+        max-width: 1600px;
+        margin: auto;
+        padding: 22px;
+      }
+      h1 {
+        margin: 0 0 8px;
+      }
+      p {
+        color: #536278;
+      }
+      #filters,
+      .actions,
+      .decisions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 15px;
+      }
+      label {
+        display: grid;
+        gap: 5px;
+        font-size: 13px;
+      }
+      select,
+      input,
+      button,
+      textarea {
+        font: inherit;
+        padding: 9px;
+        border: 1px solid #cdd6e2;
+        border-radius: 6px;
+        background: white;
+        max-width: 100%;
+      }
+      button {
+        cursor: pointer;
+      }
+      button.active {
+        background: #164c80;
+        color: white;
+        border-color: #164c80;
+      }
+      #cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      article {
+        min-width: 0;
+        background: white;
+        border: 1px solid #dce3ec;
+        border-radius: 12px;
+        padding: 18px;
+      }
+      h2 {
+        font-size: 18px;
+        overflow-wrap: anywhere;
+      }
+      .selector {
+        width: 100%;
+        margin-bottom: 12px;
+      }
+      .photo {
+        width: 100%;
+        height: 430px;
+        object-fit: contain;
+        background: #eaf0f5;
+        cursor: zoom-in;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      td,
+      th {
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid #e6ebf0;
+        padding: 8px;
+        overflow-wrap: anywhere;
+      }
+      th {
+        width: 34%;
+        color: #536278;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-size: 12px;
+      }
+      details {
+        margin-top: 15px;
+      }
+      summary {
+        cursor: pointer;
+      }
+      dialog {
+        border: 0;
+        max-width: 96vw;
+        max-height: 96vh;
+      }
+      dialog img {
+        max-width: 90vw;
+        max-height: 82vh;
+        display: block;
+      }
+      dialog::backdrop {
+        background: #000b;
+      }
+      .different {
+        background: #fff4d6;
+      }
+      textarea {
+        width: 100%;
+        min-height: 65px;
+        margin-top: 12px;
+      }
+      .note {
+        font-size: 13px;
+      }
+      .corrections {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+      .corrections input {
+        width: 100%;
+      }
+      @media (max-width: 800px) {
+        #cards {
+          grid-template-columns: 1fr;
+        }
+        .photo {
+          height: 340px;
+        }
+        header,
+        main {
+          padding: 14px;
+        }
+      }
+      body {
+        padding-left: 210px;
+      }
+      .app-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 210px;
+        padding: 24px 14px;
+        background: #142c46;
+        color: white;
+        z-index: 10;
+      }
+      .app-sidebar strong {
+        display: block;
+        margin: 0 10px 24px;
+        font-size: 18px;
+      }
+      .app-sidebar a {
+        display: block;
+        padding: 12px;
+        margin: 6px 0;
+        border-radius: 7px;
+        color: #dce8f4;
+        text-decoration: none;
+      }
+      .app-sidebar a:hover,
+      .app-sidebar a[aria-current="page"] {
+        background: #28577e;
+        color: white;
+      }
+      @media (max-width: 800px) {
+        body {
+          padding-left: 0;
+        }
+        .app-sidebar {
+          position: static;
+          width: 100%;
+          padding: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 5px;
+        }
+        .app-sidebar strong {
+          margin: 0 12px 0 0;
+          font-size: 15px;
+        }
+        .app-sidebar a {
+          margin: 0;
+          padding: 9px;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/terminal.css" />
+  </head>
+  <body class="terminal">
+    <nav class="app-sidebar" aria-label="Main navigation">
+      <strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a
+      ><a href="/" aria-current="page">Capture review</a
+      ><a href="/quality.html">Quality review</a
+      ><a href="/ingestion.html">Ingestion logs</a
+      ><a href="/search.html">Image search</a>
+    </nav>
+    <header class="frozen-pane">
+      <h1>Capture review</h1>
+      <div id="filters"></div>
+      <div class="actions">
+        <button id="execute" disabled>Execute decisions (0)</button
+        ><button id="refresh">Refresh captures</button>
+      </div>
+      <p id="status"></p>
+      <p id="pending-status" class="note" role="status"></p>
+    </header>
+    <main><div id="cards"></div></main>
+    <dialog id="zoom">
+      <button id="close">Close</button><img alt="Enlarged capture" />
+    </dialog>
+    <script>
+      let rows = [],
+        filtered = [],
+        selected = [],
+        batchDefs = [];
+      const STORAGE = "idrecapture-review-v1";
+      let decisions = {};
+      try {
+        decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
+      } catch (e) {}
+      const fields = [
+        ["subject", "Filter by identity (view only)"],
+        ["folder", "Folder"],
+        ["lighting", "Lighting"],
+        ["sdk", "SDK"],
+        ["device", "Device"],
+      ];
+      const defaults = {
+        subject: "koh-jia-yi",
+        folder: "psastationery_colour_print_cutout",
+        lighting: "office-yellow",
+        sdk: "web",
+        device: "huawei-nova-7i",
+      };
+      const filters = {};
+      const el = /* Create a text-only DOM element. */ (tag, text) => {
+        const n = document.createElement(tag);
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      const val =
+        /* Read a capture field from its summary or annotation metadata. */ (
+          r,
+          k,
+        ) => r[k] ?? r.metadata[k] ?? "";
+      const url = /* Build an encoded URL for a capture resource. */ (
+        type,
+        r,
+      ) => "/api/" + type + "?key=" + encodeURIComponent(r.key);
+      /* Persist review drafts in browser storage and update the pending action count. */
+      function save() {
+        updateExecute();
+        try {
+          localStorage.setItem(STORAGE, JSON.stringify(decisions));
+        } catch (e) {
+          alert("Browser storage unavailable. Keep this tab open.");
+        }
+      }
+      /* Find allowed corrections from the capture’s matching batch definition. */
+      function correctionChoices(r, k) {
+        const batch = batchDefs.find(
+          /* Locate the item matching the selected capture or batch. */ (b) =>
+            b.batch_name === r.folder &&
+            b.test_plan_name === r.metadata.test_plan_name,
+        );
+        const split =
+          /* Read nonempty choices from a semicolon-separated batch setting. */ (
+            v,
+          ) =>
+            (v || "")
+              .split(";")
+              .map(
+                /* Build the corresponding display or request value for each item. */ (
+                  x,
+                ) => x.trim(),
+              )
+              .filter(Boolean);
+        if (k === "subject") {
+          const configured = split(batch?.expected_identities);
+          return configured.length
+            ? configured
+            : [
+                ...new Set(
+                  rows
+                    .filter(
+                      /* Keep items that match the current selection criteria. */ (
+                        x,
+                      ) =>
+                        x.metadata.test_plan_name === r.metadata.test_plan_name,
+                    )
+                    .map(
+                      /* Build the corresponding display or request value for each item. */ (
+                        x,
+                      ) => x.metadata.subject,
+                    )
+                    .filter(Boolean),
+                ),
+              ].sort();
+        }
+        if (k === "lighting") return split(batch?.expected_lighting);
+        if (k === "capture_device")
+          return ["", ...split(batch?.expected_web_devices)];
+        return null;
+      }
+      /* Restore a capture’s saved draft or initialize an undecided review. */
+      function decision(r) {
+        if (!decisions[r.key])
+          decisions[r.key] = {
+            key: r.key,
+            folder: r.folder,
+            filename: r.metadata.filename,
+            uuid: r.metadata.uuid,
+            csv_row_at_review: r.line,
+            subject: r.metadata.subject,
+            lighting: r.metadata.lighting,
+            sdk: r.sdk,
+            device: r.device,
+            decision: "undecided",
+            notes: "",
+            corrections: {},
+            metadata_at_review: {
+              ...r.metadata,
+            },
+          };
+        decisions[r.key].reviewed_at = new Date().toISOString();
+        return decisions[r.key];
+      }
+      /* Filter and sort captures before rendering the selected page. */
+      function apply() {
+        filtered = rows.filter(
+          /* Keep items that match the current selection criteria. */ (r) =>
+            fields.every(
+              /* Check whether all items satisfy the required condition. */ ([
+                k,
+              ]) => !filters[k].value || val(r, k) === filters[k].value,
+            ),
+        );
+        document.getElementById("status").textContent =
+          filtered.length +
+          " matching captures · showing all " +
+          filtered.length +
+          " · " +
+          rows.length +
+          " total";
+        render();
+      }
+      /* Render the current filters, review state, and matching captures. */
+      function render() {
+        updateExecute();
+        const host = document.getElementById("cards");
+        host.replaceChildren();
+        if (!filtered.length) {
+          host.append(el("p", "No captures match these filters."));
+          return;
+        }
+        for (const r of filtered) {
+          const other =
+            filtered.length === 2
+              ? filtered.find(
+                  /* Locate the item matching the selected capture or batch. */ (
+                    x,
+                  ) => x.key !== r.key,
+                )
+              : null;
+          const card = el("article");
+          card.append(
+            el("h2", r.metadata.filename),
+            el(
+              "p",
+              r.sdk.toUpperCase() + " · " + r.device + " · CSV row " + r.line,
+            ),
+          );
+          const img = el("img");
+          img.className = "photo";
+          img.loading = "lazy";
+          img.src = url("image", r);
+          img.alt = r.metadata.filename;
+          img.onclick =
+            /* Open the selected capture in the zoom dialog. */ () => {
+              const d = document.getElementById("zoom");
+              d.querySelector("img").src = img.src;
+              d.showModal();
+            };
+          card.append(img);
+          const a = el("a", "Open original image");
+          a.href = img.src;
+          a.target = "_blank";
+          a.rel = "noopener";
+          card.append(a);
+          const controls = el("div");
+          controls.className = "decisions";
+          const current = decisions[r.key]?.decision || "undecided";
+          for (const [v, label] of [
+            ["keep", "Keep"],
+            ["remove", "Remove"],
+            ["correct_metadata", "Correct metadata"],
+            ["undecided", "Undecided"],
+          ]) {
+            const b = el("button", label);
+            b.classList.toggle("active", current === v);
+            b.onclick =
+              /* Save the selected review decision and redraw its controls. */ () => {
+                decision(r).decision = v;
+                save();
+                render();
+              };
+            controls.append(b);
+          }
+          card.append(controls);
+          if (current === "correct_metadata") {
+            const changes = el("div");
+            changes.className = "corrections";
+            for (const k of [
+              "subject",
+              "lighting",
+              "capture_device",
+              "input_sensor",
+              "user",
+            ]) {
+              const wrap = el("label", "Correct " + k),
+                options = correctionChoices(r, k),
+                input = el(options ? "select" : "input");
+              input.setAttribute("aria-label", "Correct " + k);
+              if (options) {
+                const current =
+                  decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
+                if (!options.includes(current)) {
+                  const o = el(
+                    "option",
+                    (current || "(missing)") + " — outside configured choices",
+                  );
+                  o.value = current;
+                  input.append(o);
+                }
+                for (const value of [...new Set(options)]) {
+                  const o = el(
+                    "option",
+                    value ||
+                      (k === "capture_device"
+                        ? "App SDK — use input sensor"
+                        : "(missing)"),
+                  );
+                  o.value = value;
+                  input.append(o);
+                }
+              }
+              input.placeholder = val(r, k) || "(blank)";
+              input.value =
+                decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
+              input.oninput =
+                /* Store only metadata fields that differ from the original capture. */ () => {
+                  const d = decision(r);
+                  if (input.value !== (r.metadata[k] || ""))
+                    d.corrections[k] = input.value;
+                  else delete d.corrections[k];
+                  save();
+                };
+              wrap.append(input);
+              changes.append(wrap);
+            }
+            card.append(changes);
+          }
+          const notes = el("textarea");
+          notes.placeholder =
+            "Reason, duplicate of filename, or other correction details…";
+          notes.setAttribute(
+            "aria-label",
+            "Review notes for " + r.metadata.filename,
+          );
+          notes.value = decisions[r.key]?.notes || "";
+          notes.oninput =
+            /* Save the capture’s review notes in browser storage. */ () => {
+              decision(r).notes = notes.value;
+              save();
+            };
+          card.append(notes, el("h3", "CSV metadata"));
+          const table = el("table");
+          for (const [k, v] of Object.entries(r.metadata)) {
+            const tr = el("tr");
+            if (other && other.metadata[k] !== v) tr.className = "different";
+            tr.append(el("th", k), el("td", v));
+            table.append(tr);
+          }
+          card.append(table);
+          const details = el("details"),
+            pre = el("pre", "Loading…");
+          details.append(el("summary", "Original collection metadata"), pre);
+          details.addEventListener(
+            "toggle",
+            /* Decode the response body as JSON. */ async () => {
+              if (details.open && pre.textContent === "Loading…") {
+                try {
+                  const res = await fetch(url("annotation", r));
+                  pre.textContent = res.ok
+                    ? JSON.stringify(await res.json(), null, 2)
+                    : "Original metadata unavailable";
+                } catch (e) {
+                  pre.textContent = "Unable to load metadata";
+                }
+              }
+            },
+          );
+          card.append(details);
+          host.append(card);
+        }
+      }
+      /* Load current capture data and refresh page controls and results. */
+      async function load() {
+        try {
+          const [res, defs] = await Promise.all([
+            fetch("/api/captures"),
+            fetch("/api/batches"),
+          ]);
+          if (!res.ok || !defs.ok) throw Error();
+          rows = await res.json();
+          batchDefs = await defs.json();
+          for (const [k, label] of fields) {
+            const prev = filters[k]?.value ?? defaults[k];
+            if (!filters[k]) {
+              const wrap = el("label", label),
+                s = el("select");
+              filters[k] = s;
+              s.onchange =
+                /* Clear the comparison selection when a filter changes. */ () => {
+                  selected = [];
+                  apply();
+                };
+              wrap.append(s);
+              document.getElementById("filters").append(wrap);
+            }
+            const s = filters[k];
+            s.replaceChildren();
+            const all = el("option", "All");
+            all.value = "";
+            s.append(all);
+            for (const v of [
+              ...new Set(
+                rows.map(
+                  /* Build the corresponding display or request value for each item. */ (
+                    r,
+                  ) => val(r, k),
+                ),
+              ),
+            ]
+              .filter(Boolean)
+              .sort()) {
+              const o = el("option", v);
+              o.value = v;
+              s.append(o);
+            }
+            s.value = [...s.options].some(
+              /* Check whether any item matches the requested condition. */ (
+                o,
+              ) => o.value === prev,
+            )
+              ? prev
+              : "";
+          }
+          apply();
+          save();
+        } catch (e) {
+          document.getElementById("status").textContent =
+            "Could not load captures. Please refresh.";
+        }
+      }
+      /* Export review data as a downloadable browser file. */
+      function download(data, type, ext) {
+        const u = URL.createObjectURL(
+            new Blob([data], {
+              type,
+            }),
+          ),
+          a = el("a");
+        a.href = u;
+        a.download =
+          "capture_decisions_" +
+          new Date().toISOString().slice(0, 10) +
+          "." +
+          ext;
+        a.click();
+        setTimeout(
+          /* Release the temporary download URL after the browser starts the download. */ () =>
+            URL.revokeObjectURL(u),
+          1000,
+        );
+      }
+      let executing = false;
+      /* Select drafts that require a metadata edit or deletion. */
+      function pendingDecisions() {
+        return rows.filter(
+          /* Keep items that match the current selection criteria. */ (r) =>
+            ["remove", "correct_metadata"].includes(decisions[r.key]?.decision),
+        );
+      }
+      /* Update the execution button from pending drafts and submission state. */
+      function updateExecute() {
+        const b = document.getElementById("execute");
+        if (!b) return;
+        b.disabled = executing || !pendingDecisions().length;
+        b.textContent = executing
+          ? "Executing…"
+          : "Execute decisions (" + pendingDecisions().length + ")";
+        document.getElementById("pending-status").textContent =
+          pendingDecisions().length
+            ? pendingDecisions()
+                .map(
+                  /* Build the corresponding display or request value for each item. */ (
+                    r,
+                  ) =>
+                    r.metadata.filename +
+                    " · " +
+                    decisions[r.key].decision +
+                    (decisions[r.key].corrections?.subject
+                      ? " → " + decisions[r.key].corrections.subject
+                      : ""),
+                )
+                .join(" | ")
+            : "No pending edits or removals in this browser. To edit a capture, use Correct metadata on its card.";
+      }
+      /* Confirm and submit pending edits and deletions, retaining failed drafts. */
+      async function executeDecisions() {
+        const pending = pendingDecisions().map(
+          /* Build the corresponding display or request value for each item. */ (
+            r,
+          ) => ({
+            r,
+            d: JSON.parse(JSON.stringify(decisions[r.key])),
+          }),
+        );
+        if (executing || !pending.length) return;
+        const allowed = [
+          "subject",
+          "lighting",
+          "capture_device",
+          "input_sensor",
+          "user",
+        ];
+        for (const { r, d } of pending) {
+          if (
+            d.decision === "correct_metadata" &&
+            (!Object.keys(d.corrections || {}).length ||
+              Object.keys(d.corrections).some(
+                /* Check whether any item matches the requested condition. */ (
+                  k,
+                ) => !allowed.includes(k),
+              ))
+          ) {
+            alert(
+              "Review corrections for " +
+                r.metadata.filename +
+                ". Enter at least one metadata change. Folder moves are not supported.",
+            );
+            return;
+          }
+        }
+        const lines = pending.map(
+          /* Build the corresponding display or request value for each item. */ ({
+            r,
+            d,
+          }) =>
+            r.metadata.subject +
+            " / " +
+            r.folder +
+            " / " +
+            r.metadata.filename +
+            " — " +
+            (d.decision === "remove"
+              ? "DELETE"
+              : Object.entries(d.corrections)
+                  .map(
+                    /* Build the corresponding display or request value for each item. */ ([
+                      k,
+                      v,
+                    ]) =>
+                      k +
+                      ": " +
+                      (d.metadata_at_review[k] || "(blank)") +
+                      " → " +
+                      (v || "(blank)"),
+                  )
+                  .join(", ")),
+        );
+        if (
+          !confirm(
+            "Execute " +
+              pending.length +
+              " pending decisions?\nIncludes all identities, folders and lighting, regardless of the current filters.\n\n" +
+              lines.join("\n") +
+              "\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.",
+          )
+        )
+          return;
+        const token = prompt("Enter PIN to execute these decisions:");
+        if (!token) return;
+        executing = true;
+        updateExecute();
+        let completed = 0;
+        let failure = "";
+        try {
+          for (const { r, d } of pending) {
+            const item = {
+              key: r.key,
+              folder: r.folder,
+              uuid: r.metadata.uuid,
+              filename: r.metadata.filename,
+            };
+            const correcting = d.decision === "correct_metadata";
+            const res = await fetch(
+              correcting ? "/api/edit-capture" : "/api/apply-decisions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Delete-Token": token,
+                },
+                body: JSON.stringify(
+                  correcting
+                    ? {
+                        ...item,
+                        changes: d.corrections,
+                        expected: d.metadata_at_review,
+                      }
+                    : {
+                        confirm_count: 1,
+                        remove: [item],
+                      },
+                ),
+              },
+            );
+            if (!res.ok) throw Error(await res.text());
+            await res.json();
+            delete decisions[r.key];
+            completed++;
+            save();
+          }
+        } catch (e) {
+          failure = e.message;
+        } finally {
+          executing = false;
+          await load();
+          updateExecute();
+        }
+        alert(
+          completed +
+            " decision(s) applied." +
+            (failure
+              ? " Stopped: " + failure + ". Unapplied decisions remain saved."
+              : ""),
+        );
+      }
+      document.getElementById("execute").onclick = executeDecisions;
+      document.getElementById("refresh").onclick = load;
+      document.getElementById("close").onclick =
+        /* Close the image preview dialog. */ () =>
+          document.getElementById("zoom").close();
+      load();
+      window.addEventListener(
+        "storage",
+        /* Handle the storage event for this control. */ (e) => {
+          if (e.key === STORAGE && !executing) {
+            try {
+              decisions = JSON.parse(e.newValue || "{}");
+            } catch (err) {}
+            render();
+          }
+        },
+      );
+      window.addEventListener(
+        "focus",
+        /* Handle the focus event for this control. */ () => {
+          if (!executing) {
+            try {
+              decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
+            } catch (e) {}
+            load();
+          }
+        },
+      );
+    </script>
+    <script src="/image_zoom.js"></script>
+    <link rel="stylesheet" href="/frozen_panes.css" />
+  </body>
+</html>

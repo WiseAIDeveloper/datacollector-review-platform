@@ -1,95 +1,1380 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Identity coverage review</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#172235;font:14px system-ui}header,main{max-width:1700px;margin:auto;padding:20px}h1{margin:0 0 7px}h2{margin:28px 0 12px}p{color:#526176}.toolbar,.actions,.decisions{display:flex;flex-wrap:wrap;gap:9px;align-items:end}.toolbar{margin:16px 0}.actions{margin:12px 0}label{display:grid;gap:5px;font-size:12px}select,input,button,textarea{font:inherit;padding:8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff}button{cursor:pointer}button.active{background:#174f83;color:#fff;border-color:#174f83}.summary{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:12px}.stat,.group,.capture{background:#fff;border:1px solid #dbe3ed;border-radius:10px}.stat{padding:14px}.stat b{font-size:24px;display:block}.group{margin:12px 0;padding:14px}.group.over{border-left:5px solid #d76c34}.group.missing{border-left:5px solid #c43f4c}.group.complete{border-left:5px solid #33956b}.group-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.group-head h3{margin:0;font-size:16px}.badge{white-space:nowrap;background:#eef3f8;border-radius:99px;padding:5px 9px}.captures{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:13px}.capture{padding:12px;min-width:0}.photo{height:280px;width:100%;object-fit:contain;background:#eaf0f5;cursor:zoom-in}.capture h4{margin:10px 0 4px;overflow-wrap:anywhere}.facts{margin:0 0 8px;color:#536278}.decisions{margin:10px 0}.corrections{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0}.corrections input{width:100%}textarea{width:100%;min-height:58px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #e7ecf2;padding:6px;overflow-wrap:anywhere}th{width:34%;color:#536278}details{margin-top:9px}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}.muted{color:#69778a;font-size:12px}.empty{padding:18px;background:#fff;border-radius:10px}dialog{border:0;max-width:96vw;max-height:96vh}dialog img{max-width:90vw;max-height:84vh;display:block}dialog::backdrop{background:#000b}@media(max-width:760px){header,main{padding:13px}.summary{grid-template-columns:1fr 1fr}.captures{grid-template-columns:1fr}.photo{height:240px}}
-body{padding-left:210px}.app-sidebar{position:fixed;inset:0 auto 0 0;width:210px;padding:24px 14px;background:#142c46;color:white;z-index:10}.app-sidebar strong{display:block;margin:0 10px 24px;font-size:18px}.app-sidebar a{display:block;padding:12px;margin:6px 0;border-radius:7px;color:#dce8f4;text-decoration:none}.app-sidebar a:hover,.app-sidebar a[aria-current="page"]{background:#28577e;color:white}@media(max-width:800px){body{padding-left:0}.app-sidebar{position:static;width:100%;padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}.app-sidebar strong{margin:0 12px 0 0;font-size:15px}.app-sidebar a{margin:0;padding:9px}}.missing-count{color:#b42318!important;font-weight:600}.found-count{color:#18733c!important;font-weight:600}</style><link rel="stylesheet" href="/terminal.css"><body class="terminal"><nav class="app-sidebar" aria-label="Main navigation"><strong>Capture workspace</strong><a href="/coverage.html" aria-current="page">Dashboard</a><a href="/">Capture review</a><a href="/quality.html">Quality review</a><a href="/ingestion.html">Ingestion logs</a><a href="/search.html">Image search</a></nav><header class="dashboard-header frozen-pane"><div class="dashboard-titlebar"><h1>Identity coverage dashboard</h1><button id="execute" disabled>Execute decisions (0)</button></div><details class="plan-files"><summary>Plan files</summary><p class="muted">Test plan CSV: <code>internal_colour_print_enhancement_2.csv</code> · Batch names CSV: <code>internal_colour_print_enhancement_2_batches.csv</code></p></details><div class="toolbar"><label>Identity<select id="subject"></select></label><button id="refresh">Refresh data</button></div></header><main><div id="summary" class="summary"></div><section><h2>Missing</h2><div id="missing"></div></section><section><h2>Over-count</h2><div id="over"></div></section><section><h2>Complete</h2><details><summary id="complete-summary">Show complete groups</summary><div id="complete"></div></details></section></main><dialog id="zoom"><button id="close">Close</button><img alt="Enlarged capture"></dialog><script>
-const STORAGE='idrecapture-review-v1',MATRIX='internal_colour_print_enhancement_2';let rows=[],matrix=[],batchDefs=[],decisions={},qualityReviews={};try{decisions=JSON.parse(localStorage.getItem(STORAGE)||'{}')}catch(e){}const $=id=>document.getElementById(id),el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n},url=(type,r)=>'/api/'+type+'?key='+encodeURIComponent(r.key);
-function save(){updateExecute();try{localStorage.setItem(STORAGE,JSON.stringify(decisions))}catch(e){alert('Browser storage unavailable. Keep this tab open.')}}
-
-function correctionChoices(r,k){
- const batch=batchDefs.find(b=>b.batch_name===r.folder&&b.test_plan_name===r.metadata.test_plan_name);
- const split=v=>(v||'').split(';').map(x=>x.trim()).filter(Boolean);
- if(k==='subject'){const configured=split(batch?.expected_identities);return configured.length?configured:[...new Set(rows.filter(x=>x.metadata.test_plan_name===r.metadata.test_plan_name).map(x=>x.metadata.subject).filter(Boolean))].sort()}
- if(k==='lighting')return split(batch?.expected_lighting);
- if(k==='capture_device')return ['',...split(batch?.expected_web_devices)];
- return null;
-}
-
-function decision(r){if(!decisions[r.key])decisions[r.key]={key:r.key,folder:r.folder,filename:r.metadata.filename,uuid:r.metadata.uuid,csv_row_at_review:r.line,subject:r.metadata.subject,lighting:r.metadata.lighting,sdk:r.sdk,device:r.device,decision:'undecided',notes:'',corrections:{},metadata_at_review:{...r.metadata}};decisions[r.key].reviewed_at=new Date().toISOString();return decisions[r.key]}
-const key=(folder,lighting,sdk,device)=>[folder,lighting,sdk,device].join('\u001f');
-function groups(){const subject=$('subject').value,caps=rows.filter(r=>r.metadata.subject===subject&&r.metadata.test_plan_name==='colour_print_enhancement_2'),by=new Map;for(const r of caps){const k=key(r.folder,r.metadata.lighting||'',r.sdk,r.device);if(!by.has(k))by.set(k,[]);by.get(k).push(r)}return matrix.map(m=>{const captures=by.get(key(m.folder,m.lighting,m.sdk,m.device))||[],expected=Number(m.expected_count_per_identity||0);return{m,captures,expected,found:captures.length}})}
-function metricClass(label){return label.startsWith('Missing')?'missing-count':label.startsWith('Found')?'found-count':''}
-function metricSpan(text){const span=el('span',text);span.className=metricClass(text);return span}
-function stat(label,value){const d=el('div');d.className='stat '+metricClass(label);d.append(el('b',value),el('span',label));return d}
-const expandedExcess=new Set();
-function groupCard(g,type){const box=el('article');box.className='group '+type;const head=el('div');head.className='group-head';const title=el('h3',[g.m.sdk.toUpperCase(),g.m.device].join(' · ')),badge=el('span');badge.append(el('span','Expected '+g.expected+' · '),metricSpan('Found '+g.found));badge.className='badge';head.append(title,badge);box.append(head);if(type==='missing'){box.append(el('p',(g.expected-g.found)+' more capture'+(g.expected-g.found===1?'':'s')+' needed.'));return box}const captures=el('div');captures.className='captures';for(const r of g.captures)captures.append(captureCard(r));if(type==='over'){const details=el('details');details.className='excess-review';const groupKey=[$('subject').value,g.m.folder,g.m.lighting,g.m.sdk,g.m.device].join('|');details.open=expandedExcess.has(groupKey);details.addEventListener('toggle',()=>{if(!details.isConnected)return;if(details.open)expandedExcess.add(groupKey);else expandedExcess.delete(groupKey)});details.append(el('summary','Review '+g.found+' captures · '+Math.max(g.found-g.expected,0)+' excess'),captures);box.append(details)}else box.append(captures);return box}
-function captureCard(r){const card=el('article');card.className='capture';const img=el('img');img.className='photo';img.src=url('image',r);img.alt=r.metadata.filename;img.loading='lazy';img.onclick=()=>{$('zoom').querySelector('img').src=img.src;$('zoom').showModal()};const link=el('a','Open original');link.href=img.src;link.target='_blank';link.rel='noopener';card.append(img,el('h4',r.metadata.filename),el('p','CSV row '+r.line+' · creation_time: '+(r.metadata.creation_time||'(blank)')),link);const original=el('p','Original annotation lighting: '+(r.annotation_lighting||'(missing)'));original.className='facts';card.append(original);const controls=el('div');controls.className='decisions';const current=decisions[r.key]?.decision||'undecided';for(const [v,label]of [['keep','Keep'],['remove','Remove'],['correct_metadata','Correct metadata'],['undecided','Undecided']]){const b=el('button',label);b.classList.toggle('active',current===v);b.onclick=()=>{decision(r).decision=v;save();render()};controls.append(b)}card.append(controls);if(current==='correct_metadata'){const changes=el('div');changes.className='corrections';for(const k of ['subject','lighting','capture_device','input_sensor','user']){const wrap=el('label','Correct '+k),options=correctionChoices(r,k),input=el(options?'select':'input');input.setAttribute('aria-label','Correct '+k);if(options){const current=decisions[r.key]?.corrections?.[k]??r.metadata[k]??'';if(!options.includes(current)){const o=el('option',(current||'(missing)')+' — outside configured choices');o.value=current;input.append(o)}for(const value of [...new Set(options)]){const o=el('option',value||(k==='capture_device'?'App SDK — use input sensor':'(missing)'));o.value=value;input.append(o)}}input.placeholder=r.metadata[k]||r[k]||'(blank)';input.value=decisions[r.key]?.corrections?.[k]??r.metadata[k]??'';input.oninput=()=>{const d=decision(r);if(input.value!==(r.metadata[k]||''))d.corrections[k]=input.value;else delete d.corrections[k];save()};wrap.append(input);changes.append(wrap)}card.append(changes)}const notes=el('textarea');notes.placeholder='Reason, duplicate filename, or correction details…';notes.value=decisions[r.key]?.notes||'';notes.oninput=()=>{decision(r).notes=notes.value;save()};card.append(notes);const details=el('details'),table=el('table');for(const [k,v]of Object.entries(r.metadata)){const tr=el('tr');tr.append(el('th',k),el('td',v));table.append(tr)}details.append(el('summary','Current CSV metadata'),table);const raw=el('details'),pre=el('pre','Loading…');raw.append(el('summary','Full original collection metadata'),pre);raw.addEventListener('toggle',async()=>{if(raw.open&&pre.textContent==='Loading…'){try{const res=await fetch(url('annotation',r));pre.textContent=res.ok?JSON.stringify(await res.json(),null,2):'Original metadata unavailable'}catch(e){pre.textContent='Unable to load metadata'}}});card.append(details,raw);return card}
-function batchGroups(gs){
- const batches=new Map,defs=new Map(batchDefs.map(d=>[d.batch_name,d]));
- for(const g of gs){const d=defs.get(g.m.folder)||{};if(!batches.has(g.m.folder))batches.set(g.m.folder,{name:g.m.folder,display:d.batch_display_name||g.m.folder,order:Number(d.sort_order||999),definition:d,groups:[],actual:0});batches.get(g.m.folder).groups.push(g)}
- for(const r of rows){if(r.metadata.subject===$('subject').value&&r.metadata.test_plan_name==='colour_print_enhancement_2'&&batches.has(r.folder))batches.get(r.folder).actual++}
- return [...batches.values()].map(b=>({...b,expected:b.groups.reduce((n,g)=>n+g.expected,0),found:b.groups.reduce((n,g)=>n+g.found,0),missing:b.groups.reduce((n,g)=>n+Math.max(g.expected-g.found,0),0),excess:b.groups.reduce((n,g)=>n+Math.max(g.found-g.expected,0),0)})).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name))
-}
-const viewNames={batches:'All batches',missing:'Missing',excess:'Excess',complete:'Complete',unreviewed:'Unreviewed'};
-let currentView='batches';
-function initBatchViews(){
- const style=el('style');style.textContent='.summary{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.views{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0}.views a{padding:10px 14px;border:1px solid #cbd5e1;border-radius:7px;text-decoration:none;color:#174f83;background:white}.views a.active{background:#174f83;color:white}.batch{background:white;border:1px solid #dbe3ed;border-radius:12px;padding:18px;margin:16px 0}.batch h2{margin:0 0 8px;overflow-wrap:anywhere;font-size:18px}.batch .group{background:#f8fafc}.batch.missing{border-left:5px solid #c43f4c}.batch.excess{border-left:5px solid #d76c34}.batch.complete{border-left:5px solid #33956b}.batch-totals{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.batch-definition{display:grid;gap:4px;padding:10px 12px;border-radius:8px;background:#f4f7fb;margin:10px 0}.batch-definition p{margin:0}.batch-totals span{padding:5px 9px;background:#eef3f8;border-radius:6px}.coverage-table{font-size:13px}.coverage-table th{width:auto}.batch a{color:#174f83}.lighting-block{margin:16px 0;padding:14px;border:1px solid #dbe3ed;border-radius:9px;background:#f8fafc}.lighting-block h3{margin:0 0 8px;font-size:17px}.lighting-block .group{background:white}';document.head.append(style);
- const main=document.querySelector('main');for(const section of main.querySelectorAll('section'))section.remove();
- const nav=el('nav');nav.id='views';nav.className='views';nav.setAttribute('aria-label','Coverage views');
- for(const [id,label]of Object.entries(viewNames)){const a=el('a',label);a.href='#'+id;a.dataset.view=id;nav.append(a)}
- const title=el('h2');title.id='view-title';const note=el('p');note.id='view-note';const content=el('div');content.id='batch-content';main.append(nav,title,note,content);
- window.addEventListener('hashchange',render);
-}
-function coverageTable(gs){
- const table=el('table');table.className='coverage-table';const head=el('tr');for(const label of ['Lighting','SDK / device','Expected','Found','Missing','To add','Reviewed'])head.append(el('th',label));table.append(head);
- for(const g of gs){const tr=el('tr'),needed=Math.max(g.expected-g.found,0);if(needed)tr.className='missing-case';for(const [i,v] of [g.m.lighting,g.m.sdk.toUpperCase()+' / '+g.m.device,g.expected,g.found,needed,needed?'Add '+needed+' capture'+(needed===1?'':'s'):'—'].entries()){const td=el('td',v);td.className=i===3?'found-count':i===4?'missing-count':'';tr.append(td)}const reviewed=g.captures.filter(r=>['pass','error'].includes(qualityReviews[r.key]?.status)).length,cell=el('td'),check=el('input');check.type='checkbox';check.className='reviewed-check';check.checked=g.captures.length>0&&reviewed===g.captures.length;check.disabled=true;check.setAttribute('aria-label',g.m.lighting+' / '+g.m.sdk+' / '+g.m.device+' reviewed');cell.title=reviewed+' of '+g.captures.length+' existing captures reviewed';cell.append(check);tr.append(cell);table.append(tr)}return table
-}
-function lightingBlocks(gs,view){
- const wrap=el('div'),by=new Map;wrap.className='lighting-groups';
- for(const g of gs){if(!by.has(g.m.lighting))by.set(g.m.lighting,[]);by.get(g.m.lighting).push(g)}
- for(const [lighting,list]of by){const block=el('section');block.className='lighting-block';const expected=list.reduce((n,g)=>n+g.expected,0),found=list.reduce((n,g)=>n+g.found,0),missing=list.reduce((n,g)=>n+Math.max(g.expected-g.found,0),0),excess=list.reduce((n,g)=>n+Math.max(g.found-g.expected,0),0);block.append(el('h3',lighting));const totals=el('div');totals.className='batch-totals';for(const text of ['Expected '+expected,'Found '+found,'Missing '+missing,'Excess '+excess])totals.append(metricSpan(text));block.append(totals);if(view==='excess'){for(const g of list)block.append(groupCard(g,'over'))}else block.append(coverageTable(list));wrap.append(block)}return wrap
-}
-function batchCard(b,view){
- const state=b.excess?'excess':b.missing?'missing':'complete';const box=el('article');box.className='batch '+state;const heading=el('div');heading.className='batch-heading';const captures=rows.filter(r=>r.folder===b.name&&r.metadata.subject===$('subject').value&&r.metadata.test_plan_name==='colour_print_enhancement_2'),reviewed=captures.filter(r=>['pass','error'].includes(qualityReviews[r.key]?.status)).length;const reviewState=reviewed===0?'unreviewed':reviewed===captures.length?'reviewed':'reviewing';const review=el('a',({unreviewed:'Unreviewed',reviewing:'Reviewing',reviewed:'Reviewed'})[reviewState]+' · '+reviewed+'/'+captures.length);review.className='review-quality '+reviewState;review.title='Review quality — '+reviewed+' of '+captures.length+' captures reviewed (pass or fail)';review.href='/quality.html?'+new URLSearchParams({batch:b.name,subject:$('subject').value});heading.append(el('h2',b.display),review);box.append(heading);const rawName=el('p',b.name);rawName.className='muted';box.append(rawName);
- const d=b.definition||{},definition=el('details');definition.className='batch-definition';definition.append(el('summary','Expected batch requirements'));const title=v=>v?v[0].toUpperCase()+v.slice(1):'Unknown';
- for(const text of ['Capture class: '+title(d.capture_class),'Expected lighting: '+(d.expected_lighting||''),'WEB SDK devices: '+(d.expected_web_devices||''),'APP SDK devices: '+(d.expected_app_devices||''),'Expected per SDK/device + lighting: '+(d.expected_per_sdk_device_lighting||'')])definition.append(el('p',text));box.append(definition);
- const totals=el('div');totals.className='batch-totals';for(const text of ['Expected '+b.expected,'Found '+b.found,'Missing '+b.missing,'Excess '+b.excess])totals.append(metricSpan(text));box.append(totals);
- if(b.actual>b.found)box.append(el('p',(b.actual-b.found)+' capture(s) have metadata that does not match the matrix.'));
- if(view==='batches'||view==='unreviewed'){const label=b.missing&&b.excess?'Missing + Excess':b.missing?'Missing':b.excess?'Excess':'Complete';box.append(el('p',label));const details=el('details');details.append(el('summary','Show batch grouped by lighting'),lightingBlocks(b.groups,'requirements'));box.append(details);return box}
- const selected=b.groups.filter(g=>view==='missing'?g.found<g.expected:view==='excess'?g.found>g.expected:g.found===g.expected);box.append(lightingBlocks(selected,view));return box
-}
-function render(){
- if(!$('batch-content'))initBatchViews();
- const requested=location.hash.slice(1);currentView=Object.hasOwn(viewNames,requested)?requested:'batches';
- const batches=batchGroups(groups()),missing=batches.filter(b=>b.missing>0),excess=batches.filter(b=>b.excess>0),complete=batches.filter(b=>b.missing===0&&b.excess===0);
- const sum=(bs,k)=>bs.reduce((n,b)=>n+b[k],0);
- $('summary').replaceChildren(stat('Expected captures',sum(batches,'expected')),stat('Found in matrix',sum(batches,'found')),stat('Missing captures',sum(missing,'missing')),stat('Excess captures',sum(excess,'excess')));
- const unreviewed=batches.filter(b=>rows.some(r=>r.folder===b.name&&r.metadata.subject===$('subject').value&&r.metadata.test_plan_name==='colour_print_enhancement_2'&&!['pass','error'].includes(qualityReviews[r.key]?.status)));const lists={batches,missing,excess,complete,unreviewed};
- for(const a of $('views').querySelectorAll('a')){const id=a.dataset.view;a.textContent=viewNames[id]+' ('+lists[id].length+')';a.classList.toggle('active',id===currentView);if(id===currentView)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')}
- $('view-title').textContent=viewNames[currentView];
- $('view-note').textContent={batches:'Each batch is a matrix folder. A batch can have both missing and excess combinations.',missing:'All batches with missing captures are shown here, including batches with zero captures.',excess:'Review combinations above the expected count within each batch. Repeated counts do not prove identical images.',complete:'Every matrix combination in these batches has exactly the required count.',unreviewed:'Batches with existing captures still awaiting quality review, including partially reviewed batches.'}[currentView];
- const host=$('batch-content');host.replaceChildren();if(!lists[currentView].length){const p=el('p','No batches in this view.');p.className='empty';host.append(p)}else for(const b of lists[currentView])host.append(batchCard(b,currentView));save();
-}
-function download(data,type,ext){const u=URL.createObjectURL(new Blob([data],{type})),a=el('a');a.href=u;a.download='capture_decisions_'+new Date().toISOString().slice(0,10)+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
-let executing=false;
-function pendingDecisions(){return rows.filter(r=>r.metadata.subject===$('subject').value&&r.metadata.test_plan_name==='colour_print_enhancement_2'&&['remove','correct_metadata'].includes(decisions[r.key]?.decision))}
-function updateExecute(){const b=document.getElementById('execute');if(!b)return;b.disabled=executing||!pendingDecisions().length;b.textContent=executing?'Executing…':'Execute decisions ('+pendingDecisions().length+')'}
-async function executeDecisions(){
- const pending=pendingDecisions().map(r=>({r,d:JSON.parse(JSON.stringify(decisions[r.key]))}));if(executing||!pending.length)return;
- const allowed=['subject','lighting','capture_device','input_sensor','user'];
- for(const {r,d} of pending){if(d.decision==='correct_metadata'&&(!Object.keys(d.corrections||{}).length||Object.keys(d.corrections).some(k=>!allowed.includes(k)))){alert('Review corrections for '+r.metadata.filename+'. Enter at least one metadata change. Folder moves are not supported.');return}}
- const lines=pending.map(({r,d})=>r.folder+' / '+r.metadata.filename+' — '+(d.decision==='remove'?'DELETE':Object.entries(d.corrections).map(([k,v])=>k+': '+(d.metadata_at_review[k]||'(blank)')+' → '+(v||'(blank)')).join(', ')));
- if(!confirm('Execute '+pending.length+' decisions for '+($('subject').value||'all identities')+'?\nAcross all folders and lighting for this identity.\n\n'+lines.join('\n')+'\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.'))return;
- const token=prompt('Enter PIN to execute these decisions:');if(!token)return;
- executing=true;updateExecute();let completed=0;let failure='';
- try{for(const {r,d} of pending){
- const item={key:r.key,folder:r.folder,uuid:r.metadata.uuid,filename:r.metadata.filename};
- const correcting=d.decision==='correct_metadata';
- const res=await fetch(correcting?'/api/edit-capture':'/api/apply-decisions',{method:'POST',headers:{'Content-Type':'application/json','X-Delete-Token':token},body:JSON.stringify(correcting?{...item,changes:d.corrections,expected:d.metadata_at_review}:{confirm_count:1,remove:[item]})});
- if(!res.ok)throw Error(await res.text());await res.json();
- delete decisions[r.key];completed++;save();
- }}catch(e){failure=e.message}finally{executing=false;await load();updateExecute()}
- alert(completed+' decision(s) applied.'+(failure?' Stopped: '+failure+'. Unapplied decisions remain saved.':''));
-}
-async function load(){try{const [a,b,c,d]=await Promise.all([fetch('/api/captures'),fetch('/api/matrix'),fetch('/api/batches'),fetch('/api/quality')]);if(!a.ok||!b.ok||!c.ok||!d.ok)throw Error();rows=await a.json();matrix=await b.json();batchDefs=await c.json();qualityReviews=await d.json();const previous=$('subject').value||'koh-jia-yi',subjects=[...new Set(rows.filter(r=>r.metadata.test_plan_name==='colour_print_enhancement_2').map(r=>r.metadata.subject).filter(Boolean))].sort();$('subject').replaceChildren(...subjects.map(s=>{const o=el('option',s);o.value=s;return o}));$('subject').value=subjects.includes(previous)?previous:subjects[0]||'';render()}catch(e){$('summary').replaceChildren(stat('Load error','Please refresh'))}}
-$('execute').onclick=executeDecisions;$('subject').onchange=render;$('refresh').onclick=load;$('close').onclick=()=>$('zoom').close();load();
-window.addEventListener('focus',()=>{if(!executing){try{decisions=JSON.parse(localStorage.getItem(STORAGE)||'{}')}catch(e){}load()}});
-</script><script src="/image_zoom.js"></script><link rel="stylesheet" href="/frozen_panes.css"></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Identity coverage review</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f3f6fa;
+        color: #172235;
+        font: 14px system-ui;
+      }
+      header,
+      main {
+        max-width: 1700px;
+        margin: auto;
+        padding: 20px;
+      }
+      h1 {
+        margin: 0 0 7px;
+      }
+      h2 {
+        margin: 28px 0 12px;
+      }
+      p {
+        color: #526176;
+      }
+      .toolbar,
+      .actions,
+      .decisions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        align-items: end;
+      }
+      .toolbar {
+        margin: 16px 0;
+      }
+      .actions {
+        margin: 12px 0;
+      }
+      label {
+        display: grid;
+        gap: 5px;
+        font-size: 12px;
+      }
+      select,
+      input,
+      button,
+      textarea {
+        font: inherit;
+        padding: 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+      }
+      button {
+        cursor: pointer;
+      }
+      button.active {
+        background: #174f83;
+        color: #fff;
+        border-color: #174f83;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
+        gap: 12px;
+      }
+      .stat,
+      .group,
+      .capture {
+        background: #fff;
+        border: 1px solid #dbe3ed;
+        border-radius: 10px;
+      }
+      .stat {
+        padding: 14px;
+      }
+      .stat b {
+        font-size: 24px;
+        display: block;
+      }
+      .group {
+        margin: 12px 0;
+        padding: 14px;
+      }
+      .group.over {
+        border-left: 5px solid #d76c34;
+      }
+      .group.missing {
+        border-left: 5px solid #c43f4c;
+      }
+      .group.complete {
+        border-left: 5px solid #33956b;
+      }
+      .group-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+      }
+      .group-head h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .badge {
+        white-space: nowrap;
+        background: #eef3f8;
+        border-radius: 99px;
+        padding: 5px 9px;
+      }
+      .captures {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 12px;
+        margin-top: 13px;
+      }
+      .capture {
+        padding: 12px;
+        min-width: 0;
+      }
+      .photo {
+        height: 280px;
+        width: 100%;
+        object-fit: contain;
+        background: #eaf0f5;
+        cursor: zoom-in;
+      }
+      .capture h4 {
+        margin: 10px 0 4px;
+        overflow-wrap: anywhere;
+      }
+      .facts {
+        margin: 0 0 8px;
+        color: #536278;
+      }
+      .decisions {
+        margin: 10px 0;
+      }
+      .corrections {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+        margin: 8px 0;
+      }
+      .corrections input {
+        width: 100%;
+      }
+      textarea {
+        width: 100%;
+        min-height: 58px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid #e7ecf2;
+        padding: 6px;
+        overflow-wrap: anywhere;
+      }
+      th {
+        width: 34%;
+        color: #536278;
+      }
+      details {
+        margin-top: 9px;
+      }
+      summary {
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .muted {
+        color: #69778a;
+        font-size: 12px;
+      }
+      .empty {
+        padding: 18px;
+        background: #fff;
+        border-radius: 10px;
+      }
+      dialog {
+        border: 0;
+        max-width: 96vw;
+        max-height: 96vh;
+      }
+      dialog img {
+        max-width: 90vw;
+        max-height: 84vh;
+        display: block;
+      }
+      dialog::backdrop {
+        background: #000b;
+      }
+      @media (max-width: 760px) {
+        header,
+        main {
+          padding: 13px;
+        }
+        .summary {
+          grid-template-columns: 1fr 1fr;
+        }
+        .captures {
+          grid-template-columns: 1fr;
+        }
+        .photo {
+          height: 240px;
+        }
+      }
+      body {
+        padding-left: 210px;
+      }
+      .app-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 210px;
+        padding: 24px 14px;
+        background: #142c46;
+        color: white;
+        z-index: 10;
+      }
+      .app-sidebar strong {
+        display: block;
+        margin: 0 10px 24px;
+        font-size: 18px;
+      }
+      .app-sidebar a {
+        display: block;
+        padding: 12px;
+        margin: 6px 0;
+        border-radius: 7px;
+        color: #dce8f4;
+        text-decoration: none;
+      }
+      .app-sidebar a:hover,
+      .app-sidebar a[aria-current="page"] {
+        background: #28577e;
+        color: white;
+      }
+      @media (max-width: 800px) {
+        body {
+          padding-left: 0;
+        }
+        .app-sidebar {
+          position: static;
+          width: 100%;
+          padding: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 5px;
+        }
+        .app-sidebar strong {
+          margin: 0 12px 0 0;
+          font-size: 15px;
+        }
+        .app-sidebar a {
+          margin: 0;
+          padding: 9px;
+        }
+      }
+      .missing-count {
+        color: #b42318 !important;
+        font-weight: 600;
+      }
+      .found-count {
+        color: #18733c !important;
+        font-weight: 600;
+      }
+    </style>
+    <link rel="stylesheet" href="/terminal.css" />
+  </head>
+  <body class="terminal">
+    <nav class="app-sidebar" aria-label="Main navigation">
+      <strong>Capture workspace</strong
+      ><a href="/coverage.html" aria-current="page">Dashboard</a
+      ><a href="/">Capture review</a><a href="/quality.html">Quality review</a
+      ><a href="/ingestion.html">Ingestion logs</a
+      ><a href="/search.html">Image search</a>
+    </nav>
+    <header class="dashboard-header frozen-pane">
+      <div class="dashboard-titlebar">
+        <h1>Identity coverage dashboard</h1>
+        <button id="execute" disabled>Execute decisions (0)</button>
+      </div>
+      <details class="plan-files">
+        <summary>Plan files</summary>
+        <p class="muted">
+          Test plan CSV: <code>internal_colour_print_enhancement_2.csv</code> ·
+          Batch names CSV:
+          <code>internal_colour_print_enhancement_2_batches.csv</code>
+        </p>
+      </details>
+      <div class="toolbar">
+        <label>Identity<select id="subject"></select></label
+        ><button id="refresh">Refresh data</button>
+      </div>
+    </header>
+    <main>
+      <div id="summary" class="summary"></div>
+      <section>
+        <h2>Missing</h2>
+        <div id="missing"></div>
+      </section>
+      <section>
+        <h2>Over-count</h2>
+        <div id="over"></div>
+      </section>
+      <section>
+        <h2>Complete</h2>
+        <details>
+          <summary id="complete-summary">Show complete groups</summary>
+          <div id="complete"></div>
+        </details>
+      </section>
+    </main>
+    <dialog id="zoom">
+      <button id="close">Close</button><img alt="Enlarged capture" />
+    </dialog>
+    <script>
+      const STORAGE = "idrecapture-review-v1",
+        MATRIX = "internal_colour_print_enhancement_2";
+      let rows = [],
+        matrix = [],
+        batchDefs = [],
+        decisions = {},
+        qualityReviews = {};
+      try {
+        decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
+      } catch (e) {}
+      const $ = /* Find an element by its page identifier. */ (id) =>
+          document.getElementById(id),
+        el = /* Create a text-only DOM element. */ (tag, text) => {
+          const n = document.createElement(tag);
+          if (text !== undefined) n.textContent = text;
+          return n;
+        },
+        url = /* Build an encoded URL for a capture resource. */ (type, r) =>
+          "/api/" + type + "?key=" + encodeURIComponent(r.key);
+      /* Persist review drafts in browser storage and update the pending action count. */
+      function save() {
+        updateExecute();
+        try {
+          localStorage.setItem(STORAGE, JSON.stringify(decisions));
+        } catch (e) {
+          alert("Browser storage unavailable. Keep this tab open.");
+        }
+      }
+      /* Find allowed corrections from the capture’s matching batch definition. */
+      function correctionChoices(r, k) {
+        const batch = batchDefs.find(
+          /* Locate the item matching the selected capture or batch. */ (b) =>
+            b.batch_name === r.folder &&
+            b.test_plan_name === r.metadata.test_plan_name,
+        );
+        const split =
+          /* Read nonempty choices from a semicolon-separated batch setting. */ (
+            v,
+          ) =>
+            (v || "")
+              .split(";")
+              .map(
+                /* Build the corresponding display or request value for each item. */ (
+                  x,
+                ) => x.trim(),
+              )
+              .filter(Boolean);
+        if (k === "subject") {
+          const configured = split(batch?.expected_identities);
+          return configured.length
+            ? configured
+            : [
+                ...new Set(
+                  rows
+                    .filter(
+                      /* Keep items that match the current selection criteria. */ (
+                        x,
+                      ) =>
+                        x.metadata.test_plan_name === r.metadata.test_plan_name,
+                    )
+                    .map(
+                      /* Build the corresponding display or request value for each item. */ (
+                        x,
+                      ) => x.metadata.subject,
+                    )
+                    .filter(Boolean),
+                ),
+              ].sort();
+        }
+        if (k === "lighting") return split(batch?.expected_lighting);
+        if (k === "capture_device")
+          return ["", ...split(batch?.expected_web_devices)];
+        return null;
+      }
+      /* Restore a capture’s saved draft or initialize an undecided review. */
+      function decision(r) {
+        if (!decisions[r.key])
+          decisions[r.key] = {
+            key: r.key,
+            folder: r.folder,
+            filename: r.metadata.filename,
+            uuid: r.metadata.uuid,
+            csv_row_at_review: r.line,
+            subject: r.metadata.subject,
+            lighting: r.metadata.lighting,
+            sdk: r.sdk,
+            device: r.device,
+            decision: "undecided",
+            notes: "",
+            corrections: {},
+            metadata_at_review: {
+              ...r.metadata,
+            },
+          };
+        decisions[r.key].reviewed_at = new Date().toISOString();
+        return decisions[r.key];
+      }
+      const key =
+        /* Build a stable coverage-group key from batch, lighting, SDK, and device. */ (
+          folder,
+          lighting,
+          sdk,
+          device,
+        ) => [folder, lighting, sdk, device].join("\u001f");
+      /* Match captures to expected matrix groups for the selected identity. */
+      function groups() {
+        const subject = $("subject").value,
+          caps = rows.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              r.metadata.subject === subject &&
+              r.metadata.test_plan_name === "colour_print_enhancement_2",
+          ),
+          by = new Map();
+        for (const r of caps) {
+          const k = key(r.folder, r.metadata.lighting || "", r.sdk, r.device);
+          if (!by.has(k)) by.set(k, []);
+          by.get(k).push(r);
+        }
+        return matrix.map(
+          /* Build the corresponding display or request value for each item. */ (
+            m,
+          ) => {
+            const captures =
+                by.get(key(m.folder, m.lighting, m.sdk, m.device)) || [],
+              expected = Number(m.expected_count_per_identity || 0);
+            return {
+              m,
+              captures,
+              expected,
+              found: captures.length,
+            };
+          },
+        );
+      }
+      /* Choose a visual status for a coverage metric. */
+      function metricClass(label) {
+        return label.startsWith("Missing")
+          ? "missing-count"
+          : label.startsWith("Found")
+            ? "found-count"
+            : "";
+      }
+      /* Render a coverage metric with its status styling. */
+      function metricSpan(text) {
+        const span = el("span", text);
+        span.className = metricClass(text);
+        return span;
+      }
+      /* Render a labelled summary count. */
+      function stat(label, value) {
+        const d = el("div");
+        d.className = "stat " + metricClass(label);
+        d.append(el("b", value), el("span", label));
+        return d;
+      }
+      const expandedExcess = new Set();
+      /* Render expected and actual counts with the group’s capture previews. */
+      function groupCard(g, type) {
+        const box = el("article");
+        box.className = "group " + type;
+        const head = el("div");
+        head.className = "group-head";
+        const title = el("h3", [g.m.sdk.toUpperCase(), g.m.device].join(" · ")),
+          badge = el("span");
+        badge.append(
+          el("span", "Expected " + g.expected + " · "),
+          metricSpan("Found " + g.found),
+        );
+        badge.className = "badge";
+        head.append(title, badge);
+        box.append(head);
+        if (type === "missing") {
+          box.append(
+            el(
+              "p",
+              g.expected -
+                g.found +
+                " more capture" +
+                (g.expected - g.found === 1 ? "" : "s") +
+                " needed.",
+            ),
+          );
+          return box;
+        }
+        const captures = el("div");
+        captures.className = "captures";
+        for (const r of g.captures) captures.append(captureCard(r));
+        if (type === "over") {
+          const details = el("details");
+          details.className = "excess-review";
+          const groupKey = [
+            $("subject").value,
+            g.m.folder,
+            g.m.lighting,
+            g.m.sdk,
+            g.m.device,
+          ].join("|");
+          details.open = expandedExcess.has(groupKey);
+          details.addEventListener(
+            "toggle",
+            /* Handle the toggle event for this control. */ () => {
+              if (!details.isConnected) return;
+              if (details.open) expandedExcess.add(groupKey);
+              else expandedExcess.delete(groupKey);
+            },
+          );
+          details.append(
+            el(
+              "summary",
+              "Review " +
+                g.found +
+                " captures · " +
+                Math.max(g.found - g.expected, 0) +
+                " excess",
+            ),
+            captures,
+          );
+          box.append(details);
+        } else box.append(captures);
+        return box;
+      }
+      /* Render a capture with its review actions and metadata correction controls. */
+      function captureCard(r) {
+        const card = el("article");
+        card.className = "capture";
+        const img = el("img");
+        img.className = "photo";
+        img.src = url("image", r);
+        img.alt = r.metadata.filename;
+        img.loading = "lazy";
+        img.onclick =
+          /* Open the selected capture in the zoom dialog. */ () => {
+            $("zoom").querySelector("img").src = img.src;
+            $("zoom").showModal();
+          };
+        const link = el("a", "Open original");
+        link.href = img.src;
+        link.target = "_blank";
+        link.rel = "noopener";
+        card.append(
+          img,
+          el("h4", r.metadata.filename),
+          el(
+            "p",
+            "CSV row " +
+              r.line +
+              " · creation_time: " +
+              (r.metadata.creation_time || "(blank)"),
+          ),
+          link,
+        );
+        const original = el(
+          "p",
+          "Original annotation lighting: " +
+            (r.annotation_lighting || "(missing)"),
+        );
+        original.className = "facts";
+        card.append(original);
+        const controls = el("div");
+        controls.className = "decisions";
+        const current = decisions[r.key]?.decision || "undecided";
+        for (const [v, label] of [
+          ["keep", "Keep"],
+          ["remove", "Remove"],
+          ["correct_metadata", "Correct metadata"],
+          ["undecided", "Undecided"],
+        ]) {
+          const b = el("button", label);
+          b.classList.toggle("active", current === v);
+          b.onclick =
+            /* Save the selected review decision and redraw its controls. */ () => {
+              decision(r).decision = v;
+              save();
+              render();
+            };
+          controls.append(b);
+        }
+        card.append(controls);
+        if (current === "correct_metadata") {
+          const changes = el("div");
+          changes.className = "corrections";
+          for (const k of [
+            "subject",
+            "lighting",
+            "capture_device",
+            "input_sensor",
+            "user",
+          ]) {
+            const wrap = el("label", "Correct " + k),
+              options = correctionChoices(r, k),
+              input = el(options ? "select" : "input");
+            input.setAttribute("aria-label", "Correct " + k);
+            if (options) {
+              const current =
+                decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
+              if (!options.includes(current)) {
+                const o = el(
+                  "option",
+                  (current || "(missing)") + " — outside configured choices",
+                );
+                o.value = current;
+                input.append(o);
+              }
+              for (const value of [...new Set(options)]) {
+                const o = el(
+                  "option",
+                  value ||
+                    (k === "capture_device"
+                      ? "App SDK — use input sensor"
+                      : "(missing)"),
+                );
+                o.value = value;
+                input.append(o);
+              }
+            }
+            input.placeholder = r.metadata[k] || r[k] || "(blank)";
+            input.value =
+              decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
+            input.oninput =
+              /* Store only metadata fields that differ from the original capture. */ () => {
+                const d = decision(r);
+                if (input.value !== (r.metadata[k] || ""))
+                  d.corrections[k] = input.value;
+                else delete d.corrections[k];
+                save();
+              };
+            wrap.append(input);
+            changes.append(wrap);
+          }
+          card.append(changes);
+        }
+        const notes = el("textarea");
+        notes.placeholder =
+          "Reason, duplicate filename, or correction details…";
+        notes.value = decisions[r.key]?.notes || "";
+        notes.oninput =
+          /* Save the capture’s review notes in browser storage. */ () => {
+            decision(r).notes = notes.value;
+            save();
+          };
+        card.append(notes);
+        const details = el("details"),
+          table = el("table");
+        for (const [k, v] of Object.entries(r.metadata)) {
+          const tr = el("tr");
+          tr.append(el("th", k), el("td", v));
+          table.append(tr);
+        }
+        details.append(el("summary", "Current CSV metadata"), table);
+        const raw = el("details"),
+          pre = el("pre", "Loading…");
+        raw.append(el("summary", "Full original collection metadata"), pre);
+        raw.addEventListener(
+          "toggle",
+          /* Decode the response body as JSON. */ async () => {
+            if (raw.open && pre.textContent === "Loading…") {
+              try {
+                const res = await fetch(url("annotation", r));
+                pre.textContent = res.ok
+                  ? JSON.stringify(await res.json(), null, 2)
+                  : "Original metadata unavailable";
+              } catch (e) {
+                pre.textContent = "Unable to load metadata";
+              }
+            }
+          },
+        );
+        card.append(details, raw);
+        return card;
+      }
+      /* Aggregate matrix groups into batch coverage and quality totals. */
+      function batchGroups(gs) {
+        const batches = new Map(),
+          defs = new Map(
+            batchDefs.map(
+              /* Build the corresponding display or request value for each item. */ (
+                d,
+              ) => [d.batch_name, d],
+            ),
+          );
+        for (const g of gs) {
+          const d = defs.get(g.m.folder) || {};
+          if (!batches.has(g.m.folder))
+            batches.set(g.m.folder, {
+              name: g.m.folder,
+              display: d.batch_display_name || g.m.folder,
+              order: Number(d.sort_order || 999),
+              definition: d,
+              groups: [],
+              actual: 0,
+            });
+          batches.get(g.m.folder).groups.push(g);
+        }
+        for (const r of rows) {
+          if (
+            r.metadata.subject === $("subject").value &&
+            r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+            batches.has(r.folder)
+          )
+            batches.get(r.folder).actual++;
+        }
+        return [...batches.values()]
+          .map(
+            /* Build the corresponding display or request value for each item. */ (
+              b,
+            ) => ({
+              ...b,
+              expected: b.groups.reduce(
+                /* Accumulate the displayed total from the matching items. */ (
+                  n,
+                  g,
+                ) => n + g.expected,
+                0,
+              ),
+              found: b.groups.reduce(
+                /* Accumulate the displayed total from the matching items. */ (
+                  n,
+                  g,
+                ) => n + g.found,
+                0,
+              ),
+              missing: b.groups.reduce(
+                /* Accumulate the displayed total from the matching items. */ (
+                  n,
+                  g,
+                ) => n + Math.max(g.expected - g.found, 0),
+                0,
+              ),
+              excess: b.groups.reduce(
+                /* Accumulate the displayed total from the matching items. */ (
+                  n,
+                  g,
+                ) => n + Math.max(g.found - g.expected, 0),
+                0,
+              ),
+            }),
+          )
+          .sort(
+            /* Order the displayed items by the selected value. */ (a, b) =>
+              a.order - b.order || a.name.localeCompare(b.name),
+          );
+      }
+      const viewNames = {
+        batches: "All batches",
+        missing: "Missing",
+        excess: "Excess",
+        complete: "Complete",
+        unreviewed: "Unreviewed",
+      };
+      let currentView = "batches";
+      /* Create batch navigation controls and synchronize the selected view. */
+      function initBatchViews() {
+        const style = el("style");
+        style.textContent =
+          ".summary{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.views{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0}.views a{padding:10px 14px;border:1px solid #cbd5e1;border-radius:7px;text-decoration:none;color:#174f83;background:white}.views a.active{background:#174f83;color:white}.batch{background:white;border:1px solid #dbe3ed;border-radius:12px;padding:18px;margin:16px 0}.batch h2{margin:0 0 8px;overflow-wrap:anywhere;font-size:18px}.batch .group{background:#f8fafc}.batch.missing{border-left:5px solid #c43f4c}.batch.excess{border-left:5px solid #d76c34}.batch.complete{border-left:5px solid #33956b}.batch-totals{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.batch-definition{display:grid;gap:4px;padding:10px 12px;border-radius:8px;background:#f4f7fb;margin:10px 0}.batch-definition p{margin:0}.batch-totals span{padding:5px 9px;background:#eef3f8;border-radius:6px}.coverage-table{font-size:13px}.coverage-table th{width:auto}.batch a{color:#174f83}.lighting-block{margin:16px 0;padding:14px;border:1px solid #dbe3ed;border-radius:9px;background:#f8fafc}.lighting-block h3{margin:0 0 8px;font-size:17px}.lighting-block .group{background:white}";
+        document.head.append(style);
+        const main = document.querySelector("main");
+        for (const section of main.querySelectorAll("section"))
+          section.remove();
+        const nav = el("nav");
+        nav.id = "views";
+        nav.className = "views";
+        nav.setAttribute("aria-label", "Coverage views");
+        for (const [id, label] of Object.entries(viewNames)) {
+          const a = el("a", label);
+          a.href = "#" + id;
+          a.dataset.view = id;
+          nav.append(a);
+        }
+        const title = el("h2");
+        title.id = "view-title";
+        const note = el("p");
+        note.id = "view-note";
+        const content = el("div");
+        content.id = "batch-content";
+        main.append(nav, title, note, content);
+        window.addEventListener("hashchange", render);
+      }
+      /* Render matrix coverage counts for each lighting and device combination. */
+      function coverageTable(gs) {
+        const table = el("table");
+        table.className = "coverage-table";
+        const head = el("tr");
+        for (const label of [
+          "Lighting",
+          "SDK / device",
+          "Expected",
+          "Found",
+          "Missing",
+          "To add",
+          "Reviewed",
+        ])
+          head.append(el("th", label));
+        table.append(head);
+        for (const g of gs) {
+          const tr = el("tr"),
+            needed = Math.max(g.expected - g.found, 0);
+          if (needed) tr.className = "missing-case";
+          for (const [i, v] of [
+            g.m.lighting,
+            g.m.sdk.toUpperCase() + " / " + g.m.device,
+            g.expected,
+            g.found,
+            needed,
+            needed
+              ? "Add " + needed + " capture" + (needed === 1 ? "" : "s")
+              : "—",
+          ].entries()) {
+            const td = el("td", v);
+            td.className =
+              i === 3 ? "found-count" : i === 4 ? "missing-count" : "";
+            tr.append(td);
+          }
+          const reviewed = g.captures.filter(
+              /* Keep items that match the current selection criteria. */ (r) =>
+                ["pass", "error"].includes(qualityReviews[r.key]?.status),
+            ).length,
+            cell = el("td"),
+            check = el("input");
+          check.type = "checkbox";
+          check.className = "reviewed-check";
+          check.checked =
+            g.captures.length > 0 && reviewed === g.captures.length;
+          check.disabled = true;
+          check.setAttribute(
+            "aria-label",
+            g.m.lighting + " / " + g.m.sdk + " / " + g.m.device + " reviewed",
+          );
+          cell.title =
+            reviewed +
+            " of " +
+            g.captures.length +
+            " existing captures reviewed";
+          cell.append(check);
+          tr.append(cell);
+          table.append(tr);
+        }
+        return table;
+      }
+      /* Render the selected batch groups organized by lighting. */
+      function lightingBlocks(gs, view) {
+        const wrap = el("div"),
+          by = new Map();
+        wrap.className = "lighting-groups";
+        for (const g of gs) {
+          if (!by.has(g.m.lighting)) by.set(g.m.lighting, []);
+          by.get(g.m.lighting).push(g);
+        }
+        for (const [lighting, list] of by) {
+          const block = el("section");
+          block.className = "lighting-block";
+          const expected = list.reduce(
+              /* Accumulate the displayed total from the matching items. */ (
+                n,
+                g,
+              ) => n + g.expected,
+              0,
+            ),
+            found = list.reduce(
+              /* Accumulate the displayed total from the matching items. */ (
+                n,
+                g,
+              ) => n + g.found,
+              0,
+            ),
+            missing = list.reduce(
+              /* Accumulate the displayed total from the matching items. */ (
+                n,
+                g,
+              ) => n + Math.max(g.expected - g.found, 0),
+              0,
+            ),
+            excess = list.reduce(
+              /* Accumulate the displayed total from the matching items. */ (
+                n,
+                g,
+              ) => n + Math.max(g.found - g.expected, 0),
+              0,
+            );
+          block.append(el("h3", lighting));
+          const totals = el("div");
+          totals.className = "batch-totals";
+          for (const text of [
+            "Expected " + expected,
+            "Found " + found,
+            "Missing " + missing,
+            "Excess " + excess,
+          ])
+            totals.append(metricSpan(text));
+          block.append(totals);
+          if (view === "excess") {
+            for (const g of list) block.append(groupCard(g, "over"));
+          } else block.append(coverageTable(list));
+          wrap.append(block);
+        }
+        return wrap;
+      }
+      /* Render one batch’s coverage summary and quality-review links. */
+      function batchCard(b, view) {
+        const state = b.excess ? "excess" : b.missing ? "missing" : "complete";
+        const box = el("article");
+        box.className = "batch " + state;
+        const heading = el("div");
+        heading.className = "batch-heading";
+        const captures = rows.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              r.folder === b.name &&
+              r.metadata.subject === $("subject").value &&
+              r.metadata.test_plan_name === "colour_print_enhancement_2",
+          ),
+          reviewed = captures.filter(
+            /* Keep items that match the current selection criteria. */ (r) =>
+              ["pass", "error"].includes(qualityReviews[r.key]?.status),
+          ).length;
+        const reviewState =
+          reviewed === 0
+            ? "unreviewed"
+            : reviewed === captures.length
+              ? "reviewed"
+              : "reviewing";
+        const review = el(
+          "a",
+          {
+            unreviewed: "Unreviewed",
+            reviewing: "Reviewing",
+            reviewed: "Reviewed",
+          }[reviewState] +
+            " · " +
+            reviewed +
+            "/" +
+            captures.length,
+        );
+        review.className = "review-quality " + reviewState;
+        review.title =
+          "Review quality — " +
+          reviewed +
+          " of " +
+          captures.length +
+          " captures reviewed (pass or fail)";
+        review.href =
+          "/quality.html?" +
+          new URLSearchParams({
+            batch: b.name,
+            subject: $("subject").value,
+          });
+        heading.append(el("h2", b.display), review);
+        box.append(heading);
+        const rawName = el("p", b.name);
+        rawName.className = "muted";
+        box.append(rawName);
+        const d = b.definition || {},
+          definition = el("details");
+        definition.className = "batch-definition";
+        definition.append(el("summary", "Expected batch requirements"));
+        const title =
+          /* Display a capitalized label with a fallback for missing values. */ (
+            v,
+          ) => (v ? v[0].toUpperCase() + v.slice(1) : "Unknown");
+        for (const text of [
+          "Capture class: " + title(d.capture_class),
+          "Expected lighting: " + (d.expected_lighting || ""),
+          "WEB SDK devices: " + (d.expected_web_devices || ""),
+          "APP SDK devices: " + (d.expected_app_devices || ""),
+          "Expected per SDK/device + lighting: " +
+            (d.expected_per_sdk_device_lighting || ""),
+        ])
+          definition.append(el("p", text));
+        box.append(definition);
+        const totals = el("div");
+        totals.className = "batch-totals";
+        for (const text of [
+          "Expected " + b.expected,
+          "Found " + b.found,
+          "Missing " + b.missing,
+          "Excess " + b.excess,
+        ])
+          totals.append(metricSpan(text));
+        box.append(totals);
+        if (b.actual > b.found)
+          box.append(
+            el(
+              "p",
+              b.actual -
+                b.found +
+                " capture(s) have metadata that does not match the matrix.",
+            ),
+          );
+        if (view === "batches" || view === "unreviewed") {
+          const label =
+            b.missing && b.excess
+              ? "Missing + Excess"
+              : b.missing
+                ? "Missing"
+                : b.excess
+                  ? "Excess"
+                  : "Complete";
+          box.append(el("p", label));
+          const details = el("details");
+          details.append(
+            el("summary", "Show batch grouped by lighting"),
+            lightingBlocks(b.groups, "requirements"),
+          );
+          box.append(details);
+          return box;
+        }
+        const selected = b.groups.filter(
+          /* Keep items that match the current selection criteria. */ (g) =>
+            view === "missing"
+              ? g.found < g.expected
+              : view === "excess"
+                ? g.found > g.expected
+                : g.found === g.expected,
+        );
+        box.append(lightingBlocks(selected, view));
+        return box;
+      }
+      /* Render the current filters, review state, and matching captures. */
+      function render() {
+        if (!$("batch-content")) initBatchViews();
+        const requested = location.hash.slice(1);
+        currentView = Object.hasOwn(viewNames, requested)
+          ? requested
+          : "batches";
+        const batches = batchGroups(groups()),
+          missing = batches.filter(
+            /* Keep items that match the current selection criteria. */ (b) =>
+              b.missing > 0,
+          ),
+          excess = batches.filter(
+            /* Keep items that match the current selection criteria. */ (b) =>
+              b.excess > 0,
+          ),
+          complete = batches.filter(
+            /* Keep items that match the current selection criteria. */ (b) =>
+              b.missing === 0 && b.excess === 0,
+          );
+        const sum = /* Sum a batch metric for the dashboard summary. */ (
+          bs,
+          k,
+        ) =>
+          bs.reduce(
+            /* Accumulate the displayed total from the matching items. */ (
+              n,
+              b,
+            ) => n + b[k],
+            0,
+          );
+        $("summary").replaceChildren(
+          stat("Expected captures", sum(batches, "expected")),
+          stat("Found in matrix", sum(batches, "found")),
+          stat("Missing captures", sum(missing, "missing")),
+          stat("Excess captures", sum(excess, "excess")),
+        );
+        const unreviewed = batches.filter(
+          /* Keep items that match the current selection criteria. */ (b) =>
+            rows.some(
+              /* Check whether any item matches the requested condition. */ (
+                r,
+              ) =>
+                r.folder === b.name &&
+                r.metadata.subject === $("subject").value &&
+                r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+                !["pass", "error"].includes(qualityReviews[r.key]?.status),
+            ),
+        );
+        const lists = {
+          batches,
+          missing,
+          excess,
+          complete,
+          unreviewed,
+        };
+        for (const a of $("views").querySelectorAll("a")) {
+          const id = a.dataset.view;
+          a.textContent = viewNames[id] + " (" + lists[id].length + ")";
+          a.classList.toggle("active", id === currentView);
+          if (id === currentView) a.setAttribute("aria-current", "page");
+          else a.removeAttribute("aria-current");
+        }
+        $("view-title").textContent = viewNames[currentView];
+        $("view-note").textContent = {
+          batches:
+            "Each batch is a matrix folder. A batch can have both missing and excess combinations.",
+          missing:
+            "All batches with missing captures are shown here, including batches with zero captures.",
+          excess:
+            "Review combinations above the expected count within each batch. Repeated counts do not prove identical images.",
+          complete:
+            "Every matrix combination in these batches has exactly the required count.",
+          unreviewed:
+            "Batches with existing captures still awaiting quality review, including partially reviewed batches.",
+        }[currentView];
+        const host = $("batch-content");
+        host.replaceChildren();
+        if (!lists[currentView].length) {
+          const p = el("p", "No batches in this view.");
+          p.className = "empty";
+          host.append(p);
+        } else
+          for (const b of lists[currentView])
+            host.append(batchCard(b, currentView));
+        save();
+      }
+      /* Export review data as a downloadable browser file. */
+      function download(data, type, ext) {
+        const u = URL.createObjectURL(
+            new Blob([data], {
+              type,
+            }),
+          ),
+          a = el("a");
+        a.href = u;
+        a.download =
+          "capture_decisions_" +
+          new Date().toISOString().slice(0, 10) +
+          "." +
+          ext;
+        a.click();
+        setTimeout(
+          /* Release the temporary download URL after the browser starts the download. */ () =>
+            URL.revokeObjectURL(u),
+          1000,
+        );
+      }
+      let executing = false;
+      /* Select drafts that require a metadata edit or deletion. */
+      function pendingDecisions() {
+        return rows.filter(
+          /* Keep items that match the current selection criteria. */ (r) =>
+            r.metadata.subject === $("subject").value &&
+            r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+            ["remove", "correct_metadata"].includes(decisions[r.key]?.decision),
+        );
+      }
+      /* Update the execution button from pending drafts and submission state. */
+      function updateExecute() {
+        const b = document.getElementById("execute");
+        if (!b) return;
+        b.disabled = executing || !pendingDecisions().length;
+        b.textContent = executing
+          ? "Executing…"
+          : "Execute decisions (" + pendingDecisions().length + ")";
+      }
+      /* Confirm and submit pending edits and deletions, retaining failed drafts. */
+      async function executeDecisions() {
+        const pending = pendingDecisions().map(
+          /* Build the corresponding display or request value for each item. */ (
+            r,
+          ) => ({
+            r,
+            d: JSON.parse(JSON.stringify(decisions[r.key])),
+          }),
+        );
+        if (executing || !pending.length) return;
+        const allowed = [
+          "subject",
+          "lighting",
+          "capture_device",
+          "input_sensor",
+          "user",
+        ];
+        for (const { r, d } of pending) {
+          if (
+            d.decision === "correct_metadata" &&
+            (!Object.keys(d.corrections || {}).length ||
+              Object.keys(d.corrections).some(
+                /* Check whether any item matches the requested condition. */ (
+                  k,
+                ) => !allowed.includes(k),
+              ))
+          ) {
+            alert(
+              "Review corrections for " +
+                r.metadata.filename +
+                ". Enter at least one metadata change. Folder moves are not supported.",
+            );
+            return;
+          }
+        }
+        const lines = pending.map(
+          /* Build the corresponding display or request value for each item. */ ({
+            r,
+            d,
+          }) =>
+            r.folder +
+            " / " +
+            r.metadata.filename +
+            " — " +
+            (d.decision === "remove"
+              ? "DELETE"
+              : Object.entries(d.corrections)
+                  .map(
+                    /* Build the corresponding display or request value for each item. */ ([
+                      k,
+                      v,
+                    ]) =>
+                      k +
+                      ": " +
+                      (d.metadata_at_review[k] || "(blank)") +
+                      " → " +
+                      (v || "(blank)"),
+                  )
+                  .join(", ")),
+        );
+        if (
+          !confirm(
+            "Execute " +
+              pending.length +
+              " decisions for " +
+              ($("subject").value || "all identities") +
+              "?\nAcross all folders and lighting for this identity.\n\n" +
+              lines.join("\n") +
+              "\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.",
+          )
+        )
+          return;
+        const token = prompt("Enter PIN to execute these decisions:");
+        if (!token) return;
+        executing = true;
+        updateExecute();
+        let completed = 0;
+        let failure = "";
+        try {
+          for (const { r, d } of pending) {
+            const item = {
+              key: r.key,
+              folder: r.folder,
+              uuid: r.metadata.uuid,
+              filename: r.metadata.filename,
+            };
+            const correcting = d.decision === "correct_metadata";
+            const res = await fetch(
+              correcting ? "/api/edit-capture" : "/api/apply-decisions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Delete-Token": token,
+                },
+                body: JSON.stringify(
+                  correcting
+                    ? {
+                        ...item,
+                        changes: d.corrections,
+                        expected: d.metadata_at_review,
+                      }
+                    : {
+                        confirm_count: 1,
+                        remove: [item],
+                      },
+                ),
+              },
+            );
+            if (!res.ok) throw Error(await res.text());
+            await res.json();
+            delete decisions[r.key];
+            completed++;
+            save();
+          }
+        } catch (e) {
+          failure = e.message;
+        } finally {
+          executing = false;
+          await load();
+          updateExecute();
+        }
+        alert(
+          completed +
+            " decision(s) applied." +
+            (failure
+              ? " Stopped: " + failure + ". Unapplied decisions remain saved."
+              : ""),
+        );
+      }
+      /* Load current capture data and refresh page controls and results. */
+      async function load() {
+        try {
+          const [a, b, c, d] = await Promise.all([
+            fetch("/api/captures"),
+            fetch("/api/matrix"),
+            fetch("/api/batches"),
+            fetch("/api/quality"),
+          ]);
+          if (!a.ok || !b.ok || !c.ok || !d.ok) throw Error();
+          rows = await a.json();
+          matrix = await b.json();
+          batchDefs = await c.json();
+          qualityReviews = await d.json();
+          const previous = $("subject").value || "koh-jia-yi",
+            subjects = [
+              ...new Set(
+                rows
+                  .filter(
+                    /* Keep items that match the current selection criteria. */ (
+                      r,
+                    ) =>
+                      r.metadata.test_plan_name ===
+                      "colour_print_enhancement_2",
+                  )
+                  .map(
+                    /* Build the corresponding display or request value for each item. */ (
+                      r,
+                    ) => r.metadata.subject,
+                  )
+                  .filter(Boolean),
+              ),
+            ].sort();
+          $("subject").replaceChildren(
+            ...subjects.map(
+              /* Build the corresponding display or request value for each item. */ (
+                s,
+              ) => {
+                const o = el("option", s);
+                o.value = s;
+                return o;
+              },
+            ),
+          );
+          $("subject").value = subjects.includes(previous)
+            ? previous
+            : subjects[0] || "";
+          render();
+        } catch (e) {
+          $("summary").replaceChildren(stat("Load error", "Please refresh"));
+        }
+      }
+      $("execute").onclick = executeDecisions;
+      $("subject").onchange = render;
+      $("refresh").onclick = load;
+      $("close").onclick = /* Close the image preview dialog. */ () =>
+        $("zoom").close();
+      load();
+      window.addEventListener(
+        "focus",
+        /* Handle the focus event for this control. */ () => {
+          if (!executing) {
+            try {
+              decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
+            } catch (e) {}
+            load();
+          }
+        },
+      );
+    </script>
+    <script src="/image_zoom.js"></script>
+    <link rel="stylesheet" href="/frozen_panes.css" />
+  </body>
+</html>

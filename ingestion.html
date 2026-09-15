@@ -1,11 +1,459 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ingestion logs</title><style>
-*{box-sizing:border-box}body{margin:0;padding-left:185px;background:#080a0c;color:#c4cbd2;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.app-sidebar{position:fixed;inset:0 auto 0 0;width:185px;padding:16px 10px;background:#101316;border-right:1px solid #272c31}.app-sidebar strong{display:block;margin:0 8px 18px;font-size:13px;color:#f0f3f5}.app-sidebar a{display:block;padding:8px;margin:3px 0;color:#a8b2bc;text-decoration:none}.app-sidebar a[aria-current],.app-sidebar a:hover{background:#222930;color:#96e6b3}main{padding:16px;max-width:1900px;margin:auto}h1{font-size:16px;margin:0 0 8px;color:#96e6b3}h1:before{content:'> '}p{color:#8d98a3;margin:6px 0}.toolbar,.stats{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0}.stats div{display:flex;gap:5px}.stats b{font-size:12px;color:#e6edf3}button{font:inherit;padding:3px 8px;border:1px solid #36404a;border-radius:3px;background:#151a20;color:#c4cbd2;cursor:pointer}button:disabled{opacity:.4;cursor:default}.table-wrap{overflow:auto;border-top:1px solid #272c31}table{border-collapse:collapse;width:100%;font:inherit}th,td{text-align:left;padding:3px 9px;border-bottom:1px solid #15191d;white-space:nowrap}th{color:#8b9aaa;font-weight:normal;background:#101316}td:first-child{color:#96e6b3}tr:hover{background:#141a20}#error{color:#ff8d8d;white-space:pre-wrap}#error:empty{display:none}#status{color:#7d8994}a{color:#96e6b3}@media(max-width:800px){body{padding-left:0}.app-sidebar{position:static;width:100%;display:flex;flex-wrap:wrap;align-items:center;padding:8px;gap:6px}.app-sidebar strong{margin:0 8px 0 0}.app-sidebar a{margin:0;padding:5px}main{padding:10px}}
-dialog{background:#101316;color:#c4cbd2;border:1px solid #36404a;max-width:1000px;width:94vw;max-height:94vh;padding:16px}dialog::backdrop{background:#000c}.review-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}#review-image{width:100%;max-height:65vh;object-fit:contain;background:#060708}.review-fields label{display:grid;gap:4px;margin:8px 0}input,select,textarea{width:100%;font:inherit;background:#080a0c;color:#eee;border:1px solid #36404a;padding:6px}textarea{min-height:70px}#review-error{color:#ff8d8d}#remove-capture{color:#ff8d8d}#all-metadata{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}@media(max-width:700px){.review-layout{grid-template-columns:1fr}}
-.action-feed{margin:10px 0;padding:8px 0;border-top:1px solid #272c31}.action-feed>summary{cursor:pointer;color:#96e6b3;padding:6px 0}.action-line{padding:2px 0;overflow-wrap:anywhere}.action-line.modified{color:#e2bc72}.action-line.deleted{color:#ff8d8d}#action-lines{max-height:180px;overflow:auto}#action-count{color:#8d98a3;font-weight:normal}</style><nav class="app-sidebar" aria-label="Main navigation"><strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a><a href="/">Capture review</a><a href="/quality.html">Quality review</a><a href="/ingestion.html" aria-current="page">Ingestion logs</a><a href="/search.html">Image search</a></nav><header class="frozen-pane"><h1>Ingestion logs</h1><div class="stats"><div><b id="total">—</b>Total logged</div><div><b id="ingested">—</b>Ingested since monitoring began</div><div><b id="existing">—</b>Existing pictures</div><div><b id="pending">—</b>Waiting for original image</div></div><div class="toolbar"><span id="status" role="status">Connecting…</span><button id="refresh">Refresh now</button><button id="latest" hidden>Back to live</button></div><p id="error" role="alert"></p></header><main><details class="action-feed" id="action-feed" open><summary>Actions <span id="action-count"></span> · expand / minimize</summary><div id="action-lines">No actions recorded yet.</div></details><div class="table-wrap"><table><thead><tr><th>Picture</th><th>Batch</th><th>Lighting</th><th>Identity</th><th>SDK</th><th>Device</th><th>Capture time</th><th></th></tr></thead><tbody id="logs"></tbody></table></div><p id="empty" hidden>No pictures logged yet. Waiting for the first scan.</p><div class="toolbar"><button id="older" disabled>Older entries</button><span>Latest entries first · 100 per page</span></div></main><dialog id="review"><div class="toolbar"><b id="review-title">Capture</b><button id="review-close">Close</button></div><p id="review-error" role="alert"></p><div class="review-layout"><div><img id="review-image" alt="Selected original capture"><p>Original image</p></div><div><p>Current CSV metadata. The physical log preserves the original ingestion history.</p><div id="review-fields" class="review-fields"></div><div class="toolbar"><button id="save-metadata" disabled>Save metadata</button><button id="remove-capture" disabled>Delete capture</button></div><details><summary>All current metadata</summary><pre id="all-metadata"></pre></details></div></div></dialog><script>
-const $=id=>document.getElementById(id);let before=null,next=null,busy=false;
-function cell(row,value){const td=document.createElement('td');td.textContent=value||'—';row.append(td);return td}
-function renderActions(data){const actions=data.actions||[];$('action-count').textContent='('+actions.length+' latest / '+(data.action_total||0)+' total)';$('action-lines').replaceChildren();if(!actions.length){$('action-lines').textContent='No actions recorded yet.';return}for(const action of actions){const line=document.createElement('div');line.className='action-line '+action.action;line.textContent=(action.action==='modified'?'Modified metadata for ':'Deleted ')+action.filename+' · '+action.batch;const changes=Object.entries(action.changes||{}).map(([key,value])=>key+': '+value.from+' → '+value.to).join(' | ');if(changes)line.append(document.createTextNode(' · '+changes));$('action-lines').append(line)}}
-async function refresh(){if(busy)return;busy=true;try{const response=await fetch('/api/ingestion?limit=100'+(before?'&before='+before:''),{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('HTTP '+response.status);const data=await response.json();renderActions(data);for(const k of ['total','ingested','existing'])$(k).textContent=data[k];$('pending').textContent=data.pending_images;$('error').textContent=(data.errors||[]).join('\n');const stale=data.last_scan&&Date.now()-Date.parse(data.last_scan)>20000;$('status').textContent=(stale?'Scanner delayed':data.errors.length?'Scan needs attention':data.last_scan?'Scanning every 5 seconds':'First scan running')+(before?' · Viewing older entries':' · Live');$('logs').replaceChildren();for(const event of data.events){const row=document.createElement('tr');cell(row,event.filename);for(const key of ['batch','lighting','subject','sdk','device','creation_time'])cell(row,event[key]);const action=cell(row,'');const edit=document.createElement('button');edit.textContent=event.available===false?'Unavailable':'Edit';edit.disabled=event.available===false;if(event.available===false){row.title='Capture no longer indexed; showing its last ingestion metadata.';edit.title=row.title}edit.onclick=()=>openCapture(event.key);action.replaceChildren(edit);$('logs').append(row)}next=data.next_before;$('older').disabled=!next;$('latest').hidden=!before;$('empty').hidden=data.events.length>0}catch(e){$('status').textContent='Disconnected — retrying every 5 seconds';$('error').textContent='Unable to refresh ingestion logs: '+e.message}finally{busy=false}}
-
-$('refresh').onclick=refresh;$('older').onclick=()=>{if(!busy&&next){before=next;refresh()}};$('latest').onclick=()=>{if(!busy){before=null;refresh()}};refresh();setInterval(refresh,5000);
-</script><script src="/capture_review.js"></script><link rel="stylesheet" href="/frozen_panes.css"></html>
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Ingestion logs</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding-left: 185px;
+      background: #080a0c;
+      color: #c4cbd2;
+      font:
+        12px/1.5 ui-monospace,
+        SFMono-Regular,
+        Consolas,
+        monospace;
+    }
+    .app-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 185px;
+      padding: 16px 10px;
+      background: #101316;
+      border-right: 1px solid #272c31;
+    }
+    .app-sidebar strong {
+      display: block;
+      margin: 0 8px 18px;
+      font-size: 13px;
+      color: #f0f3f5;
+    }
+    .app-sidebar a {
+      display: block;
+      padding: 8px;
+      margin: 3px 0;
+      color: #a8b2bc;
+      text-decoration: none;
+    }
+    .app-sidebar a[aria-current],
+    .app-sidebar a:hover {
+      background: #222930;
+      color: #96e6b3;
+    }
+    main {
+      padding: 16px;
+      max-width: 1900px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px;
+      color: #96e6b3;
+    }
+    h1:before {
+      content: "> ";
+    }
+    p {
+      color: #8d98a3;
+      margin: 6px 0;
+    }
+    .toolbar,
+    .stats {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    .stats div {
+      display: flex;
+      gap: 5px;
+    }
+    .stats b {
+      font-size: 12px;
+      color: #e6edf3;
+    }
+    button {
+      font: inherit;
+      padding: 3px 8px;
+      border: 1px solid #36404a;
+      border-radius: 3px;
+      background: #151a20;
+      color: #c4cbd2;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .table-wrap {
+      overflow: auto;
+      border-top: 1px solid #272c31;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font: inherit;
+    }
+    th,
+    td {
+      text-align: left;
+      padding: 3px 9px;
+      border-bottom: 1px solid #15191d;
+      white-space: nowrap;
+    }
+    th {
+      color: #8b9aaa;
+      font-weight: normal;
+      background: #101316;
+    }
+    td:first-child {
+      color: #96e6b3;
+    }
+    tr:hover {
+      background: #141a20;
+    }
+    #error {
+      color: #ff8d8d;
+      white-space: pre-wrap;
+    }
+    #error:empty {
+      display: none;
+    }
+    #status {
+      color: #7d8994;
+    }
+    a {
+      color: #96e6b3;
+    }
+    @media (max-width: 800px) {
+      body {
+        padding-left: 0;
+      }
+      .app-sidebar {
+        position: static;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 8px;
+        gap: 6px;
+      }
+      .app-sidebar strong {
+        margin: 0 8px 0 0;
+      }
+      .app-sidebar a {
+        margin: 0;
+        padding: 5px;
+      }
+      main {
+        padding: 10px;
+      }
+    }
+    dialog {
+      background: #101316;
+      color: #c4cbd2;
+      border: 1px solid #36404a;
+      max-width: 1000px;
+      width: 94vw;
+      max-height: 94vh;
+      padding: 16px;
+    }
+    dialog::backdrop {
+      background: #000c;
+    }
+    .review-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    #review-image {
+      width: 100%;
+      max-height: 65vh;
+      object-fit: contain;
+      background: #060708;
+    }
+    .review-fields label {
+      display: grid;
+      gap: 4px;
+      margin: 8px 0;
+    }
+    input,
+    select,
+    textarea {
+      width: 100%;
+      font: inherit;
+      background: #080a0c;
+      color: #eee;
+      border: 1px solid #36404a;
+      padding: 6px;
+    }
+    textarea {
+      min-height: 70px;
+    }
+    #review-error {
+      color: #ff8d8d;
+    }
+    #remove-capture {
+      color: #ff8d8d;
+    }
+    #all-metadata {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 11px;
+    }
+    @media (max-width: 700px) {
+      .review-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .action-feed {
+      margin: 10px 0;
+      padding: 8px 0;
+      border-top: 1px solid #272c31;
+    }
+    .action-feed > summary {
+      cursor: pointer;
+      color: #96e6b3;
+      padding: 6px 0;
+    }
+    .action-line {
+      padding: 2px 0;
+      overflow-wrap: anywhere;
+    }
+    .action-line.modified {
+      color: #e2bc72;
+    }
+    .action-line.deleted {
+      color: #ff8d8d;
+    }
+    #action-lines {
+      max-height: 180px;
+      overflow: auto;
+    }
+    #action-count {
+      color: #8d98a3;
+      font-weight: normal;
+    }
+  </style>
+  <nav class="app-sidebar" aria-label="Main navigation">
+    <strong>Capture workspace</strong><a href="/coverage.html">Dashboard</a
+    ><a href="/">Capture review</a><a href="/quality.html">Quality review</a
+    ><a href="/ingestion.html" aria-current="page">Ingestion logs</a
+    ><a href="/search.html">Image search</a>
+  </nav>
+  <header class="frozen-pane">
+    <h1>Ingestion logs</h1>
+    <div class="stats">
+      <div><b id="total">—</b>Total logged</div>
+      <div><b id="ingested">—</b>Ingested since monitoring began</div>
+      <div><b id="existing">—</b>Existing pictures</div>
+      <div><b id="pending">—</b>Waiting for original image</div>
+    </div>
+    <div class="toolbar">
+      <span id="status" role="status">Connecting…</span
+      ><button id="refresh">Refresh now</button
+      ><button id="latest" hidden>Back to live</button>
+    </div>
+    <p id="error" role="alert"></p>
+  </header>
+  <main>
+    <details class="action-feed" id="action-feed" open>
+      <summary>
+        Actions <span id="action-count"></span> · expand / minimize
+      </summary>
+      <div id="action-lines">No actions recorded yet.</div>
+    </details>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Picture</th>
+            <th>Batch</th>
+            <th>Lighting</th>
+            <th>Identity</th>
+            <th>SDK</th>
+            <th>Device</th>
+            <th>Capture time</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="logs"></tbody>
+      </table>
+    </div>
+    <p id="empty" hidden>No pictures logged yet. Waiting for the first scan.</p>
+    <div class="toolbar">
+      <button id="older" disabled>Older entries</button
+      ><span>Latest entries first · 100 per page</span>
+    </div>
+  </main>
+  <dialog id="review">
+    <div class="toolbar">
+      <b id="review-title">Capture</b><button id="review-close">Close</button>
+    </div>
+    <p id="review-error" role="alert"></p>
+    <div class="review-layout">
+      <div>
+        <img id="review-image" alt="Selected original capture" />
+        <p>Original image</p>
+      </div>
+      <div>
+        <p>
+          Current CSV metadata. The physical log preserves the original
+          ingestion history.
+        </p>
+        <div id="review-fields" class="review-fields"></div>
+        <div class="toolbar">
+          <button id="save-metadata" disabled>Save metadata</button
+          ><button id="remove-capture" disabled>Delete capture</button>
+        </div>
+        <details>
+          <summary>All current metadata</summary>
+          <pre id="all-metadata"></pre>
+        </details>
+      </div>
+    </div>
+  </dialog>
+  <script>
+    const $ = /* Find an element by its page identifier. */ (id) =>
+      document.getElementById(id);
+    let before = null,
+      next = null,
+      busy = false;
+    /* Append a safely escaped value to an ingestion table row. */
+    function cell(row, value) {
+      const td = document.createElement("td");
+      td.textContent = value || "—";
+      row.append(td);
+      return td;
+    }
+    /* Render recent metadata edits and deletions from the action history. */
+    function renderActions(data) {
+      const actions = data.actions || [];
+      $("action-count").textContent =
+        "(" +
+        actions.length +
+        " latest / " +
+        (data.action_total || 0) +
+        " total)";
+      $("action-lines").replaceChildren();
+      if (!actions.length) {
+        $("action-lines").textContent = "No actions recorded yet.";
+        return;
+      }
+      for (const action of actions) {
+        const line = document.createElement("div");
+        line.className = "action-line " + action.action;
+        line.textContent =
+          (action.action === "modified"
+            ? "Modified metadata for "
+            : "Deleted ") +
+          action.filename +
+          " · " +
+          action.batch;
+        const changes = Object.entries(action.changes || {})
+          .map(
+            /* Build the corresponding display or request value for each item. */ ([
+              key,
+              value,
+            ]) => key + ": " + value.from + " → " + value.to,
+          )
+          .join(" | ");
+        if (changes) line.append(document.createTextNode(" · " + changes));
+        $("action-lines").append(line);
+      }
+    }
+    /* Fetch current page data and redraw its results and status. */
+    async function refresh() {
+      if (busy) return;
+      busy = true;
+      try {
+        const response = await fetch(
+          "/api/ingestion?limit=100" + (before ? "&before=" + before : ""),
+          {
+            signal: AbortSignal.timeout(15000),
+          },
+        );
+        if (!response.ok) throw Error("HTTP " + response.status);
+        const data = await response.json();
+        renderActions(data);
+        for (const k of ["total", "ingested", "existing"])
+          $(k).textContent = data[k];
+        $("pending").textContent = data.pending_images;
+        $("error").textContent = (data.errors || []).join("\n");
+        const stale =
+          data.last_scan && Date.now() - Date.parse(data.last_scan) > 20000;
+        $("status").textContent =
+          (stale
+            ? "Scanner delayed"
+            : data.errors.length
+              ? "Scan needs attention"
+              : data.last_scan
+                ? "Scanning every 5 seconds"
+                : "First scan running") +
+          (before ? " · Viewing older entries" : " · Live");
+        $("logs").replaceChildren();
+        for (const event of data.events) {
+          const row = document.createElement("tr");
+          cell(row, event.filename);
+          for (const key of [
+            "batch",
+            "lighting",
+            "subject",
+            "sdk",
+            "device",
+            "creation_time",
+          ])
+            cell(row, event[key]);
+          const action = cell(row, "");
+          const edit = document.createElement("button");
+          edit.textContent = event.available === false ? "Unavailable" : "Edit";
+          edit.disabled = event.available === false;
+          if (event.available === false) {
+            row.title =
+              "Capture no longer indexed; showing its last ingestion metadata.";
+            edit.title = row.title;
+          }
+          edit.onclick =
+            /* Open the available capture represented by this history event. */ () =>
+              openCapture(event.key);
+          action.replaceChildren(edit);
+          $("logs").append(row);
+        }
+        next = data.next_before;
+        $("older").disabled = !next;
+        $("latest").hidden = !before;
+        $("empty").hidden = data.events.length > 0;
+      } catch (e) {
+        $("status").textContent = "Disconnected — retrying every 5 seconds";
+        $("error").textContent =
+          "Unable to refresh ingestion logs: " + e.message;
+      } finally {
+        busy = false;
+      }
+    }
+    $("refresh").onclick = refresh;
+    $("older").onclick =
+      /* Load the next page of older ingestion events. */ () => {
+        if (!busy && next) {
+          before = next;
+          refresh();
+        }
+      };
+    $("latest").onclick = /* Return to the latest ingestion events. */ () => {
+      if (!busy) {
+        before = null;
+        refresh();
+      }
+    };
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+  <script src="/capture_review.js"></script>
+  <link rel="stylesheet" href="/frozen_panes.css" />
+</html>

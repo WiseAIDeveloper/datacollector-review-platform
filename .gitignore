@@ -5,3 +5,14 @@ __pycache__/
 delete_token.txt
 
 ingestion_logs/
+
+.env
+.env.*
+!.env.example
+node_modules/
+.venv/
+.coverage*
+htmlcov/
+artifacts/
+*.sqlite
+*.sqlite-*
