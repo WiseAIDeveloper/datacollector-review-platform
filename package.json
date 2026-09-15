@@ -1,0 +1,13 @@
+{
+  "name": "datacollector-review-platform",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write '*.html' '*.js' '*.css'",
+    "format:check": "prettier --check '*.html' '*.js' '*.css'",
+    "test:frontend": "node scripts/check_frontend.cjs"
+  },
+  "devDependencies": {
+    "@babel/parser": "7.28.4",
+    "prettier": "3.6.2"
+  }
+}
