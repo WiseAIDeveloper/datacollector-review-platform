@@ -127,6 +127,55 @@ class Client:
             return response.status, body, response.headers
 
 
+class FixtureServer(Client):
+    """Manage a restartable server process backed by one disposable dataset."""
+
+    def __init__(self, base, token, root, rows, command, source, environment):
+        """Keep process configuration alongside the fixture's HTTP client."""
+        super().__init__(base, token, root, rows)
+        self.command, self.source, self.environment = command, source, environment
+        self.process = None
+
+    def start(self):
+        """Launch the selected server and wait for its initial ingestion scan."""
+        self.process = subprocess.Popen(
+            self.command,
+            cwd=self.source,
+            env=self.environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for attempt in range(100):
+            if self.process.poll() is not None:
+                raise RuntimeError("Fixture server exited during startup")
+            try:
+                if (
+                    self.request("/health")[0] == 200
+                    and not self.request("/api/ingestion?limit=1")[1]["scanning"]
+                ):
+                    return
+            except OSError:
+                pass
+            time.sleep(0.05)
+        raise RuntimeError("Fixture server did not become ready")
+
+    def stop(self):
+        """Terminate the fixture process and bound cleanup if shutdown stalls."""
+        if self.process is None:
+            return
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+    def restart(self):
+        """Restart the same server without replacing its persisted fixture files."""
+        self.stop()
+        self.start()
+
+
 @contextmanager
 def running_server(source=SOURCE):
     """Run either the original or current app against disposable data only."""
@@ -163,30 +212,17 @@ def running_server(source=SOURCE):
             "PYTHONPATH": str(source),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
-        process = subprocess.Popen(
+        client = FixtureServer(
+            f"http://127.0.0.1:{port}",
+            token,
+            root,
+            rows,
             [sys.executable, str(script)],
-            cwd=source,
-            env=environment,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            source,
+            environment,
         )
-        client = Client(f"http://127.0.0.1:{port}", token, root, rows)
         try:
-            for attempt in range(100):
-                if process.poll() is not None:
-                    raise RuntimeError("Fixture server exited during startup")
-                try:
-                    if client.request("/health")[0] == 200:
-                        break
-                except OSError:
-                    time.sleep(0.05)
-            else:
-                raise RuntimeError("Fixture server did not become ready")
+            client.start()
             yield client
         finally:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+            client.stop()

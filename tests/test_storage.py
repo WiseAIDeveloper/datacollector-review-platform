@@ -2,13 +2,14 @@
 
 import csv
 import json
-import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import INDEXES, dataset
+from tests.support import INDEXES, SOURCE, dataset
 import delete_capture
 import edit_capture
 import ingestion
@@ -100,6 +101,29 @@ class StorageTests(unittest.TestCase):
                 / f"{self.row['uuid']}.json"
             ).exists()
         )
+
+    def test_delete_command_line_entrypoint(self):
+        """Delete a synthetic capture through the original command-line interface."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SOURCE / "delete_capture.py"),
+                "--root",
+                str(self.root),
+                "--folder",
+                "genuine",
+                "--uuid",
+                self.row["uuid"],
+                "--filename",
+                self.row["filename"],
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["uuid"], self.row["uuid"])
+        self.assertFalse((self.folder / self.row["ori_path"]).exists())
 
     def test_delete_validation_does_not_modify_indexes(self):
         """Reject invalid folders, filenames, and outside-image paths before deletion."""

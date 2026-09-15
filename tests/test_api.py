@@ -229,6 +229,18 @@ class ApiTests(unittest.TestCase):
             expected = entry
         self.assertEqual(self.client.request("/api/quality", payload)[0], 409)
 
+    def test_quality_and_history_survive_server_restart(self):
+        """Preserve saved quality decisions and ingestion history across a process restart."""
+        payload = dict(
+            key=self.key, status="pass", notes="Synthetic review", expected=None
+        )
+        status, saved, _ = self.client.request("/api/quality", payload)
+        self.assertEqual(status, 200)
+        self.client.restart()
+        self.assertEqual(self.client.request("/api/quality")[1][self.key], saved)
+        snapshot = self.client.request("/api/ingestion")[1]
+        self.assertEqual((snapshot["total"], snapshot["existing"]), (5, 5))
+
 
 if __name__ == "__main__":
     unittest.main()
