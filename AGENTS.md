@@ -50,6 +50,15 @@ These practices apply to the `datacollector-review-platform` repository.
 - Run checks appropriate to the change before committing, including relevant tests, linting, or builds where available.
 - Resolve failures caused by the change and report any checks that could not be run.
 
+## Feature Preview Testing
+
+- Reserve host port **8770** (container port **8080**) for feature previews. Keep the existing service on its configured port (normally `8769`).
+- When the user says they want to test a new feature, build the requested feature branch or PR and start a separate Docker container named `idrecapture-viewer-preview` on port `8770`; this request authorizes starting the preview without another confirmation.
+- Use a separate preview image and isolated dataset copies or fixtures, ingestion state, logs, and runtime credentials. Do not share writable production data or state. The existing Compose file fixes the production container name, so changing only its project name or port is insufficient isolation.
+- Check whether `8770` is occupied before starting. Replace only a confirmed previous preview; if another service owns the port, report the conflict instead of stopping it or silently choosing another port.
+- Verify `/health` and the feature's relevant page or workflow, then share a browser-accessible URL (or an SSH tunnel command for a localhost binding), the tested branch/commit, and any limitations. Leave the preview running for the user's visual review.
+- Wait for the user's verdict. Another agent may merge the PR after the user authorizes it; starting or approving a preview does not itself authorize merging or replacing the main service.
+
 ## Code Quality
 
 - Keep code clean and concise, with descriptive names and small functions focused on one responsibility.
