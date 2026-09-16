@@ -71,6 +71,17 @@
         grid-template-columns: repeat(5, minmax(120px, 1fr));
         gap: 12px;
       }
+      .batch-filter {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .batch-filter button {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
       .stat,
       .group,
       .capture {
@@ -309,6 +320,12 @@
       </div>
     </header>
     <main>
+      <div
+        id="batch-filter"
+        class="batch-filter"
+        role="group"
+        aria-label="Batches"
+      ></div>
       <div id="summary" class="summary"></div>
       <section>
         <h2>Missing</h2>
@@ -336,7 +353,8 @@
         matrix = [],
         batchDefs = [],
         decisions = {},
-        qualityReviews = {};
+        qualityReviews = {},
+        selectedBatch = "";
       try {
         decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
       } catch (e) {}
@@ -1046,6 +1064,38 @@
         box.append(lightingBlocks(selected, view));
         return box;
       }
+      /* Keep all batch choices available and preserve keyboard focus when redrawing. */
+      function renderBatchFilter(batches) {
+        if (
+          !batches.some(
+            /* Check that the selected batch still exists. */ (b) =>
+              b.name === selectedBatch,
+          )
+        )
+          selectedBatch = "";
+        const host = $("batch-filter"),
+          focused = host.contains(document.activeElement)
+            ? document.activeElement.dataset.batch
+            : undefined;
+        host.replaceChildren(el("strong", "Batches"));
+        for (const batch of [{ name: "", display: "All" }, ...batches]) {
+          const button = el("button", batch.display);
+          button.type = "button";
+          button.dataset.batch = batch.name;
+          button.classList.toggle("active", batch.name === selectedBatch);
+          button.setAttribute(
+            "aria-pressed",
+            String(batch.name === selectedBatch),
+          );
+          button.onclick =
+            /* Select exactly one batch, or clear the batch filter. */ () => {
+              selectedBatch = batch.name;
+              render();
+            };
+          host.append(button);
+          if (batch.name === focused) button.focus();
+        }
+      }
       /* Render the current filters, review state, and matching captures. */
       function render() {
         if (!$("batch-content")) initBatchViews();
@@ -1053,7 +1103,13 @@
         currentView = Object.hasOwn(viewNames, requested)
           ? requested
           : "batches";
-        const batches = batchGroups(groups()),
+        const allBatches = batchGroups(groups());
+        renderBatchFilter(allBatches);
+        const batches = allBatches.filter(
+            /* Apply the batch selection to cards, totals, and status counts. */ (
+              b,
+            ) => !selectedBatch || b.name === selectedBatch,
+          ),
           missing = batches.filter(
             /* Keep items that match the current selection criteria. */ (b) =>
               b.missing > 0,
