@@ -1,16 +1,14 @@
-/* Verify that frontend cleanup preserves the original JavaScript behavior. */
+/* Verify frontend syntax against the original or a tested feature baseline. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-const revision = process.argv[2] || "808746d";
-const revisionFiles = new Set(
-  execFileSync("git", ["ls-tree", "-r", "--name-only", revision], {
-    encoding: "utf8",
-  }).split("\n"),
-);
+// Batch filtering is covered by tests/browser/test_dashboard_batch_filter.py.
+const featureBaselines = {
+  "coverage.html": "21164dd5c6082208a842b2e62a5c9d9a679c5c75",
+};
 const files = [
   "capture_review.js",
   "image_zoom.js",
@@ -64,6 +62,12 @@ function scripts(source, filename) {
 }
 
 for (const filename of files) {
+  const revision = process.argv[2] || featureBaselines[filename] || "808746d";
+  const revisionFiles = new Set(
+    execFileSync("git", ["ls-tree", "-r", "--name-only", revision], {
+      encoding: "utf8",
+    }).split("\n"),
+  );
   const directory = filename.endsWith(".html") ? "pages" : "static/js";
   const currentPath = path.join("web", directory, filename);
   const originalPath = revisionFiles.has(currentPath) ? currentPath : filename;
