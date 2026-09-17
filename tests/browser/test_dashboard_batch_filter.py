@@ -90,6 +90,34 @@ with sync_playwright() as playwright:
         expect(all_button).to_have_attribute("aria-pressed", "true")
         expect(page.locator(".batch")).to_have_count(3)
         expect(page.locator("#summary b")).to_have_text(["6", "4", "3", "1"])
+        expect(alpha).to_have_attribute("data-status", "in-progress")
+        expect(beta).to_have_attribute("data-status", "excess")
+        expect(empty).to_have_attribute("data-status", "not-started")
+        for button, colour in [
+            (alpha, "rgb(213, 234, 251)"),
+            (beta, "rgb(255, 240, 173)"),
+            (empty, "rgb(216, 221, 227)"),
+        ]:
+            assert button.evaluate("e => getComputedStyle(e).backgroundColor") == colour
+
+        # Complete Alpha while Beta has both missing and excess combinations.
+        data["matrix"] = [
+            (
+                dict(item, expected_count_per_identity="1")
+                if item["folder"] == "alpha"
+                else item
+            )
+            for item in matrix
+        ] + [dict(matrix[1], lighting="office")]
+        page.locator("#refresh").click()
+        expect(alpha).to_have_attribute("data-status", "completed")
+        assert alpha.evaluate("e => getComputedStyle(e).backgroundColor") == (
+            "rgb(213, 239, 221)"
+        )
+        expect(beta).to_have_attribute("data-status", "excess")
+        data["matrix"] = matrix
+        page.locator("#refresh").click()
+        expect(alpha).to_have_attribute("data-status", "in-progress")
 
         alpha.click()
         expect(alpha).to_have_attribute("aria-pressed", "true")
@@ -116,6 +144,40 @@ with sync_playwright() as playwright:
         expect(alpha).to_have_attribute("aria-pressed", "false")
         expect(page.locator(".batch h2")).to_have_text(["Beta"])
         expect(page.locator("#summary b")).to_have_text(["2", "3", "0", "1"])
+        assert beta.evaluate("e => getComputedStyle(e).backgroundColor") == (
+            "rgb(255, 240, 173)"
+        )
+        expect(beta).to_have_attribute("title", "Excess")
+
+        page.locator('[data-view="excess"]').click()
+        expect(page.locator(".group.over")).to_have_count(1)
+        yellow = "rgb(244, 211, 94)"
+        for selector in [
+            "#summary .excess-count",
+            "#view-title",
+            ".lighting-block.has-excess > h3",
+            ".group.over .badge .found-count",
+            ".excess-review > summary",
+        ]:
+            assert (
+                page.locator(selector).first.evaluate("e => getComputedStyle(e).color")
+                == yellow
+            ), selector
+        assert (
+            page.locator(".batch.excess").evaluate(
+                "e => getComputedStyle(e).borderLeftColor"
+            )
+            == "rgb(200, 170, 69)"
+        )
+        page.locator('[data-view="batches"]').click()
+        page.get_by_text("Show batch grouped by lighting", exact=True).click()
+        expect(page.locator(".coverage-table .excess-case")).to_have_count(1)
+        assert (
+            page.locator(".coverage-table .excess-case td").first.evaluate(
+                "e => getComputedStyle(e).backgroundColor"
+            )
+            == "rgb(48, 41, 16)"
+        )
 
         page.locator('[data-view="missing"]').click()
         expect(page.locator(".batch")).to_have_count(0)
@@ -162,6 +224,7 @@ with sync_playwright() as playwright:
     browser.close()
 
 print(
-    "PASS batch selection, All reset, totals, status/identity filters, refresh, "
+    "PASS batch progress colours, yellow excess theme, collapse/expand, "
+    "batch selection, All reset, totals, status/identity filters, refresh, "
     "empty batches, removed selections, keyboard controls, and desktop/mobile layouts."
 )

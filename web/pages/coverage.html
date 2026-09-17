@@ -299,7 +299,7 @@
     </style>
     <link rel="stylesheet" href="/terminal.css" />
   </head>
-  <body class="terminal">
+  <body class="terminal dashboard">
     <nav class="app-sidebar" aria-label="Main navigation">
       <strong>Capture workspace</strong
       ><a href="/coverage.html" aria-current="page">Dashboard</a
@@ -497,7 +497,9 @@
           ? "missing-count"
           : label.startsWith("Found")
             ? "found-count"
-            : "";
+            : label.startsWith("Excess")
+              ? "excess-count"
+              : "";
       }
       /* Render a coverage metric with its status styling. */
       function metricSpan(text) {
@@ -855,6 +857,7 @@
           const tr = el("tr"),
             needed = Math.max(g.expected - g.found, 0);
           if (needed) tr.className = "missing-case";
+          else if (g.found > g.expected) tr.className = "excess-case";
           for (const [i, v] of [
             g.m.lighting,
             g.m.sdk.toUpperCase() + " / " + g.m.device,
@@ -867,7 +870,13 @@
           ].entries()) {
             const td = el("td", v);
             td.className =
-              i === 3 ? "found-count" : i === 4 ? "missing-count" : "";
+              i === 3
+                ? g.found > g.expected
+                  ? "excess-count"
+                  : "found-count"
+                : i === 4
+                  ? "missing-count"
+                  : "";
             tr.append(td);
           }
           const reviewed = g.captures.filter(
@@ -939,6 +948,7 @@
           block.append(el("h3", lighting));
           const totals = el("div");
           totals.className = "batch-totals";
+          block.classList.toggle("has-excess", excess > 0);
           for (const text of [
             "Expected " + expected,
             "Found " + found,
@@ -1073,6 +1083,13 @@
         box.append(lightingBlocks(selected, view));
         return box;
       }
+      /* Classify capture progress, prioritizing excess over missing combinations. */
+      function batchProgress(batch) {
+        if (batch.excess > 0) return ["excess", "Excess"];
+        if (batch.actual === 0) return ["not-started", "Not started"];
+        if (batch.missing === 0) return ["completed", "Completed"];
+        return ["in-progress", "In progress"];
+      }
       /* Keep all batch choices available and preserve keyboard focus when redrawing. */
       function renderBatchFilter(batches) {
         if (
@@ -1091,6 +1108,11 @@
           const button = el("button", batch.display);
           button.type = "button";
           button.dataset.batch = batch.name;
+          if (batch.name) {
+            const [status, label] = batchProgress(batch);
+            button.dataset.status = status;
+            button.title = label;
+          }
           button.classList.toggle("active", batch.name === selectedBatch);
           button.setAttribute(
             "aria-pressed",
@@ -1175,6 +1197,10 @@
           else a.removeAttribute("aria-current");
         }
         $("view-title").textContent = viewNames[currentView];
+        $("view-title").classList.toggle(
+          "excess-count",
+          currentView === "excess",
+        );
         $("view-note").textContent = {
           batches:
             "Each batch is a matrix folder. A batch can have both missing and excess combinations.",
