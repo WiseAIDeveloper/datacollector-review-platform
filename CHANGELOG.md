@@ -8,6 +8,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A collapsible Batches filter with single-selection buttons and an All button on the dashboard.
+  Cards, totals, and status counts follow the selected batch, which stays selected
+  across identity changes, status views, and data refreshes.
+- Batch buttons retain their dark style with subtle status text, borders, and
+  selected tints: grey for not started, blue for in progress, green for completed,
+  and yellow for excess. Excess takes priority and uses yellow highlights
+  throughout the dashboard.
 - A `VERSION` file, release guide, and pull request checklist to keep version numbers,
   release notes, and verification records consistent.
 

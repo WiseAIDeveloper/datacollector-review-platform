@@ -439,6 +439,91 @@ body.terminal .review-quality.reviewed {
   color: #b0f0c8;
 }
 
+/* Preserve dark buttons with subtle status text, borders, and selected tints. */
+body.terminal.dashboard {
+  --excess-text: #f4d35e;
+  --excess-border: #c8aa45;
+  --excess-background: #302910;
+}
+body.terminal.dashboard .batch-filter button[data-status] {
+  color: var(--status-text);
+  background: #151a20;
+  border: 1px solid var(--status-border);
+}
+body.terminal.dashboard [data-status="not-started"] {
+  --status-text: #c4cbd2;
+  --status-border: #36404a;
+  --status-selected: #242a30;
+  --status-accent: #65717d;
+}
+body.terminal.dashboard [data-status="in-progress"] {
+  --status-text: #a9d9ff;
+  --status-border: #354957;
+  --status-selected: #182630;
+  --status-accent: #47647a;
+}
+body.terminal.dashboard [data-status="completed"] {
+  --status-text: #96e6b3;
+  --status-border: #354c3f;
+  --status-selected: #182a20;
+  --status-accent: #4c8662;
+}
+body.terminal.dashboard [data-status="excess"] {
+  --status-text: var(--excess-text);
+  --status-border: #544a2e;
+  --status-selected: #2b2719;
+  --status-accent: #6f633d;
+}
+body.terminal.dashboard .batch-filter button[data-status].active {
+  background: var(--status-selected);
+  border-color: var(--status-accent);
+}
+body.terminal.dashboard .excess-count {
+  color: var(--excess-text) !important;
+}
+body.terminal.dashboard .group.over .badge .found-count {
+  color: var(--excess-text) !important;
+}
+body.terminal.dashboard .stat.excess-count,
+body.terminal.dashboard .batch-totals .excess-count,
+body.terminal.dashboard .excess-review > summary,
+body.terminal.dashboard .views a[data-view="excess"] {
+  background: var(--excess-background);
+  border-color: var(--excess-border);
+  color: var(--excess-text);
+}
+body.terminal.dashboard .views a[data-view="excess"].active {
+  background: #594816;
+  color: #fff0ad;
+}
+body.terminal.dashboard .batch.excess,
+body.terminal.dashboard .group.over {
+  border-color: var(--excess-border);
+  background: #18170f;
+}
+body.terminal.dashboard .batch.excess > .batch-heading > h2,
+body.terminal.dashboard .batch.excess > p:not(.muted) {
+  color: var(--excess-text);
+}
+body.terminal.dashboard .lighting-block.has-excess {
+  border-color: var(--excess-border);
+  background: #18170f;
+}
+body.terminal.dashboard .lighting-block.has-excess > h3 {
+  background: var(--excess-background);
+  border-color: var(--excess-border);
+  color: var(--excess-text);
+}
+body.terminal.dashboard .lighting-block.has-excess .coverage-table th {
+  background: var(--excess-background);
+  color: var(--excess-text);
+  border-bottom-color: var(--excess-border);
+}
+body.terminal.dashboard .coverage-table tr.excess-case td {
+  background: var(--excess-background);
+  border-bottom-color: var(--excess-border);
+}
+
 body.terminal .dashboard-header {
   position: sticky;
   top: 0;
