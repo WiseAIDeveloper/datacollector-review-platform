@@ -94,11 +94,14 @@ with sync_playwright() as playwright:
         expect(beta).to_have_attribute("data-status", "excess")
         expect(empty).to_have_attribute("data-status", "not-started")
         for button, colour in [
-            (alpha, "rgb(213, 234, 251)"),
-            (beta, "rgb(255, 240, 173)"),
-            (empty, "rgb(216, 221, 227)"),
+            (alpha, "rgb(169, 217, 255)"),
+            (beta, "rgb(244, 211, 94)"),
+            (empty, "rgb(196, 203, 210)"),
         ]:
-            assert button.evaluate("e => getComputedStyle(e).backgroundColor") == colour
+            assert button.evaluate("e => getComputedStyle(e).color") == colour
+            assert button.evaluate("e => getComputedStyle(e).backgroundColor") == (
+                "rgb(21, 26, 32)"
+            )
 
         # Complete Alpha while Beta has both missing and excess combinations.
         data["matrix"] = [
@@ -111,8 +114,8 @@ with sync_playwright() as playwright:
         ] + [dict(matrix[1], lighting="office")]
         page.locator("#refresh").click()
         expect(alpha).to_have_attribute("data-status", "completed")
-        assert alpha.evaluate("e => getComputedStyle(e).backgroundColor") == (
-            "rgb(213, 239, 221)"
+        assert alpha.evaluate("e => getComputedStyle(e).color") == (
+            "rgb(150, 230, 179)"
         )
         expect(beta).to_have_attribute("data-status", "excess")
         data["matrix"] = matrix
@@ -145,7 +148,7 @@ with sync_playwright() as playwright:
         expect(page.locator(".batch h2")).to_have_text(["Beta"])
         expect(page.locator("#summary b")).to_have_text(["2", "3", "0", "1"])
         assert beta.evaluate("e => getComputedStyle(e).backgroundColor") == (
-            "rgb(255, 240, 173)"
+            "rgb(43, 39, 25)"
         )
         expect(beta).to_have_attribute("title", "Excess")
 
