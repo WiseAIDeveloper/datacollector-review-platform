@@ -7,7 +7,7 @@ const parser = require("@babel/parser");
 
 // Batch filtering is covered by tests/browser/test_dashboard_batch_filter.py.
 const featureBaselines = {
-  "coverage.html": "073cba926a1eac79f26222309c65b4c2d2a2d554",
+  "coverage.html": "6c4f5cd3c8dfbf64c6dbd1de10737522f1918a6d",
 };
 const files = [
   "capture_review.js",
