@@ -82,7 +82,7 @@ with sync_playwright() as playwright:
         data["matrix"] = matrix
         page.set_viewport_size({"width": width, "height": 1000})
         page.goto("http://fixture/coverage.html")
-        filters = page.get_by_role("group", name="Batches", exact=True)
+        filters = page.get_by_role("group", name="Batches filter", exact=True)
         all_button = filters.get_by_role("button", name="All", exact=True)
         alpha = filters.get_by_role("button", name="Alpha", exact=True)
         beta = filters.get_by_role("button", name="Beta", exact=True)
@@ -96,6 +96,18 @@ with sync_playwright() as playwright:
         expect(all_button).to_have_attribute("aria-pressed", "false")
         expect(page.locator(".batch h2")).to_have_text(["Alpha"])
         expect(page.locator("#summary b")).to_have_text(["2", "1", "1", "0"])
+
+        toggle = page.locator(".batch-filter-panel > summary")
+        expect(toggle).to_have_text("Batches filter")
+        toggle.click()
+        expect(alpha).not_to_be_visible()
+        expect(page.locator(".batch h2")).to_have_text(["Alpha"])
+        page.locator("#refresh").click()
+        expect(alpha).not_to_be_visible()
+        toggle.focus()
+        toggle.press("Enter")
+        expect(alpha).to_be_visible()
+        expect(alpha).to_have_attribute("aria-pressed", "true")
 
         beta.focus()
         beta.press("Enter")

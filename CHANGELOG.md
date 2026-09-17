@@ -8,7 +8,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Clickable, single-selection batch filters and an All button on the dashboard.
+- A collapsible Batches filter with single-selection buttons and an All button on the dashboard.
   Cards, totals, and status counts follow the selected batch, which stays selected
   across identity changes, status views, and data refreshes.
 - A `VERSION` file, release guide, and pull request checklist to keep version numbers,

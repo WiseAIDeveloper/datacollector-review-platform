@@ -71,12 +71,18 @@
         grid-template-columns: repeat(5, minmax(120px, 1fr));
         gap: 12px;
       }
+      .batch-filter-panel {
+        margin: 0 0 16px;
+      }
+      .batch-filter-panel > summary {
+        font-weight: 600;
+      }
       .batch-filter {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        margin-bottom: 16px;
+        margin-top: 8px;
       }
       .batch-filter button {
         max-width: 100%;
@@ -320,12 +326,15 @@
       </div>
     </header>
     <main>
-      <div
-        id="batch-filter"
-        class="batch-filter"
-        role="group"
-        aria-label="Batches"
-      ></div>
+      <details class="batch-filter-panel" open>
+        <summary>Batches filter</summary>
+        <div
+          id="batch-filter"
+          class="batch-filter"
+          role="group"
+          aria-label="Batches filter"
+        ></div>
+      </details>
       <div id="summary" class="summary"></div>
       <section>
         <h2>Missing</h2>
@@ -1077,7 +1086,7 @@
           focused = host.contains(document.activeElement)
             ? document.activeElement.dataset.batch
             : undefined;
-        host.replaceChildren(el("strong", "Batches"));
+        host.replaceChildren();
         for (const batch of [{ name: "", display: "All" }, ...batches]) {
           const button = el("button", batch.display);
           button.type = "button";
