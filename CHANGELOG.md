@@ -20,6 +20,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Rename the dashboard's "Missing captures" summary to "Incomplete captures",
+  retaining its red status text and capture count.
 - Grouped Python application code under `app/`, capture operations under
   `app/captures/`, HTML under `web/pages/`, and shared assets under `web/static/`.
   Docker and developer tools now follow the package layout; public web routes,

@@ -493,7 +493,7 @@
       }
       /* Choose a visual status for a coverage metric. */
       function metricClass(label) {
-        return label.startsWith("Missing")
+        return label.startsWith("Missing") || label.startsWith("Incomplete")
           ? "missing-count"
           : label.startsWith("Found")
             ? "found-count"
@@ -1167,7 +1167,7 @@
         $("summary").replaceChildren(
           stat("Expected captures", sum(batches, "expected")),
           stat("Found in matrix", sum(batches, "found")),
-          stat("Missing captures", sum(missing, "missing")),
+          stat("Incomplete captures", sum(missing, "missing")),
           stat("Excess captures", sum(excess, "excess")),
         );
         const unreviewed = batches.filter(
