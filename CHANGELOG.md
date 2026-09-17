@@ -35,6 +35,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dashboard status colours now apply only to text. Summary cards, batch buttons,
+  status tabs, quality-review links, cards, and tables use neutral dark surfaces
+  and grey borders, including when excess captures are zero.
 - Made the frozen-header browser test read from its disposable fixture server
   instead of a hardcoded deployment address.
 

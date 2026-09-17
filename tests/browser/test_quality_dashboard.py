@@ -70,7 +70,7 @@ with sync_playwright() as p:
     expect(button).to_have_text("Reviewing · 1/3")
     assert "reviewing" in button.get_attribute("class")
     assert (
-        button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(22, 54, 81)"
+        button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(21, 26, 32)"
     )
     for r in rows:
         reviews[r["key"]] = {"status": "pass"}
@@ -82,7 +82,7 @@ with sync_playwright() as p:
     page.get_by_text("Show batch grouped by lighting", exact=True).click()
     expect(page.locator(".reviewed-check")).to_be_checked()
     assert (
-        button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(25, 60, 41)"
+        button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(21, 26, 32)"
     )
     assert not errors, errors
     b.close()
