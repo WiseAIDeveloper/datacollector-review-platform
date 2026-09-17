@@ -11,15 +11,17 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A collapsible Batches filter with single-selection buttons and an All button on the dashboard.
   Cards, totals, and status counts follow the selected batch, which stays selected
   across identity changes, status views, and data refreshes.
-- Batch buttons retain their dark style with subtle status text, borders, and
-  selected tints: grey for not started, blue for in progress, green for completed,
-  and yellow for excess. Excess takes priority and uses yellow highlights
-  throughout the dashboard.
+- Batch buttons retain their dark style with status text: red for incomplete
+  (including not started), green for completed, and yellow for excess.
+  Excess takes priority. Selected batch buttons and All have a neutral inset
+  pressed appearance, distinct from status colours.
 - A `VERSION` file, release guide, and pull request checklist to keep version numbers,
   release notes, and verification records consistent.
 
 ### Changed
 
+- Rename the dashboard's "Missing captures" summary to "Incomplete captures",
+  retaining its red status text and capture count.
 - Grouped Python application code under `app/`, capture operations under
   `app/captures/`, HTML under `web/pages/`, and shared assets under `web/static/`.
   Docker and developer tools now follow the package layout; public web routes,
@@ -35,6 +37,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dashboard status colours now apply only to text. Summary cards, batch buttons,
+  status tabs, quality-review links, cards, and tables use neutral dark surfaces
+  and grey borders, including when excess captures are zero.
+- Missing, not-started, and in-progress dashboard statuses use red text across
+  batch buttons, status tabs, batch headings, coverage rows, and quality-review links.
 - Made the frozen-header browser test read from its disposable fixture server
   instead of a hardcoded deployment address.
 
