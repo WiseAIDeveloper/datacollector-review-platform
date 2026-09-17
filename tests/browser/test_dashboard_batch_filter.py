@@ -101,9 +101,9 @@ with sync_playwright() as playwright:
         expect(beta).to_have_attribute("data-status", "excess")
         expect(empty).to_have_attribute("data-status", "not-started")
         for button, colour in [
-            (alpha, "rgb(169, 217, 255)"),
+            (alpha, "rgb(255, 141, 141)"),
             (beta, "rgb(244, 211, 94)"),
-            (empty, "rgb(196, 203, 210)"),
+            (empty, "rgb(255, 141, 141)"),
         ]:
             assert button.evaluate("e => getComputedStyle(e).color") == colour
             assert button.evaluate("e => getComputedStyle(e).backgroundColor") == (
@@ -135,6 +135,9 @@ with sync_playwright() as playwright:
         alpha.click()
         expect(alpha).to_have_attribute("aria-pressed", "true")
         expect(all_button).to_have_attribute("aria-pressed", "false")
+        assert alpha.evaluate("e => getComputedStyle(e).color") == "rgb(255, 141, 141)"
+        assert alpha.evaluate("e => getComputedStyle(e).boxShadow").count("inset") == 2
+        assert all_button.evaluate("e => getComputedStyle(e).transform") == "none"
         expect(page.locator(".batch h2")).to_have_text(["Alpha"])
         expect(page.locator("#summary b")).to_have_text(["2", "1", "1", "0"])
 
@@ -210,6 +213,16 @@ with sync_playwright() as playwright:
         empty.click()
         expect(page.locator(".batch h2")).to_have_text(["Empty"])
         expect(page.locator("#summary b")).to_have_text(["2", "0", "2", "0"])
+        for selector in [
+            '[data-view="missing"]',
+            "#view-title",
+            ".batch.missing > .batch-heading > h2",
+            ".coverage-table .missing-case td:first-child",
+        ]:
+            assert (
+                page.locator(selector).first.evaluate("e => getComputedStyle(e).color")
+                == "rgb(255, 141, 141)"
+            ), selector
         expect(page.locator(".coverage-table .missing-case")).to_have_count(1)
         assert (
             page.locator(".coverage-table .missing-case td").first.evaluate(
@@ -218,6 +231,13 @@ with sync_playwright() as playwright:
             == "rgb(53, 65, 75)"
         )
         all_button.click()
+        assert all_button.evaluate("e => getComputedStyle(e).color") == (
+            "rgb(196, 203, 210)"
+        )
+        assert (
+            all_button.evaluate("e => getComputedStyle(e).boxShadow").count("inset")
+            == 2
+        )
         expect(page.locator(".batch h2")).to_have_text(["Alpha", "Empty"])
         expect(page.locator("#subject")).to_have_value("person-a")
 

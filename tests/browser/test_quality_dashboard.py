@@ -65,10 +65,12 @@ with sync_playwright() as p:
     button = page.locator(".review-quality")
     expect(button).to_have_text("Unreviewed · 0/3")
     assert "unreviewed" in button.get_attribute("class")
+    assert button.evaluate("e => getComputedStyle(e).color") == "rgb(255, 141, 141)"
     reviews[rows[0]["key"]] = {"status": "error"}
     page.locator("#refresh").click()
     expect(button).to_have_text("Reviewing · 1/3")
     assert "reviewing" in button.get_attribute("class")
+    assert button.evaluate("e => getComputedStyle(e).color") == "rgb(255, 141, 141)"
     assert (
         button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(21, 26, 32)"
     )
@@ -87,5 +89,5 @@ with sync_playwright() as p:
     assert not errors, errors
     b.close()
 print(
-    "PASS dashboard grey/blue/green states, counts, unreviewed includes partial and excludes completed reviews."
+    "PASS dashboard review states, red in-progress text, counts, unreviewed includes partial and excludes completed reviews."
 )

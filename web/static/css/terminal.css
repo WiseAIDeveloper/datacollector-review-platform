@@ -443,16 +443,17 @@ body.terminal .review-quality.reviewed {
 body.terminal.dashboard {
   --excess-text: #f4d35e;
 }
-body.terminal.dashboard .batch-filter button[data-status] {
-  color: var(--status-text);
+body.terminal.dashboard .batch-filter button {
+  color: var(--status-text, #c4cbd2);
   background: #151a20;
   border: 1px solid #36404a;
+  box-shadow:
+    0 2px 0 #080a0c,
+    inset 0 1px 0 #ffffff0d;
 }
-body.terminal.dashboard [data-status="not-started"] {
-  --status-text: #c4cbd2;
-}
+body.terminal.dashboard [data-status="not-started"],
 body.terminal.dashboard [data-status="in-progress"] {
-  --status-text: #a9d9ff;
+  --status-text: #ff8d8d;
 }
 body.terminal.dashboard [data-status="completed"] {
   --status-text: #96e6b3;
@@ -461,10 +462,21 @@ body.terminal.dashboard [data-status="excess"] {
   --status-text: var(--excess-text);
 }
 body.terminal.dashboard button.active,
-body.terminal.dashboard .batch-filter button[data-status].active,
 body.terminal.dashboard .views a.active {
   background: #242a30;
   border-color: #65717d;
+}
+body.terminal.dashboard .batch-filter button:hover {
+  border-color: #8b9aaa;
+}
+body.terminal.dashboard .batch-filter button[aria-pressed="true"],
+body.terminal.dashboard .batch-filter button:active {
+  background: #242a30;
+  border-color: #8b9aaa;
+  box-shadow:
+    inset 0 2px 4px #0009,
+    inset 0 -1px 0 #ffffff0d;
+  transform: translateY(1px);
 }
 body.terminal.dashboard :focus-visible {
   outline-color: #c4cbd2;
@@ -500,6 +512,22 @@ body.terminal.dashboard .coverage-table tr:nth-child(odd):hover td {
 }
 body.terminal.dashboard .reviewed-check {
   accent-color: #8b9aaa;
+}
+body.terminal.dashboard .review-quality.unreviewed,
+body.terminal.dashboard .review-quality.reviewing,
+body.terminal.dashboard .views a[data-view="unreviewed"],
+body.terminal.dashboard .views a[data-view="missing"],
+body.terminal.dashboard .batch.missing > .batch-heading > h2,
+body.terminal.dashboard .batch.missing > p:not(.muted),
+body.terminal.dashboard .group.missing .group-head h3,
+body.terminal.dashboard .coverage-table tr.missing-case td,
+body.terminal.dashboard
+  #views:has(a[data-view="unreviewed"].active)
+  ~ #view-title,
+body.terminal.dashboard
+  #views:has(a[data-view="missing"].active)
+  ~ #view-title {
+  color: #ff8d8d;
 }
 body.terminal.dashboard .excess-count {
   color: var(--excess-text) !important;
