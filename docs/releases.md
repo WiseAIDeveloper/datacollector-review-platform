@@ -1,6 +1,6 @@
 # Versions and releases
 
-The first stable release is **v1.0.0**. [CHANGELOG.md](../CHANGELOG.md) describes
+The current stable release is **v1.1.0**; the first stable release is **v1.0.0**. [CHANGELOG.md](../CHANGELOG.md) describes
 each version; [GitHub Releases](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases)
 provides its tag and release notes.
 
@@ -72,7 +72,7 @@ approval; the user's separate decision to merge a PR still applies.
 
 This is a retrospective tag of the verified deployment. Its source is already
 included in merged PR #2. A later helper cleanup (`65de613`) is on `main` but is
-outside this deployed baseline and belongs under **Unreleased**.
+outside that baseline and is included in **v1.1.0**.
 
 | Item                                    | Preserved identity                                                        |
 | --------------------------------------- | ------------------------------------------------------------------------- |

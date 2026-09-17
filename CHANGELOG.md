@@ -6,6 +6,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-17
+
 ### Added
 
 - A collapsible Batches filter with single-selection buttons and an All button on the dashboard.
@@ -86,5 +88,6 @@ historical tag does not contain `VERSION` or `CHANGELOG.md`.
 See the [validation report](docs/refactor-validation.md) and
 [release guide](docs/releases.md) for image identity and recovery details.
 
-[Unreleased]: https://github.com/WiseAIDeveloper/datacollector-review-platform/compare/v1.0.0...main
+[Unreleased]: https://github.com/WiseAIDeveloper/datacollector-review-platform/compare/v1.1.0...main
+[1.1.0]: https://github.com/WiseAIDeveloper/datacollector-review-platform/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0

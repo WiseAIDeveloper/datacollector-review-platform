@@ -52,9 +52,10 @@ docs/            Detailed guides
 
 ## Versions
 
-[v1.0.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0)
-preserves the first verified working version. The folder layout above is part of
-the newer, unreleased changes.
+[v1.1.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.1.0)
+adds the collapsible dashboard batch filter, text-only status colours, and the
+application folder layout shown above. The first verified working version remains
+preserved as [v1.0.0](https://github.com/WiseAIDeveloper/datacollector-review-platform/releases/tag/v1.0.0).
 
 See the [changelog](CHANGELOG.md) for changes by version and the
 [release guide](docs/releases.md) for versioning and rollback.
