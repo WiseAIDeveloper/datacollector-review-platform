@@ -96,11 +96,8 @@
       if (!response.ok) throw new Error(await response.text());
       const selected = await response.json();
       name.textContent = selected.name;
+      name.title = selected.name;
       document.title = selected.name + " · " + document.title;
-      const files = document.querySelector(".plan-files p");
-      if (files)
-        files.textContent =
-          "Test plan and batch definitions from project: " + selected.name;
     } catch (error) {
       identity.textContent =
         "Project unavailable. Select a project to continue.";

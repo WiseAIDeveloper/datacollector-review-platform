@@ -548,70 +548,74 @@ body.terminal .dashboard-header {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #101619;
-  border-bottom: 1px solid #52606b;
-  box-shadow: 0 5px 16px #0007;
-  padding: 16px 20px;
-}
-body.terminal .dashboard-titlebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 12px;
+  background: #101619;
+  border-bottom: 1px solid #52606b;
+  padding: 10px 12px;
+}
+body.terminal .dashboard-titlebar {
+  display: contents;
 }
 body.terminal .dashboard-titlebar h1 {
   margin: 0;
+  font-size: 13px;
+  white-space: nowrap;
 }
 body.terminal .dashboard-titlebar #execute {
+  order: 2;
   margin-left: auto;
-  padding: 9px 15px;
-  border-color: #69aa80;
-  background: #193c29;
-  color: #b0f0c8;
+  padding: 5px 8px;
   white-space: nowrap;
 }
 body.terminal .dashboard-header .toolbar {
-  margin: 12px 0 0;
-  align-items: end;
-  gap: 12px;
+  order: 3;
+  margin: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+body.terminal .dashboard-header .toolbar label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 body.terminal .dashboard-header #subject {
-  min-width: 220px;
+  min-width: 0;
+  width: 130px;
 }
-body.terminal .dashboard-header #saved:empty {
-  display: none;
+body.terminal .dashboard-header .project-context {
+  order: 1;
+  flex: 0 1 300px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 10px;
 }
-@media (max-width: 800px) {
+body.terminal .dashboard-header .project-context > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.terminal .dashboard-header .project-context .current-project-name {
+  font-size: 10px;
+  font-weight: 400;
+}
+@media (max-width: 1200px) {
   body.terminal .dashboard-header {
-    padding: 12px;
-    max-height: 50vh;
-    overflow: auto;
+    flex-wrap: wrap;
+    gap: 8px 12px;
   }
-  body.terminal .dashboard-titlebar {
-    gap: 8px;
-    align-items: start;
+  body.terminal .dashboard-header .project-context {
+    flex-basis: 260px;
   }
-  body.terminal .dashboard-titlebar h1 {
-    font-size: 14px;
-  }
-  body.terminal .dashboard-titlebar #execute {
-    padding: 7px;
-    font-size: 11px;
-  }
-  body.terminal .dashboard-header #subject {
-    min-width: 0;
-    max-width: 100%;
-  }
-}
-
-body.terminal .dashboard-header .plan-files {
-  margin: 0 0 8px;
-  color: #8d98a3;
-  font-size: 11px;
-}
-body.terminal .dashboard-header .plan-files p {
-  overflow-wrap: anywhere;
 }
 
 body.terminal .reviewed-check {
