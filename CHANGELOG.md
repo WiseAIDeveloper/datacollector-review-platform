@@ -8,7 +8,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- A separate Docker service discovers projects from folders, opens on project selection, and restores copied ingestion/action JSONL history into project-local databases. Each project keeps its own review logs and quality-review state.
+- A separate Docker service discovers projects from folders, opens on project selection, and restores copied ingestion/action JSONL history into project-local databases. Each project keeps its own review logs and quality-review state. Existing shared-image URLs continue to load in review pages.
 
 - Create named projects by uploading a test-plan CSV and batches CSV together. Select projects from the Projects page to scope dashboards, capture review, and search to their collection plans. Existing dataset access remains available. Project definitions persist in the state volume; creation uses the existing write PIN.
 

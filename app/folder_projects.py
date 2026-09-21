@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .projects import Projects, parse_csv, validate_pair, MATRIX_FIELDS, BATCH_FIELDS
+from .captures.catalog import records
 
 
 class FolderProjects:
@@ -141,6 +142,10 @@ class ProjectApplications:
         self.lock = threading.RLock()
         self.applications = {}
         self.ingestion = self
+
+    def records(self):
+        """Resolve globally keyed image links in the shared source capture dataset."""
+        return records(self.settings.root)
 
     def start(self):
         """Project workers start only after a valid selection."""

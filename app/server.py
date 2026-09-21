@@ -160,6 +160,9 @@ class Handler(BaseHTTPRequestHandler):
         if (
             isinstance(application, ProjectApplications)
             and path.startswith("/api/")
+            and not (
+                path in {"/api/image", "/api/annotation"} and not self.project_id()
+            )
             and path not in {"/api/projects", "/api/project", "/api/project-mode"}
         ):
             return application.select(self.project_id())

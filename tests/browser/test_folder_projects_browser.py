@@ -33,6 +33,9 @@ with running_server(folder_mode=True) as client, sync_playwright() as playwright
     expect(page.locator("header")).to_contain_text(
         "Project: 001_MyKad_ColourPrintEnhancement2"
     )
+    page.get_by_role("link", name="Capture review", exact=True).click()
+    page.locator("#cards img").first.wait_for()
+    page.wait_for_function("document.querySelector('#cards img')?.naturalWidth > 0")
     page.get_by_role("link", name="Projects", exact=True).click()
     add_folder(client, "002_Another", other=True)
     page.get_by_role("button", name="Refresh projects").click()

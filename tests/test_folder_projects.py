@@ -30,6 +30,9 @@ class FolderProjectTests(unittest.TestCase):
             self.assertEqual(client.request("/api/projects")[1], [])
             self.assertIn(b"Select a project", client.request("/")[1])
             self.assertEqual(client.request("/api/captures")[0], 400)
+            self.assertEqual(
+                client.request("/api/image?key=genuine/capture-0/capture-0.jpg")[0], 200
+            )
             add_folder(client, "001_First")
             second = add_folder(client, "002_Second", other=True)
             self.assertEqual(
