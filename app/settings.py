@@ -18,6 +18,7 @@ class Settings:
     delete_token: str = field(repr=False)
     host: str = "0.0.0.0"
     port: int = 8080
+    projects_root: Path = None
     static_root: ClassVar[Path] = Path(__file__).resolve().parents[1] / "web"
 
     @classmethod
@@ -37,4 +38,9 @@ class Settings:
             delete_token=token,
             host=environment.get("HOST", "0.0.0.0"),
             port=port,
+            projects_root=(
+                Path(environment["PROJECTS_ROOT"]).resolve()
+                if environment.get("PROJECTS_ROOT")
+                else None
+            ),
         )

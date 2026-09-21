@@ -186,9 +186,9 @@ class FixtureServer(Client):
             if self.process.poll() is not None:
                 raise RuntimeError("Fixture server exited during startup")
             try:
-                if (
-                    self.request("/health")[0] == 200
-                    and not self.request("/api/ingestion?limit=1")[1]["scanning"]
+                if self.request("/health")[0] == 200 and (
+                    self.environment.get("PROJECTS_ROOT")
+                    or not self.request("/api/ingestion?limit=1")[1]["scanning"]
                 ):
                     return
             except OSError:
@@ -214,7 +214,7 @@ class FixtureServer(Client):
 
 
 @contextmanager
-def running_server(source=SOURCE):
+def running_server(source=SOURCE, folder_mode=False):
     """Run either the original or current app against disposable data only."""
     with tempfile.TemporaryDirectory(prefix="review-test-") as temporary:
         root = Path(temporary)
@@ -253,6 +253,9 @@ def running_server(source=SOURCE):
             "PYTHONPATH": str(source),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
+        environment["PROJECTS_ROOT"] = (
+            str(root / "project-folders") if folder_mode else ""
+        )
         client = FixtureServer(
             f"http://127.0.0.1:{port}",
             token,

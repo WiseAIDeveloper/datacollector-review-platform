@@ -87,6 +87,52 @@ class IngestionLog:
         )
         self.stop = threading.Event()
         self.thread = None
+        self.batch_filter = None
+
+    def restore_logs(self):
+        """Import copied JSONL history once, transactionally, before the first scan."""
+        with self.lock, self.db:
+            if self.db.execute(
+                "SELECT 1 FROM meta WHERE key='logs_restored'"
+            ).fetchone():
+                return
+            if (
+                self.db.execute("SELECT count(*) FROM events").fetchone()[0]
+                or self.db.execute("SELECT count(*) FROM actions").fetchone()[0]
+            ):
+                self.db.execute("INSERT INTO meta VALUES ('logs_restored', '1')")
+                return
+            restored = 0
+            for table, path in (
+                ("events", self.log_path),
+                ("actions", self.log_path.with_name("actions.jsonl")),
+            ):
+                if not path.exists():
+                    continue
+                fields = [
+                    row[1] for row in self.db.execute(f"PRAGMA table_info({table})")
+                ]
+                with path.open(encoding="utf-8") as stream:
+                    for line in stream:
+                        if not line.strip():
+                            continue
+                        row = json.loads(line)
+                        if not isinstance(row, dict) or not set(fields).issubset(row):
+                            raise ValueError(
+                                f"Invalid copied {path.name}; history was not imported"
+                            )
+                        if table == "actions":
+                            row["changes"] = json.dumps(row["changes"])
+                        self.db.execute(
+                            f"INSERT INTO {table} ({','.join(fields)}) VALUES ({','.join('?' for _ in fields)})",
+                            [row[field] for field in fields],
+                        )
+                        restored += 1
+            if restored:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO meta VALUES ('initialized', '1')"
+                )
+            self.db.execute("INSERT INTO meta VALUES ('logs_restored', '1')")
 
     def scan(self):
         """Log each complete capture once and retry incomplete files on the next scan."""
@@ -104,6 +150,7 @@ class IngestionLog:
             except OSError as e:
                 self.status.update(last_scan=detected, scanning=False, errors=[str(e)])
                 return
+            allowed = self.batch_filter() if self.batch_filter else None
             for folder in folders:
                 path = folder / INDEX_NAME
                 if (
@@ -115,6 +162,12 @@ class IngestionLog:
                 try:
                     rows = read_stable_rows(path)
                     for row in rows:
+                        if (
+                            allowed is not None
+                            and (folder.name, row.get("test_plan_name", ""))
+                            not in allowed
+                        ):
+                            continue
                         uuid, filename = row["uuid"], row["filename"]
                         if not uuid or not filename or not row["ori_path"]:
                             continue

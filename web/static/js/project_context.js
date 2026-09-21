@@ -33,9 +33,16 @@
     nav.append(link);
     if (location.pathname === "/projects.html")
       link.setAttribute("aria-current", "page");
+    let folderMode = false;
+    try {
+      const mode = await originalFetch("/api/project-mode");
+      folderMode = mode.ok && (await mode.json()).folders;
+    } catch (_) {
+      // Existing pages can still navigate while the service recovers.
+    }
     if (!project) return;
     for (const anchor of nav.querySelectorAll("a")) {
-      if (anchor.getAttribute("href") === "/ingestion.html") {
+      if (anchor.getAttribute("href") === "/ingestion.html" && !folderMode) {
         anchor.textContent = "Ingestion logs (all)";
         continue;
       }

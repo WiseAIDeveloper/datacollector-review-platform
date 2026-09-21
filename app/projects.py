@@ -17,7 +17,7 @@ MATRIX_FIELDS = {
     "device",
     "expected_count_per_identity",
 }
-BATCH_FIELDS = {"batch_name", "test_plan_name", "expected_identities"}
+BATCH_FIELDS = {"batch_name", "test_plan_name"}
 
 
 def parse_csv(value, required, label):
@@ -48,6 +48,30 @@ def parse_csv(value, required, label):
         ):
             raise ValueError(f"{label}: incomplete or uneven row")
     return rows
+
+
+def validate_pair(plan, definitions):
+    """Validate shared plan constraints for uploaded and discovered CSV pairs."""
+    names = {row["matrix_name"] for row in plan}
+    if len(names) != 1:
+        raise ValueError("Test plan must contain exactly one matrix_name")
+    folders = [row["batch_name"] for row in definitions]
+    if len(folders) != len(set(folders)):
+        raise ValueError("Batches must have unique batch_name values")
+    for row in plan:
+        if row["folder"] not in folders:
+            raise ValueError("Every test-plan folder must match a batch_name")
+        if row["sdk"] not in {"web", "app"}:
+            raise ValueError("Test-plan sdk must be web or app")
+        if (
+            not row["expected_count_per_identity"].isascii()
+            or not row["expected_count_per_identity"].isdigit()
+        ):
+            raise ValueError("Expected counts must be non-negative integers")
+    keys = [(r["folder"], r["lighting"], r["sdk"], r["device"]) for r in plan]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Test plan contains duplicate capture requirements")
+    return next(iter(names))
 
 
 class Projects:
@@ -111,29 +135,11 @@ class Projects:
             raise ValueError("A project with this name already exists")
         plan = parse_csv(request.get("matrix_csv"), MATRIX_FIELDS, "Test plan")
         definitions = parse_csv(request.get("batches_csv"), BATCH_FIELDS, "Batches")
-        names = {row["matrix_name"] for row in plan}
-        if len(names) != 1:
-            raise ValueError("Test plan must contain exactly one matrix_name")
-        folders = [row["batch_name"] for row in definitions]
-        if len(folders) != len(set(folders)):
-            raise ValueError("Batches must have unique batch_name values")
-        for row in plan:
-            if row["folder"] not in folders:
-                raise ValueError("Every test-plan folder must match a batch_name")
-            if row["sdk"] not in {"web", "app"}:
-                raise ValueError("Test-plan sdk must be web or app")
-            if (
-                not row["expected_count_per_identity"].isascii()
-                or not row["expected_count_per_identity"].isdigit()
-            ):
-                raise ValueError("Expected counts must be non-negative integers")
-        keys = [(r["folder"], r["lighting"], r["sdk"], r["device"]) for r in plan]
-        if len(keys) != len(set(keys)):
-            raise ValueError("Test plan contains duplicate capture requirements")
+        matrix_name = validate_pair(plan, definitions)
         project = {
             "id": uuid.uuid4().hex,
             "name": name,
-            "matrix_name": next(iter(names)),
+            "matrix_name": matrix_name,
             "matrix": plan,
             "batches": definitions,
         }

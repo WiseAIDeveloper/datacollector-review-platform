@@ -16,6 +16,7 @@ from .ingestion import IngestionLog, with_current_metadata
 from .captures.quality import read_reviews, save_review
 from .settings import Settings
 from .projects import Projects
+from .folder_projects import ProjectApplications
 
 LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_BYTES = 1024 * 1024
@@ -63,7 +64,12 @@ class Application:
 
     def records(self):
         """Read the current annotation rows for this application's dataset."""
-        return records(self.settings.root)
+        rows = records(self.settings.root)
+        return (
+            self.projects.filter_records(self.project_id, rows)
+            if hasattr(self, "project_id")
+            else rows
+        )
 
     def edit(self, request):
         """Apply a metadata edit and persist its action history while holding the lock."""
@@ -149,7 +155,15 @@ class Handler(BaseHTTPRequestHandler):
     @property
     def app(self):
         """Access the application attached to this server instance."""
-        return self.server.application
+        application = self.server.application
+        path = urlparse(self.path).path
+        if (
+            isinstance(application, ProjectApplications)
+            and path.startswith("/api/")
+            and path not in {"/api/projects", "/api/project", "/api/project-mode"}
+        ):
+            return application.select(self.project_id())
+        return application
 
     def log_message(self, format, *args):
         """Keep request paths, bodies, credentials, and personal data out of access logs."""
@@ -184,7 +198,13 @@ class Handler(BaseHTTPRequestHandler):
     def get_route(self, path, query):
         """Resolve static pages, collection APIs, and individual capture resources."""
         if path in STATIC_FILES:
-            filename = STATIC_FILES[path]
+            filename = (
+                "pages/projects.html"
+                if path == "/"
+                and self.app.settings.projects_root
+                and not self.project_id()
+                else STATIC_FILES[path]
+            )
             kind = CONTENT_TYPES[filename.rsplit(".", 1)[-1]]
             return self.send(
                 (self.app.settings.static_root / filename).read_bytes(),
@@ -192,6 +212,10 @@ class Handler(BaseHTTPRequestHandler):
             )
         if path == "/health":
             return self.send(b'{"ok":true}')
+        if path == "/api/project-mode":
+            return self.send_json(
+                {"folders": bool(self.server.application.settings.projects_root)}
+            )
         if path == "/api/projects":
             return self.send_json(self.app.projects.listing())
         if path == "/api/project":
@@ -303,7 +327,8 @@ class Handler(BaseHTTPRequestHandler):
             if path not in WRITE_ROUTES:
                 return self.send(b"Not found", "text/plain", 404)
             if not hmac.compare_digest(
-                self.headers.get("X-Delete-Token", ""), self.app.settings.delete_token
+                self.headers.get("X-Delete-Token", ""),
+                self.server.application.settings.delete_token,
             ):
                 return self.send(b"Invalid deletion PIN", "text/plain", 403)
             size = int(self.headers.get("Content-Length", "0"))
@@ -336,8 +361,9 @@ class Handler(BaseHTTPRequestHandler):
                     for item in requested
                 ):
                     raise ValueError("Capture does not belong to the selected project")
+            if path == "/api/projects":
+                return self.send_json(self.server.application.create_project(request))
             action = {
-                "/api/projects": self.app.create_project,
                 "/api/quality": self.app.review,
                 "/api/edit-capture": self.app.edit,
                 "/api/apply-decisions": self.app.remove,
@@ -356,7 +382,11 @@ def create_server(settings):
     """Construct an HTTP server without starting its serving loop or ingestion worker."""
     server = ThreadingHTTPServer((settings.host, settings.port), Handler)
     try:
-        server.application = Application(settings)
+        server.application = (
+            ProjectApplications(settings, Application)
+            if settings.projects_root
+            else Application(settings)
+        )
     except Exception:
         server.server_close()
         raise

@@ -27,3 +27,9 @@
 !web/static/css/
 !web/static/css/terminal.css
 !web/static/css/frozen_panes.css
+!app/projects.py
+!app/folder_projects.py
+!web/pages/projects.html
+!web/static/js/projects.js
+!web/static/js/project_context.js
+!web/static/css/projects.css

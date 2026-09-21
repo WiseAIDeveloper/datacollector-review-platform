@@ -27,6 +27,7 @@
     <main class="project-layout">
       <section aria-labelledby="existing-title">
         <h2 id="existing-title">Select a project</h2>
+        <button id="refresh-projects" type="button">Refresh projects</button>
         <p id="list-status" role="status">Loading projects…</p>
         <div id="project-list"></div>
       </section>
@@ -66,8 +67,8 @@
             aria-describedby="batches-help"
           />
           <p id="batches-help">
-            Columns: batch_name, test_plan_name, expected_identities. Keep any
-            additional metadata columns. UTF-8, up to 400 KB per file.
+            Columns: batch_name, test_plan_name. Keep any additional metadata
+            columns. UTF-8, up to 400 KB per file.
           </p>
           <label for="pin">Write PIN</label
           ><input id="pin" type="password" required autocomplete="off" />

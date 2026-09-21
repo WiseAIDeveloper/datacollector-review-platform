@@ -1,6 +1,7 @@
 /* Create projects with a validated pair of CSVs and open scoped dashboards. */
 const list = document.getElementById("project-list");
 const listStatus = document.getElementById("list-status");
+let lastListing = null;
 const createStatus = document.getElementById("create-status");
 
 async function loadProjects() {
@@ -9,6 +10,14 @@ async function loadProjects() {
     const response = await fetch("/api/projects");
     if (!response.ok) throw new Error(await response.text());
     const projects = await response.json();
+    const snapshot = JSON.stringify(projects);
+    if (snapshot === lastListing) {
+      listStatus.textContent = projects.length
+        ? `${projects.length} projects available`
+        : "No projects yet. Upload two CSVs to get started.";
+      return;
+    }
+    lastListing = snapshot;
     list.replaceChildren();
     listStatus.textContent = projects.length
       ? `${projects.length} projects available`
@@ -18,13 +27,14 @@ async function loadProjects() {
       const title = document.createElement("h3");
       title.textContent = project.name;
       const plan = document.createElement("p");
-      plan.textContent = project.matrix_name;
+      plan.textContent = project.error || project.matrix_name;
       const open = document.createElement("a");
       open.href = "/coverage.html?project=" + encodeURIComponent(project.id);
       open.textContent = "Open project";
       if (new URLSearchParams(location.search).get("project") === project.id)
         open.textContent = "Open selected project";
-      card.append(title, plan, open);
+      card.append(title, plan);
+      if (!project.error) card.append(open);
       list.append(card);
     }
   } catch (error) {
@@ -85,3 +95,9 @@ document
     }
   });
 loadProjects();
+
+/* Detect project folders added outside the app without requiring a restart. */
+setInterval(loadProjects, 5000);
+document
+  .getElementById("refresh-projects")
+  .addEventListener("click", loadProjects);
