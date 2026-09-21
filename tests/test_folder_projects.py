@@ -104,6 +104,58 @@ class FolderProjectTests(unittest.TestCase):
             )
             self.assertEqual(client.request("/api/quality?project=002_Second")[1], {})
 
+    def test_pin_free_writes(self):
+        """Allow project creation, review, edit, and removal without a token when configured."""
+        with running_server(folder_mode=True, write_pin_required=False) as client:
+            status, project, _ = client.request(
+                "/api/projects", project_payload(client), token=""
+            )
+            self.assertEqual(status, 200)
+            query = "?project=" + project["id"]
+            self.assertFalse(
+                client.request("/api/project-mode")[1]["write_pin_required"]
+            )
+            self.assertEqual(
+                client.request(
+                    "/api/quality" + query,
+                    {
+                        "key": "genuine/capture-0/capture-0.jpg",
+                        "status": "pass",
+                        "expected": None,
+                    },
+                    token="",
+                )[0],
+                200,
+            )
+            item = {
+                "folder": "genuine",
+                "uuid": "capture-1",
+                "filename": "capture-1.jpg",
+            }
+            self.assertEqual(
+                client.request(
+                    "/api/edit-capture" + query,
+                    {
+                        **item,
+                        "changes": {"subject": "changed"},
+                        "expected": client.request("/api/captures" + query)[1][1][
+                            "metadata"
+                        ],
+                    },
+                    token="",
+                )[0],
+                200,
+            )
+            item["key"] = "genuine/capture-1/capture-1.jpg"
+            self.assertEqual(
+                client.request(
+                    "/api/apply-decisions" + query,
+                    {"confirm_count": 1, "remove": [item]},
+                    token="",
+                )[0],
+                200,
+            )
+
     def test_bad_log_import_rolls_back(self):
         """Malformed copied history cannot be replaced by an empty scanner export."""
         with TemporaryDirectory() as temporary:

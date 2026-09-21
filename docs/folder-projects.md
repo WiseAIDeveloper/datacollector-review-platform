@@ -2,7 +2,8 @@
 
 `compose.projects.yaml` starts a separate `idrecapture-project-review` container,
 using port 8771 by default. It does not replace `idrecapture-viewer` on 8769.
-The home page is a project chooser. It discovers immediate child directories under
+The new service disables write PINs with `WRITE_PIN_REQUIRED=false`; confirmation
+prompts still apply to edits and deletions. The home page is a project chooser. It discovers immediate child directories under
 `PROJECTS_ROOT` on every API request; the chooser refreshes every five seconds.
 A directory needs exactly one `NAME.csv` and matching `NAME_batches.csv` pair.
 Optional `project.json` contains a display name: `{"name": "My project"}`.
@@ -31,11 +32,12 @@ Existing captured images and annotations remain in the shared capture dataset.
 Capture edits and deletions operate on that shared dataset; project selection is
 not an independent copy of the images or collection annotations.
 
-Create a private `.env.projects` with mode 600, containing `DELETE_TOKEN`,
-`DATASET_PATH`, `PROJECTS_PATH`, `PROJECT_REVIEW_BIND_ADDRESS`, and
-`PROJECT_REVIEW_PORT`, and `PROJECT_REVIEW_GID` (the numeric group owning the
+Create a private `.env.projects` with mode 600, containing `DATASET_PATH`,
+`PROJECTS_PATH`, `PROJECT_REVIEW_BIND_ADDRESS`, `PROJECT_REVIEW_PORT`, and
+`PROJECT_REVIEW_GID` (the numeric group owning the
 project directories, obtained with `id -g` for directories created by you). The
-container joins that group to access the copied files. Keep credentials out of version control. For this service,
+container joins that group to access the copied files. No write PIN is needed.
+For this service,
 `DATASET_PATH` points to `/mnt5/auto-ekyc/idrecapture` and `PROJECTS_PATH` points to
 the `projects` directory above. Bind only to the intended host interface.
 

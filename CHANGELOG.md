@@ -6,7 +6,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Remove the write PIN from the separate folder-project service, including project creation and review actions. Existing edit/delete confirmations remain.
+
 ### Added
+
+- Show the current project in a prominent banner on review pages, with a Switch project link and the project name in the browser tab title.
 
 - A separate Docker service discovers projects from folders, opens on project selection, and restores copied ingestion/action JSONL history into project-local databases. Each project keeps its own review logs and quality-review state. Existing shared-image URLs continue to load in review pages.
 

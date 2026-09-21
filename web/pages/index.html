@@ -718,8 +718,12 @@
           )
         )
           return;
-        const token = prompt("Enter PIN to execute these decisions:");
-        if (!token) return;
+        const token = window.reviewWriteToken
+          ? await window.reviewWriteToken(
+              "Enter PIN to execute these decisions:",
+            )
+          : prompt("Enter PIN to execute these decisions:") || null;
+        if (token === null) return;
         executing = true;
         updateExecute();
         let completed = 0;

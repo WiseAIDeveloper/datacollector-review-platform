@@ -179,8 +179,10 @@ async function executeEdit(remove) {
         )
         .join("\n");
   if (!confirm(question)) return;
-  const pin = prompt("Enter your PIN:");
-  if (!pin) return;
+  const pin = window.reviewWriteToken
+    ? await window.reviewWriteToken("Enter your PIN:")
+    : prompt("Enter your PIN:") || null;
+  if (pin === null) return;
   editing = true;
   controls(true);
   $("review-error").textContent = "";

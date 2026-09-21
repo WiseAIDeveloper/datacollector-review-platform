@@ -10,7 +10,7 @@ services:
     group_add:
       - "${PROJECT_REVIEW_GID:?Set the project directory group ID}"
     environment:
-      DELETE_TOKEN: ${DELETE_TOKEN:?Set DELETE_TOKEN in the private environment file}
+      WRITE_PIN_REQUIRED: "false"
       PROJECTS_ROOT: /projects
     ports:
       - "${PROJECT_REVIEW_BIND_ADDRESS:-127.0.0.1}:${PROJECT_REVIEW_PORT:-8771}:8080"

@@ -2,6 +2,25 @@
 (() => {
   const project = new URLSearchParams(location.search).get("project");
   const originalFetch = window.fetch.bind(window);
+  const modePromise = originalFetch("/api/project-mode").then(
+    async (response) => {
+      /* Read the write policy before allowing a review action to proceed. */
+      if (!response.ok) throw new Error("Could not load review settings");
+      return response.json();
+    },
+  );
+  // The navigation listener also reports mode-fetch failures without unhandled rejections.
+  modePromise.catch(() => {});
+  window.reviewWriteToken = async (message) => {
+    /* Skip credential prompts only when the server explicitly disables them. */
+    try {
+      const mode = await modePromise;
+      return mode.write_pin_required === false ? "" : prompt(message) || null;
+    } catch (_) {
+      alert("Could not load review settings. Refresh and try again.");
+      return null;
+    }
+  };
   if (project) {
     window.fetch = (input, options) => {
       /* Add project context only to same-origin API calls from these pages. */
@@ -35,8 +54,15 @@
       link.setAttribute("aria-current", "page");
     let folderMode = false;
     try {
-      const mode = await originalFetch("/api/project-mode");
-      folderMode = mode.ok && (await mode.json()).folders;
+      const mode = await modePromise;
+      folderMode = mode.folders;
+      const pin = document.getElementById("pin");
+      if (pin && mode.write_pin_required === false) {
+        pin.required = false;
+        pin.disabled = true;
+        pin.hidden = true;
+        document.querySelector('label[for="pin"]').hidden = true;
+      }
     } catch (_) {
       // Existing pages can still navigate while the service recovers.
     }
@@ -50,23 +76,35 @@
       url.searchParams.set("project", project);
       anchor.href = url;
     }
-    const label = document.createElement("p");
-    label.setAttribute("role", "status");
+    const label = document.createElement("div");
+    label.className = "project-context";
+    label.setAttribute("role", "region");
+    label.setAttribute("aria-label", "Current project");
+    const identity = document.createElement("span");
+    const name = document.createElement("strong");
+    name.className = "current-project-name";
+    name.textContent = project;
+    identity.append("Project: ", name);
+    const switchProject = document.createElement("a");
+    switchProject.href =
+      "/projects.html?project=" + encodeURIComponent(project);
+    switchProject.textContent = "Switch project";
+    label.append(identity, switchProject);
     document.querySelector("header")?.prepend(label);
     try {
       const response = await fetch("/api/project");
       if (!response.ok) throw new Error(await response.text());
       const selected = await response.json();
-      label.textContent = "Project: " + selected.name;
+      name.textContent = selected.name;
+      document.title = selected.name + " · " + document.title;
       const files = document.querySelector(".plan-files p");
       if (files)
         files.textContent =
           "Test plan and batch definitions from project: " + selected.name;
     } catch (error) {
-      label.textContent =
-        "Project unavailable: " +
-        error.message +
-        ". Select a project from Projects.";
+      identity.textContent =
+        "Project unavailable. Select a project to continue.";
+      label.classList.add("project-unavailable");
     }
   });
 })();

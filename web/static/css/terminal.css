@@ -622,3 +622,35 @@ body.terminal .reviewed-check {
   margin: 0;
   vertical-align: middle;
 }
+
+/* Keep the active project distinct from page titles and review controls. */
+body.terminal .project-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  border: 1px solid #426c53;
+  border-left: 3px solid #96e6b3;
+  background: #14231b;
+  color: #c4cbd2;
+}
+body.terminal .project-context > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+body.terminal .project-context .current-project-name {
+  color: #c5f5d5;
+  font-size: 13px;
+}
+body.terminal .project-context > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: underline;
+}
+body.terminal .project-context.project-unavailable {
+  border-color: #c48775;
+  background: #2a1d18;
+}

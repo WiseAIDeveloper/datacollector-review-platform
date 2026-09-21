@@ -217,7 +217,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(b'{"ok":true}')
         if path == "/api/project-mode":
             return self.send_json(
-                {"folders": bool(self.server.application.settings.projects_root)}
+                {
+                    "folders": bool(self.server.application.settings.projects_root),
+                    "write_pin_required": self.server.application.settings.write_pin_required,
+                }
             )
         if path == "/api/projects":
             return self.send_json(self.app.projects.listing())
@@ -329,9 +332,12 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path not in WRITE_ROUTES:
                 return self.send(b"Not found", "text/plain", 404)
-            if not hmac.compare_digest(
-                self.headers.get("X-Delete-Token", ""),
-                self.server.application.settings.delete_token,
+            if (
+                self.server.application.settings.write_pin_required
+                and not hmac.compare_digest(
+                    self.headers.get("X-Delete-Token", ""),
+                    self.server.application.settings.delete_token,
+                )
             ):
                 return self.send(b"Invalid deletion PIN", "text/plain", 403)
             size = int(self.headers.get("Content-Length", "0"))

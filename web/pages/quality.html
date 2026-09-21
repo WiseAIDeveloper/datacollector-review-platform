@@ -314,8 +314,10 @@
         )
           return;
         if (!pin) {
-          pin = prompt("Enter PIN to save these reviews:") || "";
-          if (!pin) return;
+          pin = window.reviewWriteToken
+            ? await window.reviewWriteToken("Enter PIN to save these reviews:")
+            : prompt("Enter PIN to save these reviews:") || null;
+          if (pin === null) return;
         }
         saving = 1;
         for (const control of document.querySelectorAll(

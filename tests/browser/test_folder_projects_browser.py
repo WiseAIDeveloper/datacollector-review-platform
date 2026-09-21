@@ -1,6 +1,7 @@
 """Exercise automatic folder discovery and project-local navigation in the browser."""
 
 import os
+import re
 import shutil
 
 from playwright.sync_api import expect, sync_playwright
@@ -28,6 +29,23 @@ with running_server(folder_mode=True) as client, sync_playwright() as playwright
         "Project: 001_MyKad_ColourPrintEnhancement2"
     )
     page.locator(".batch").first.wait_for()
+    for route in (
+        "/coverage.html",
+        "/",
+        "/quality.html",
+        "/search.html",
+        "/ingestion.html",
+    ):
+        page.goto(client.base + route + "?project=001_MyKad_ColourPrintEnhancement2")
+        banner = page.get_by_role("region", name="Current project", exact=True)
+        expect(banner).to_contain_text("001_MyKad_ColourPrintEnhancement2")
+        expect(banner.get_by_role("link", name="Switch project")).to_be_visible()
+        expect(page).to_have_title(re.compile("001_MyKad_ColourPrintEnhancement2"))
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    page.get_by_role("link", name="Switch project", exact=True).click()
+    expect(page.locator("h1")).to_have_text("Projects")
+    page.get_by_role("link", name="Open selected project", exact=True).click()
     page.get_by_role("link", name="Ingestion logs", exact=True).click()
     assert "project=001_MyKad_ColourPrintEnhancement2" in page.url
     expect(page.locator("header")).to_contain_text(

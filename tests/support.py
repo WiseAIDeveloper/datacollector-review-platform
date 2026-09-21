@@ -214,7 +214,7 @@ class FixtureServer(Client):
 
 
 @contextmanager
-def running_server(source=SOURCE, folder_mode=False):
+def running_server(source=SOURCE, folder_mode=False, write_pin_required=True):
     """Run either the original or current app against disposable data only."""
     with tempfile.TemporaryDirectory(prefix="review-test-") as temporary:
         root = Path(temporary)
@@ -256,6 +256,7 @@ def running_server(source=SOURCE, folder_mode=False):
         environment["PROJECTS_ROOT"] = (
             str(root / "project-folders") if folder_mode else ""
         )
+        environment["WRITE_PIN_REQUIRED"] = "true" if write_pin_required else "false"
         client = FixtureServer(
             f"http://127.0.0.1:{port}",
             token,
