@@ -1,5 +1,9 @@
 # Deployment
 
+The active project-based service uses `compose.projects.yaml` and `.env.projects`.
+See [folder-project deployment](folder-projects.md). This page documents the
+legacy single-dataset service and its preserved rollback storage.
+
 Start with the [README setup](../README.md#run-with-docker). Run the commands
 below from the repository root. For version selection and image rollback, see the
 [release guide](releases.md).

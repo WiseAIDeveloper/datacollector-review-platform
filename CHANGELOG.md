@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Promote the project-based service to the main viewer name and port 8769; retain the original single-dataset deployment configuration for rollback.
+
 - Compact the dashboard header into one desktop row with a smaller project indicator; remove the Plan files section.
 
 - Remove the write PIN from the separate folder-project service, including project creation and review actions. Existing edit/delete confirmations remain.

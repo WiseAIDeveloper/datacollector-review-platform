@@ -10,7 +10,7 @@ quality.
 - Edit metadata, record quality decisions, or remove selected captures.
 - Search by image ID and view ingestion history.
 
-Saving changes requires a PIN. Removing a capture deletes its image files and
+The project-based service saves without a PIN; legacy mode requires one. Removing a capture deletes its image files and
 matching CSV rows.
 
 ## Projects
@@ -34,6 +34,10 @@ and must be included in state-volume backups. The existing CSV pair remains avai
 as **Existing dataset**. No dataset migration is required.
 
 ## Run with Docker
+
+The active project-based service uses `compose.projects.yaml` on port 8769. Follow
+[the folder-project deployment guide](docs/folder-projects.md). The instructions
+below retain the legacy single-dataset setup for compatibility.
 
 You need Docker Compose, a capture dataset, and a directory for logs.
 

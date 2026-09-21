@@ -1,7 +1,8 @@
 # Folder-based project service
 
-`compose.projects.yaml` starts a separate `idrecapture-project-review` container,
-using port 8771 by default. It does not replace `idrecapture-viewer` on 8769.
+`compose.projects.yaml` runs the project-based `idrecapture-viewer` service on
+port 8769. This is the active deployment configuration. Use
+`PROJECT_REVIEW_CONTAINER_NAME` and `PROJECT_REVIEW_PORT` to run a separate instance.
 The new service disables write PINs with `WRITE_PIN_REQUIRED=false`; confirmation
 prompts still apply to edits and deletions. The home page is a project chooser. It discovers immediate child directories under
 `PROJECTS_ROOT` on every API request; the chooser refreshes every five seconds.
@@ -56,5 +57,7 @@ Folders must have names using letters, digits, underscores, hyphens, or periods,
 starting with a letter or digit (up to 120 characters). Uploaded projects get a
 safe folder name automatically.
 
-The original `compose.yaml` and legacy mode remain supported. Set `PROJECTS_ROOT`
+The original `compose.yaml` is retained for legacy deployments and rollback;
+do not start it alongside the active project-based service on the same port.
+Legacy mode remains supported. Set `PROJECTS_ROOT`
 only for folder discovery; omit it to retain the previous single-dataset behavior.
