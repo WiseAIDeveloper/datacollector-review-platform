@@ -5,9 +5,12 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// Batch filtering is covered by tests/browser/test_dashboard_batch_filter.py.
+// PIN-free actions and legacy prompts are covered by the browser workflow suite.
 const featureBaselines = {
-  "coverage.html": "6c4f5cd3c8dfbf64c6dbd1de10737522f1918a6d",
+  "coverage.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
+  "index.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
+  "quality.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
+  "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
 };
 const files = [
   "capture_review.js",
