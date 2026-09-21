@@ -6,6 +6,22 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Promote the project-based service to the main viewer name and port 8769; retain the original single-dataset deployment configuration for rollback.
+
+- Compact the dashboard header into one desktop row with a smaller project indicator; remove the Plan files section.
+
+- Remove the write PIN from the separate folder-project service, including project creation and review actions. Existing edit/delete confirmations remain.
+
+### Added
+
+- Show the current project in a prominent banner on review pages, with a Switch project link and the project name in the browser tab title.
+
+- A separate Docker service discovers projects from folders, opens on project selection, and restores copied ingestion/action JSONL history into project-local databases. Each project keeps its own review logs and quality-review state. Existing shared-image URLs continue to load in review pages.
+
+- Create named projects by uploading a test-plan CSV and batches CSV together. Select projects from the Projects page to scope dashboards, capture review, and search to their collection plans. Existing dataset access remains available. Project definitions persist in the state volume; creation uses the existing write PIN.
+
 ## [1.1.0] - 2026-09-17
 
 ### Added

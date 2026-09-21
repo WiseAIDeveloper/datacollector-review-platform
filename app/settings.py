@@ -18,14 +18,20 @@ class Settings:
     delete_token: str = field(repr=False)
     host: str = "0.0.0.0"
     port: int = 8080
+    projects_root: Path = None
+    write_pin_required: bool = True
     static_root: ClassVar[Path] = Path(__file__).resolve().parents[1] / "web"
 
     @classmethod
     def from_environment(cls, environment=None):
-        """Load runtime paths and require a nonempty deletion credential."""
+        """Load runtime paths and require a credential only when write PINs are enabled."""
         environment = os.environ if environment is None else environment
         token = environment.get("DELETE_TOKEN", "").strip()
-        if not token:
+        mode = environment.get("WRITE_PIN_REQUIRED", "true").lower()
+        if mode not in {"true", "false", "1", "0"}:
+            raise ValueError("WRITE_PIN_REQUIRED must be true or false")
+        write_pin_required = mode in {"true", "1"}
+        if write_pin_required and not token:
             raise ValueError("Set DELETE_TOKEN in the runtime environment")
         port = int(environment.get("PORT", "8080"))
         if not 0 <= port <= 65535:
@@ -35,6 +41,12 @@ class Settings:
             database=Path(environment.get("INGESTION_DB", "/state/ingestion.sqlite")),
             log_path=Path(environment.get("INGESTION_LOG", "/logs/ingestion.jsonl")),
             delete_token=token,
+            write_pin_required=write_pin_required,
             host=environment.get("HOST", "0.0.0.0"),
             port=port,
+            projects_root=(
+                Path(environment["PROJECTS_ROOT"]).resolve()
+                if environment.get("PROJECTS_ROOT")
+                else None
+            ),
         )

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Projects · Capture workspace</title>
+    <link rel="stylesheet" href="/terminal.css" />
+    <link rel="stylesheet" href="/projects.css" />
+    <script src="/project_context.js"></script>
+    <script src="/projects.js" defer></script>
+  </head>
+  <body class="terminal">
+    <nav class="app-sidebar" aria-label="Main navigation">
+      <strong>Capture workspace</strong>
+      <a href="/coverage.html">Dashboard</a><a href="/">Capture review</a>
+      <a href="/quality.html">Quality review</a
+      ><a href="/ingestion.html">Ingestion logs</a>
+      <a href="/search.html">Image search</a>
+    </nav>
+    <header>
+      <h1>Projects</h1>
+      <p>
+        Create a project from a test plan and its batch definitions, or open an
+        existing project.
+      </p>
+    </header>
+    <main class="project-layout">
+      <section aria-labelledby="existing-title">
+        <h2 id="existing-title">Select a project</h2>
+        <button id="refresh-projects" type="button">Refresh projects</button>
+        <p id="list-status" role="status">Loading projects…</p>
+        <div id="project-list"></div>
+      </section>
+      <section aria-labelledby="create-title">
+        <h2 id="create-title">Create a project</h2>
+        <p>
+          Upload both CSVs together. Captures already on the server are matched
+          by batch name and test-plan name.
+        </p>
+        <form id="project-form">
+          <label for="name">Project name</label
+          ><input
+            id="name"
+            name="name"
+            required
+            maxlength="100"
+            autocomplete="off"
+          />
+          <label for="matrix">Test-plan CSV</label
+          ><input
+            id="matrix"
+            type="file"
+            accept=".csv,text/csv"
+            required
+            aria-describedby="matrix-help"
+          />
+          <p id="matrix-help">
+            Columns: matrix_name, folder, lighting, sdk, device,
+            expected_count_per_identity.
+          </p>
+          <label for="batches">Batches CSV</label
+          ><input
+            id="batches"
+            type="file"
+            accept=".csv,text/csv"
+            required
+            aria-describedby="batches-help"
+          />
+          <p id="batches-help">
+            Columns: batch_name, test_plan_name. Keep any additional metadata
+            columns. UTF-8, up to 400 KB per file.
+          </p>
+          <label for="pin">Write PIN</label
+          ><input id="pin" type="password" required autocomplete="off" />
+          <button id="create" type="submit">Create project</button>
+          <p id="create-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

@@ -35,6 +35,14 @@ class RuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Settings.from_environment({"DELETE_TOKEN": token, "PORT": port})
 
+    def test_optional_write_pin_configuration(self):
+        """Require credentials by default but allow explicitly configured PIN-free operation."""
+        settings = Settings.from_environment({"WRITE_PIN_REQUIRED": "false"})
+        self.assertFalse(settings.write_pin_required)
+        self.assertEqual(settings.delete_token, "")
+        with self.assertRaises(ValueError):
+            Settings.from_environment({"WRITE_PIN_REQUIRED": "typo"})
+
     def test_server_import_has_no_runtime_side_effects(self):
         """Importing the server must not read secrets, open databases, or start threads."""
         script = f"""

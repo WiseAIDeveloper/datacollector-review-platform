@@ -15,11 +15,17 @@ from .captures.editing import Conflict, edit_capture
 from .ingestion import IngestionLog, with_current_metadata
 from .captures.quality import read_reviews, save_review
 from .settings import Settings
+from .projects import Projects
+from .folder_projects import ProjectApplications
 
 LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_BYTES = 1024 * 1024
 STATIC_FILES = {
     "/": "pages/index.html",
+    "/projects.html": "pages/projects.html",
+    "/projects.js": "static/js/projects.js",
+    "/project_context.js": "static/js/project_context.js",
+    "/projects.css": "static/css/projects.css",
     "/coverage.html": "pages/coverage.html",
     "/quality.html": "pages/quality.html",
     "/search.html": "pages/search.html",
@@ -29,7 +35,12 @@ STATIC_FILES = {
     "/terminal.css": "static/css/terminal.css",
     "/frozen_panes.css": "static/css/frozen_panes.css",
 }
-WRITE_ROUTES = {"/api/apply-decisions", "/api/edit-capture", "/api/quality"}
+WRITE_ROUTES = {
+    "/api/projects",
+    "/api/apply-decisions",
+    "/api/edit-capture",
+    "/api/quality",
+}
 CONTENT_TYPES = {"html": "text/html", "js": "text/javascript", "css": "text/css"}
 
 
@@ -43,11 +54,22 @@ class Application:
         self.ingestion = IngestionLog(
             settings.root, settings.database, self.lock, settings.log_path
         )
+        self.projects = Projects(settings.database.parent / "projects", settings.root)
         self.quality_path = settings.log_path.with_name("quality_reviews.json")
+
+    def create_project(self, request):
+        """Serialize project creation to prevent duplicate names in concurrent requests."""
+        with self.lock:
+            return self.projects.create(request)
 
     def records(self):
         """Read the current annotation rows for this application's dataset."""
-        return records(self.settings.root)
+        rows = records(self.settings.root)
+        return (
+            self.projects.filter_records(self.project_id, rows)
+            if hasattr(self, "project_id")
+            else rows
+        )
 
     def edit(self, request):
         """Apply a metadata edit and persist its action history while holding the lock."""
@@ -133,7 +155,18 @@ class Handler(BaseHTTPRequestHandler):
     @property
     def app(self):
         """Access the application attached to this server instance."""
-        return self.server.application
+        application = self.server.application
+        path = urlparse(self.path).path
+        if (
+            isinstance(application, ProjectApplications)
+            and path.startswith("/api/")
+            and not (
+                path in {"/api/image", "/api/annotation"} and not self.project_id()
+            )
+            and path not in {"/api/projects", "/api/project", "/api/project-mode"}
+        ):
+            return application.select(self.project_id())
+        return application
 
     def log_message(self, format, *args):
         """Keep request paths, bodies, credentials, and personal data out of access logs."""
@@ -159,6 +192,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             url = urlparse(self.path)
             self.get_route(url.path, parse_qs(url.query))
+        except ValueError as error:
+            self.send(str(error).encode(), "text/plain", 400)
         except Exception as error:
             LOGGER.error("Read request failed (%s)", type(error).__name__)
             self.send(b"Request failed", "text/plain", 500)
@@ -166,7 +201,13 @@ class Handler(BaseHTTPRequestHandler):
     def get_route(self, path, query):
         """Resolve static pages, collection APIs, and individual capture resources."""
         if path in STATIC_FILES:
-            filename = STATIC_FILES[path]
+            filename = (
+                "pages/projects.html"
+                if path == "/"
+                and self.app.settings.projects_root
+                and not self.project_id()
+                else STATIC_FILES[path]
+            )
             kind = CONTENT_TYPES[filename.rsplit(".", 1)[-1]]
             return self.send(
                 (self.app.settings.static_root / filename).read_bytes(),
@@ -174,15 +215,40 @@ class Handler(BaseHTTPRequestHandler):
             )
         if path == "/health":
             return self.send(b'{"ok":true}')
+        if path == "/api/project-mode":
+            return self.send_json(
+                {
+                    "folders": bool(self.server.application.settings.projects_root),
+                    "write_pin_required": self.server.application.settings.write_pin_required,
+                }
+            )
+        if path == "/api/projects":
+            return self.send_json(self.app.projects.listing())
+        if path == "/api/project":
+            return self.send_json(self.app.projects.get(self.project_id() or "default"))
         if path == "/api/captures":
-            return self.send_json(self.app.records())
+            return self.send_json(self.records())
         if path == "/api/matrix":
-            return self.send_json(matrix(self.app.settings.root))
+            return self.send_json(
+                self.app.projects.get(self.project_id())["matrix"]
+                if self.project_id()
+                else matrix(self.app.settings.root)
+            )
         if path == "/api/batches":
-            return self.send_json(batches(self.app.settings.root))
+            return self.send_json(
+                self.app.projects.get(self.project_id())["batches"]
+                if self.project_id()
+                else batches(self.app.settings.root)
+            )
         if path == "/api/quality":
             with self.app.lock:
-                return self.send_json(read_reviews(self.app.quality_path))
+                reviews = read_reviews(self.app.quality_path)
+                if self.project_id():
+                    keys = {row["key"] for row in self.records()}
+                    reviews = {
+                        key: value for key, value in reviews.items() if key in keys
+                    }
+                return self.send_json(reviews)
         if path == "/api/search":
             return self.search(query)
         if path == "/api/ingestion":
@@ -190,6 +256,19 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/api/image", "/api/annotation", "/api/capture"}:
             return self.capture_resource(path, query)
         self.send(b"Not found", "text/plain", 404)
+
+    def project_id(self):
+        """Read tab-specific project selection from the request URL."""
+        return parse_qs(urlparse(self.path).query).get("project", [None])[0]
+
+    def records(self):
+        """Scope capture reads to the selected project when supplied."""
+        rows = self.app.records()
+        return (
+            self.app.projects.filter_records(self.project_id(), rows)
+            if self.project_id()
+            else rows
+        )
 
     def search(self, query):
         """Search capture identifiers and filenames with the existing result cap."""
@@ -202,7 +281,7 @@ class Handler(BaseHTTPRequestHandler):
             )
         matches = [
             row
-            for row in self.app.records()
+            for row in self.records()
             if any(
                 term in row["metadata"].get(field, "").lower()
                 for field in ("uuid", "filename")
@@ -226,11 +305,7 @@ class Handler(BaseHTTPRequestHandler):
     def capture_resource(self, route, query):
         """Return capture metadata or a file confined to the selected capture's folder."""
         row = next(
-            (
-                row
-                for row in self.app.records()
-                if row["key"] == query.get("key", [""])[0]
-            ),
+            (row for row in self.records() if row["key"] == query.get("key", [""])[0]),
             None,
         )
         if row is None:
@@ -257,14 +332,46 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path not in WRITE_ROUTES:
                 return self.send(b"Not found", "text/plain", 404)
-            if not hmac.compare_digest(
-                self.headers.get("X-Delete-Token", ""), self.app.settings.delete_token
+            if (
+                self.server.application.settings.write_pin_required
+                and not hmac.compare_digest(
+                    self.headers.get("X-Delete-Token", ""),
+                    self.server.application.settings.delete_token,
+                )
             ):
                 return self.send(b"Invalid deletion PIN", "text/plain", 403)
             size = int(self.headers.get("Content-Length", "0"))
-            if not 1 <= size <= MAX_REQUEST_BYTES:
+            limit = (
+                5 * MAX_REQUEST_BYTES if path == "/api/projects" else MAX_REQUEST_BYTES
+            )
+            if not 1 <= size <= limit:
                 return self.send(b"Invalid request size", "text/plain", 400)
             request = json.loads(self.rfile.read(size))
+            if not isinstance(request, dict):
+                raise ValueError("Expected a JSON object")
+            if self.project_id() and path != "/api/projects":
+                keys = {row["key"] for row in self.records()}
+                requested = (
+                    request.get("remove", [])
+                    if path == "/api/apply-decisions"
+                    else [request]
+                )
+                if not isinstance(requested, list) or any(
+                    not isinstance(item, dict)
+                    or (
+                        item.get("key")
+                        if path == "/api/quality"
+                        else "/".join(
+                            str(item.get(field, ""))
+                            for field in ("folder", "uuid", "filename")
+                        )
+                    )
+                    not in keys
+                    for item in requested
+                ):
+                    raise ValueError("Capture does not belong to the selected project")
+            if path == "/api/projects":
+                return self.send_json(self.server.application.create_project(request))
             action = {
                 "/api/quality": self.app.review,
                 "/api/edit-capture": self.app.edit,
@@ -277,16 +384,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send(str(error).encode(), "text/plain", 400)
         except Exception as error:
             LOGGER.error("Write request failed (%s)", type(error).__name__)
-            self.send(
-                b"Batch deletion failed; refresh before retrying", "text/plain", 500
-            )
+            self.send(b"Write failed; refresh before retrying", "text/plain", 500)
 
 
 def create_server(settings):
     """Construct an HTTP server without starting its serving loop or ingestion worker."""
     server = ThreadingHTTPServer((settings.host, settings.port), Handler)
     try:
-        server.application = Application(settings)
+        server.application = (
+            ProjectApplications(settings, Application)
+            if settings.projects_root
+            else Application(settings)
+        )
     except Exception:
         server.server_close()
         raise

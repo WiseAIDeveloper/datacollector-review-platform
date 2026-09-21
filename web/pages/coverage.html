@@ -298,6 +298,7 @@
       }
     </style>
     <link rel="stylesheet" href="/terminal.css" />
+    <script src="/project_context.js"></script>
   </head>
   <body class="terminal dashboard">
     <nav class="app-sidebar" aria-label="Main navigation">
@@ -312,14 +313,6 @@
         <h1>Identity coverage dashboard</h1>
         <button id="execute" disabled>Execute decisions (0)</button>
       </div>
-      <details class="plan-files">
-        <summary>Plan files</summary>
-        <p class="muted">
-          Test plan CSV: <code>internal_colour_print_enhancement_2.csv</code> ·
-          Batch names CSV:
-          <code>internal_colour_print_enhancement_2_batches.csv</code>
-        </p>
-      </details>
       <div class="toolbar">
         <label>Identity<select id="subject"></select></label
         ><button id="refresh">Refresh data</button>
@@ -1337,8 +1330,12 @@
           )
         )
           return;
-        const token = prompt("Enter PIN to execute these decisions:");
-        if (!token) return;
+        const token = window.reviewWriteToken
+          ? await window.reviewWriteToken(
+              "Enter PIN to execute these decisions:",
+            )
+          : prompt("Enter PIN to execute these decisions:") || null;
+        if (token === null) return;
         executing = true;
         updateExecute();
         let completed = 0;

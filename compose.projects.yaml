@@ -1,0 +1,22 @@
+name: datacollection_review
+
+services:
+  viewer:
+    build: .
+    image: datacollection-review:folder-projects
+    container_name: ${PROJECT_REVIEW_CONTAINER_NAME:-idrecapture-viewer}
+    restart: unless-stopped
+    network_mode: bridge
+    group_add:
+      - "${PROJECT_REVIEW_GID:?Set the project directory group ID}"
+    environment:
+      WRITE_PIN_REQUIRED: "false"
+      PROJECTS_ROOT: /projects
+    ports:
+      - "${PROJECT_REVIEW_BIND_ADDRESS:-127.0.0.1}:${PROJECT_REVIEW_PORT:-8769}:8080"
+    volumes:
+      - ${DATASET_PATH:?Set DATASET_PATH}:/data
+      - ${PROJECTS_PATH:?Set PROJECTS_PATH}:/projects
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]

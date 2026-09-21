@@ -78,14 +78,17 @@ deletions, conflicts, rollback, CSV byte preservation, ingestion, configuration,
 worker lifecycle. The browser suite checks review workflows, filters, zoom,
 refresh, and desktop/mobile layouts.
 
-All tests use synthetic temporary datasets. Browser write requests are mocked.
+All tests use synthetic temporary datasets. Capture browser write requests are mocked.
+Project browser tests perform real uploads against a separate disposable server.
 Tests never modify the live dataset or use its credential.
 
 `test:frontend` checks executable JavaScript against the original refactor baseline,
 except for explicit per-file feature baselines in `scripts/check_frontend.cjs`.
-The dashboard uses the batch-filter feature commit as its baseline, backed by
-`tests/browser/test_dashboard_batch_filter.py`; other pages retain the original
-baseline. An optional revision argument overrides all per-file defaults.
+The dashboard, capture and quality pages, and shared capture editor use the
+verified optional-PIN feature commit as their baseline. Browser scenarios cover
+both PIN-free project workflows and the original PIN-protected behavior. Other
+pages retain the original baseline. An optional revision argument overrides all
+per-file defaults.
 An intentional frontend feature change needs behavior-focused tests and a reviewed
 update to the applicable baseline; do not treat a syntax difference alone as a bug
 or disable the check without explanation.
