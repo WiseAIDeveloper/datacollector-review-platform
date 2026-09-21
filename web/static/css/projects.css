@@ -1,0 +1,62 @@
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  box-sizing: border-box;
+}
+.app-sidebar a,
+.app-sidebar strong {
+  display: block;
+}
+.project-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.project-layout section {
+  min-width: 0;
+  border: 1px solid #272c31;
+  padding: 18px;
+}
+#project-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+#project-form input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+#project-form button {
+  margin-top: 12px;
+  padding: 10px;
+}
+#project-list article {
+  border-top: 1px solid #272c31;
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+#project-list h3 {
+  margin: 0;
+}
+#create-status {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  body.terminal {
+    padding-left: 0;
+  }
+  body.terminal .app-sidebar {
+    position: static;
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+  }
+  body.terminal .app-sidebar strong {
+    width: 100%;
+    margin: 0 8px;
+  }
+  .project-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -78,7 +78,8 @@ deletions, conflicts, rollback, CSV byte preservation, ingestion, configuration,
 worker lifecycle. The browser suite checks review workflows, filters, zoom,
 refresh, and desktop/mobile layouts.
 
-All tests use synthetic temporary datasets. Browser write requests are mocked.
+All tests use synthetic temporary datasets. Capture browser write requests are mocked.
+Project browser tests perform real uploads against a separate disposable server.
 Tests never modify the live dataset or use its credential.
 
 `test:frontend` checks executable JavaScript against the original refactor baseline,

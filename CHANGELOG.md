@@ -6,6 +6,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Create named projects by uploading a test-plan CSV and batches CSV together. Select projects from the Projects page to scope dashboards, capture review, and search to their collection plans. Existing dataset access remains available. Project definitions persist in the state volume; creation uses the existing write PIN.
+
 ## [1.1.0] - 2026-09-17
 
 ### Added

@@ -90,3 +90,9 @@ for (const filename of files) {
   assert.deepEqual(after, before, `${filename}: executable JavaScript changed`);
   console.log(`PASS ${filename}: JavaScript syntax matches ${revision}`);
 }
+
+// Project behavior is exercised by the real upload and navigation browser scenario.
+for (const filename of ["project_context.js", "projects.js"]) {
+  parser.parse(fs.readFileSync(path.join("web/static/js", filename), "utf8"));
+  console.log(`PASS ${filename}: JavaScript parses`);
+}

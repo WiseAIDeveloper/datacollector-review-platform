@@ -13,6 +13,23 @@ quality.
 Saving changes requires a PIN. Removing a capture deletes its image files and
 matching CSV rows.
 
+## Projects
+
+Open **Projects** in the sidebar to enter a project name and upload its test-plan
+and batches CSVs (UTF-8, up to 400 KB each). Creating a project requires the existing
+write PIN. Both files are validated together; invalid uploads create nothing.
+Project names must be unique. The page lists the required CSV columns.
+
+Choose **Open project** to view its dashboard. The project stays in the URL across
+review and search pages, so tabs can select different projects. Captures match the
+batches CSV's `batch_name` and `test_plan_name`; uploading plans does not upload
+images. Projects may intentionally share matching captures and their reviews.
+Ingestion logs remain dataset-wide. Unselected legacy URLs keep their existing behavior.
+
+Definitions persist under `projects/` beside `INGESTION_DB` (normally `/state/projects`)
+and must be included in state-volume backups. The existing CSV pair remains available
+as **Existing dataset**. No dataset migration is required.
+
 ## Run with Docker
 
 You need Docker Compose, a capture dataset, and a directory for logs.
