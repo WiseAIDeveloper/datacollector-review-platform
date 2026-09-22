@@ -124,9 +124,11 @@ which source is correct when a phone label contradicts its native sensor model.
 ## Lighting compatibility
 
 Dashboard coverage treats `yellow` and `office-yellow` as the same lighting
-condition when matching captures to matrix requirements. Original CSV metadata,
+condition, and likewise `white` and `office-white`, when matching captures to
+matrix requirements. Original CSV metadata,
 annotation JSON, and ingestion history remain unchanged. Other lighting values
-still match exactly. Use one yellow requirement per batch/SDK/device combination
+still match exactly. Use one requirement per equivalent lighting condition and
+batch/SDK/device combination
 in generated matrices; do not create separate rows for the two equivalent labels.
 
 Dashboard batch-quality links preserve the project, batch, and selected identity.

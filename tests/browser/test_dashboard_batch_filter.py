@@ -348,6 +348,25 @@ with sync_playwright() as playwright:
     data["matrix"] = [dict(data["matrix"][0], lighting="yellow")]
     page.locator("#refresh").click()
     expect(page.locator("#summary b")).to_have_text(["2", "2", "0", "0"])
+    # White aliases share a requirement; yellow and dark remain separate.
+    data["matrix"] = [
+        dict(matrix[0], lighting="office-white", expected_count_per_identity="2")
+    ]
+    data["captures"] = [
+        dict(
+            sample,
+            key=f"white-{i}",
+            metadata=dict(sample["metadata"], lighting=lighting),
+        )
+        for i, lighting in enumerate(
+            ["white", "office-white", "yellow", "dark", "office"]
+        )
+    ]
+    page.goto("http://fixture/coverage.html")
+    expect(page.locator("#summary b")).to_have_text(["2", "2", "0", "0"])
+    data["matrix"] = [dict(data["matrix"][0], lighting="white")]
+    page.locator("#refresh").click()
+    expect(page.locator("#summary b")).to_have_text(["2", "2", "0", "0"])
     # Configured batches must remain selectable even before any captures arrive.
     data["captures"] = []
     data["matrix"] = matrix

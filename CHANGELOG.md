@@ -12,6 +12,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Count collector `white` captures against `office-white` requirements, preserving original metadata and keeping other lighting conditions separate.
+
 - Preserve expanded batch lighting sections and expected requirements when dashboard data refreshes, independently per identity.
 
 - Keep the selected project in dashboard batch-quality links, and allow configured daylight metadata corrections to save successfully.

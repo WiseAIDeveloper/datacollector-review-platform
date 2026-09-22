@@ -450,7 +450,7 @@
         return decisions[r.key];
       }
       const key =
-        /* Match collector yellow to office-yellow without changing original metadata. */ (
+        /* Match collector lighting aliases without changing original metadata. */ (
           folder,
           lighting,
           sdk,
@@ -458,7 +458,11 @@
         ) =>
           [
             folder,
-            lighting === "yellow" ? "office-yellow" : lighting,
+            lighting === "yellow"
+              ? "office-yellow"
+              : lighting === "white"
+                ? "office-white"
+                : lighting,
             sdk,
             device,
           ].join("\u001f");
