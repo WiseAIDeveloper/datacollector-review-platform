@@ -222,17 +222,24 @@
       ><a href="/ingestion.html">Ingestion logs</a
       ><a href="/search.html">Image search</a>
     </nav>
-    <header class="frozen-pane">
-      <h1>Capture review</h1>
-      <div id="filters"></div>
-      <div class="actions">
-        <button id="execute" disabled>Execute decisions (0)</button
-        ><button id="refresh">Refresh captures</button>
+    <header class="frozen-pane workspace-header">
+      <div class="header-titlebar">
+        <h1>Capture review</h1>
+        <div class="actions header-actions">
+          <button id="execute" disabled>Execute decisions (0)</button>
+          <button id="refresh">Refresh captures</button>
+        </div>
       </div>
-      <p id="status"></p>
-      <p id="pending-status" class="note" role="status"></p>
+      <details class="header-filters" open>
+        <summary>Filters</summary>
+        <div id="filters"></div>
+      </details>
+      <p id="status" role="status"></p>
     </header>
-    <main><div id="cards"></div></main>
+    <main>
+      <p id="pending-status" class="note" role="status"></p>
+      <div id="cards"></div>
+    </main>
     <dialog id="zoom">
       <button id="close">Close</button><img alt="Enlarged capture" />
     </dialog>
@@ -562,13 +569,19 @@
             all.value = "";
             s.append(all);
             for (const v of [
-              ...new Set(
-                rows.map(
+              ...new Set([
+                ...(k === "folder"
+                  ? batchDefs.map(
+                      /* Include configured folders before their first capture. */
+                      (batch) => batch.batch_name,
+                    )
+                  : []),
+                ...rows.map(
                   /* Build the corresponding display or request value for each item. */ (
                     r,
                   ) => val(r, k),
                 ),
-              ),
+              ]),
             ]
               .filter(Boolean)
               .sort()) {

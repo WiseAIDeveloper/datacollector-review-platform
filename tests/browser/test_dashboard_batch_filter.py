@@ -84,9 +84,9 @@ with sync_playwright() as playwright:
         page.goto("http://fixture/coverage.html")
         filters = page.get_by_role("group", name="Batches filter", exact=True)
         all_button = filters.get_by_role("button", name="All", exact=True)
-        alpha = filters.get_by_role("button", name="Alpha", exact=True)
-        beta = filters.get_by_role("button", name="Beta", exact=True)
-        empty = filters.get_by_role("button", name="Empty", exact=True)
+        alpha = filters.get_by_role("button", name="alpha", exact=True)
+        beta = filters.get_by_role("button", name="beta", exact=True)
+        empty = filters.get_by_role("button", name="empty", exact=True)
         expect(all_button).to_have_attribute("aria-pressed", "true")
         expect(page.locator(".batch")).to_have_count(3)
         expect(page.locator("#summary b")).to_have_text(["6", "4", "3", "1"])
@@ -278,6 +278,53 @@ with sync_playwright() as playwright:
             )
             == "rgb(244, 211, 94)"
         )
+    # A second project's collector plan must drive identity choices and coverage.
+    data["matrix"] = matrix
+    data["captures"] = [
+        dict(
+            rows[0],
+            metadata=dict(
+                rows[0]["metadata"],
+                subject="project-two-person",
+                test_plan_name="002_mykad26_initialcollection",
+            ),
+        ),
+        rows[-1],
+    ]
+    data["batches"] = [
+        dict(batch, test_plan_name="002_mykad26_initialcollection")
+        for batch in data["batches"]
+    ]
+    page.goto("http://fixture/coverage.html")
+    expect(page.locator("#subject option")).to_have_text(["project-two-person"])
+    expect(page.locator("#subject")).to_have_value("project-two-person")
+    expect(page.locator("#summary b")).to_have_text(["6", "1", "5", "0"])
+    expect(page.locator('#batch-filter button[data-batch="alpha"]')).to_have_attribute(
+        "data-status", "in-progress"
+    )
+    # Configured batches must remain selectable even before any captures arrive.
+    data["captures"] = []
+    data["matrix"] = matrix
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    page.goto("http://fixture/coverage.html")
+    expect(page.locator("#batch-filter button")).to_have_text(["All", *batch_names])
+    for filename, selector in [
+        ("index.html", "#filters select"),
+        ("quality.html", "#batch"),
+    ]:
+        page.goto("http://fixture/" + filename)
+        select = (
+            page.locator(selector).nth(1)
+            if filename == "index.html"
+            else page.locator(selector)
+        )
+        expect(select.locator("option")).to_have_text(["All", *sorted(batch_names)])
+        select.select_option("empty")
+        expect(select).to_have_value("empty")
+        page.locator(
+            "#refresh" if filename == "index.html" else "#refresh-quality"
+        ).click()
+        expect(select).to_have_value("empty")
     assert not errors, errors
     browser.close()
 

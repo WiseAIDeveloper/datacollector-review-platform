@@ -44,6 +44,14 @@
   }
   document.addEventListener("DOMContentLoaded", async () => {
     /* Display selection and preserve it when moving between review pages. */
+    const phone = matchMedia("(max-width: 760px)");
+    const filters = document.querySelectorAll(".header-filters");
+    const sizeFilters = () => {
+      /* Default to collapsed phone filters while keeping every action visible. */
+      for (const filter of filters) filter.open = !phone.matches;
+    };
+    sizeFilters();
+    phone.addEventListener("change", sizeFilters);
     const nav = document.querySelector(".app-sidebar");
     if (!nav) return;
     const link = document.createElement("a");
@@ -90,7 +98,10 @@
       "/projects.html?project=" + encodeURIComponent(project);
     switchProject.textContent = "Switch project";
     label.append(identity, switchProject);
-    document.querySelector("header")?.prepend(label);
+    const titlebar = document.querySelector(".header-titlebar");
+    if (titlebar)
+      titlebar.insertBefore(label, titlebar.querySelector(".header-actions"));
+    else document.querySelector("header")?.prepend(label);
     try {
       const response = await fetch("/api/project");
       if (!response.ok) throw new Error(await response.text());

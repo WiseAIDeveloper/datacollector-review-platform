@@ -61,3 +61,21 @@ The original `compose.yaml` is retained for legacy deployments and rollback;
 do not start it alongside the active project-based service on the same port.
 Legacy mode remains supported. Set `PROJECTS_ROOT`
 only for folder discovery; omit it to retain the previous single-dataset behavior.
+
+## Batch names and capture matching
+
+Batch filters use the exact `batch_name` values from the project's batches CSV.
+Capture and Quality filters include configured batches even when they have no
+captures. Dashboard cards can still use `batch_display_name` as their title.
+
+Capture discovery requires an exact pair: the dataset folder name must equal
+`batch_name`, and the capture index's `test_plan_name` must equal the batch CSV's
+`test_plan_name`. Keep that plan value consistent in both project CSVs and the
+collector. The CSV filename and `matrix_name` identify the review matrix and do
+not need to equal the collector's plan slug. Coverage additionally requires the
+capture's lighting, SDK, and device to match a matrix combination.
+
+The dashboard derives its identity selector, coverage, quality counts, and
+pending decisions from the selected project's configured test-plan identifiers.
+Only identities with existing captures are selectable; an empty project has no
+identity choices yet.

@@ -54,6 +54,7 @@ with sync_playwright() as p:
         ),
     )
     page.route("**/api/captures", lambda r: r.fulfill(json=rows))
+    page.route("**/api/batches", lambda r: r.fulfill(json=[]))
 
     def quality(route):
         """Read or save quality decisions in the in-memory fixture store."""
