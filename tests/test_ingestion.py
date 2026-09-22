@@ -30,7 +30,7 @@ class IngestionTests(unittest.TestCase):
                 lighting="dark",
                 subject="fixture",
                 capture_device="iphone-13",
-                input_sensor="",
+                input_sensor="websdk;mobilesafari;ios;mobile",
                 test_plan_name="colour_print_enhancement_2",
             )
             for n in names

@@ -79,3 +79,44 @@ The dashboard derives its identity selector, coverage, quality counts, and
 pending decisions from the selected project's configured test-plan identifiers.
 Only identities with existing captures are selectable; an empty project has no
 identity choices yet.
+
+## SDK detection
+
+Capture pages and ingestion use the same `input_sensor` classifier:
+
+- `websdk;...` (case-insensitive) means Web; `capture_device` supplies its device label.
+- A JSON or Python-literal object with a nonempty string `model` means App; that model is the device.
+- The legacy iOS format `model:DEVICE,...` means App.
+- Missing, malformed, or unrecognized sensors mean `unknown`, even if `capture_device` is filled.
+
+When a recognized native sensor reports `Unknown` as its model (case-insensitive),
+use `capture_device` as the displayed device while retaining App classification.
+If that label is also empty, the device remains `unknown`.
+
+No capture metadata is rewritten. Existing history retains its original detection
+record; ingestion views overlay the current classification for captures still on
+disk. Unknown captures remain reviewable but do not match App/Web matrix rows.
+
+## Check device compatibility before collection
+
+Use the collector's emitted device values when preparing matrix rows and
+`expected_web_devices` / `expected_app_devices`. Reuse those values in any
+identity-expanded collection checklist. For example, Samsung Fold 5 Web uses
+`samsung-galaxy-z-fold-5`; its native App sensor reports `SM-F946U1`. These are
+SDK-specific identifiers, not interchangeable aliases. Keep display labels
+separate from these matching keys.
+
+After creating or regenerating a project's CSVs, run:
+
+```sh
+python scripts/audit_project_devices.py \
+  --projects-root /mnt5/auto-ekyc/datacollection_review/idrecapture/projects \
+  --dataset /mnt5/auto-ekyc/idrecapture \
+  --project 002_MyKad26_InitialCollection
+```
+
+This read-only check exits nonzero if device lists differ between the batch
+CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
+again after the first sample from each device/platform; uncollected devices
+cannot be checked against real metadata yet. It does not guess aliases or decide
+which source is correct when a phone label contradicts its native sensor model.

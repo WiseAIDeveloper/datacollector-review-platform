@@ -1,6 +1,5 @@
 """Persistent ingestion history, audit exports, and periodic dataset scanning."""
 
-import ast
 import json
 import os
 import csv
@@ -10,7 +9,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .captures.catalog import EXCLUDED, INDEX_NAME
+from .captures.catalog import EXCLUDED, INDEX_NAME, capture_device
 
 
 def now():
@@ -19,18 +18,8 @@ def now():
 
 
 def device_info(row):
-    """Normalize scanner device metadata while retaining its historical fallback rules."""
-    cap = (row.get("capture_device") or "").strip()
-    if cap:
-        return "web", cap
-    raw = row.get("input_sensor") or ""
-    try:
-        value = ast.literal_eval(raw)
-        if isinstance(value, dict):
-            return "app", str(value.get("model", "unknown"))
-    except (ValueError, SyntaxError):
-        pass
-    return "app", raw.split(",")[0].removeprefix("model:") or "unknown"
+    """Use the same sensor-based SDK classification as the capture catalog."""
+    return capture_device(row)
 
 
 def read_stable_rows(path):
