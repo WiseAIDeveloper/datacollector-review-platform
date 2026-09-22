@@ -135,6 +135,31 @@ class ApiTests(unittest.TestCase):
         for query in ("limit=invalid", "before=invalid"):
             self.assertEqual(self.client.request("/api/ingestion?" + query)[0], 400)
 
+    def test_daylight_edit_is_visible_in_capture_and_ingestion(self):
+        """Daylight edits succeed through HTTP and appear in both data views."""
+        status, result, _ = self.client.request(
+            "/api/edit-capture",
+            dict(
+                folder="genuine",
+                uuid=self.row["uuid"],
+                filename=self.row["filename"],
+                changes={"lighting": "daylight"},
+                expected=self.row,
+            ),
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(result["updated"])
+        row = next(
+            r for r in self.client.request("/api/captures")[1] if r["key"] == self.key
+        )
+        event = next(
+            e
+            for e in self.client.request("/api/ingestion")[1]["events"]
+            if e["key"] == self.key
+        )
+        self.assertEqual(row["metadata"]["lighting"], "daylight")
+        self.assertEqual(event["lighting"], "daylight")
+
     def test_edit_conflict_and_action_history(self):
         """Apply an edit once, reject stale metadata, and retain its audit record."""
         payload = dict(
