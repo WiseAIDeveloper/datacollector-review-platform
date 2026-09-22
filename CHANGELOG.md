@@ -6,6 +6,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Show canonical project batch names in the dashboard filter and include configured batches with no captures in Capture and Quality filters.
+
 ### Changed
 
 - Give review pages consistent title/action rows and compact project context. Group filters separately, collapse them on phones, and keep save/execute controls visible instead of hiding them in horizontally scrolling toolbars.

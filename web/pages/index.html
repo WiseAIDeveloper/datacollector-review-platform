@@ -569,13 +569,19 @@
             all.value = "";
             s.append(all);
             for (const v of [
-              ...new Set(
-                rows.map(
+              ...new Set([
+                ...(k === "folder"
+                  ? batchDefs.map(
+                      /* Include configured folders before their first capture. */
+                      (batch) => batch.batch_name,
+                    )
+                  : []),
+                ...rows.map(
                   /* Build the corresponding display or request value for each item. */ (
                     r,
                   ) => val(r, k),
                 ),
-              ),
+              ]),
             ]
               .filter(Boolean)
               .sort()) {

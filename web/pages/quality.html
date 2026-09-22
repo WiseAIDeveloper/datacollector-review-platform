@@ -392,6 +392,7 @@
           const responses = await Promise.all([
             fetch("/api/captures"),
             fetch("/api/quality"),
+            fetch("/api/batches"),
           ]);
           if (
             responses.some(
@@ -401,7 +402,8 @@
             )
           )
             throw Error("Could not load quality review");
-          [rows, reviews] = await Promise.all(
+          let batchDefinitions;
+          [rows, reviews, batchDefinitions] = await Promise.all(
             responses.map(
               /* Decode the response body as JSON. */ (r) => r.json(),
             ),
@@ -425,13 +427,17 @@
           choose(
             "batch",
             [
-              ...new Set(
-                rows.map(
+              ...new Set([
+                ...batchDefinitions.map(
+                  /* Include configured folders before their first capture. */
+                  (batch) => batch.batch_name,
+                ),
+                ...rows.map(
                   /* Build the corresponding display or request value for each item. */ (
                     r,
                   ) => r.folder,
                 ),
-              ),
+              ]),
             ].sort(),
             first ? query.get("batch") : $("batch").value,
           );

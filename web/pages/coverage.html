@@ -1100,7 +1100,7 @@
             : undefined;
         host.replaceChildren();
         for (const batch of [{ name: "", display: "All" }, ...batches]) {
-          const button = el("button", batch.display);
+          const button = el("button", batch.name || "All");
           button.type = "button";
           button.dataset.batch = batch.name;
           if (batch.name) {
