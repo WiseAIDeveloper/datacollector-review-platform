@@ -247,18 +247,20 @@
     ><a href="/ingestion.html" aria-current="page">Ingestion logs</a
     ><a href="/search.html">Image search</a>
   </nav>
-  <header class="frozen-pane">
-    <h1>Ingestion logs</h1>
+  <header class="frozen-pane workspace-header">
+    <div class="header-titlebar">
+      <h1>Ingestion logs</h1>
+      <div class="toolbar header-actions">
+        <span id="status" role="status">Connecting…</span
+        ><button id="refresh">Refresh now</button
+        ><button id="latest" hidden>Back to live</button>
+      </div>
+    </div>
     <div class="stats">
       <div><b id="total">—</b>Total logged</div>
-      <div><b id="ingested">—</b>Ingested since monitoring began</div>
-      <div><b id="existing">—</b>Existing pictures</div>
-      <div><b id="pending">—</b>Waiting for original image</div>
-    </div>
-    <div class="toolbar">
-      <span id="status" role="status">Connecting…</span
-      ><button id="refresh">Refresh now</button
-      ><button id="latest" hidden>Back to live</button>
+      <div><b id="ingested">—</b>New captures</div>
+      <div><b id="existing">—</b>Existing captures</div>
+      <div><b id="pending">—</b>Waiting for image</div>
     </div>
     <p id="error" role="alert"></p>
   </header>

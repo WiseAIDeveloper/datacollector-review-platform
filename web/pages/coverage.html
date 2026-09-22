@@ -308,14 +308,16 @@
       ><a href="/ingestion.html">Ingestion logs</a
       ><a href="/search.html">Image search</a>
     </nav>
-    <header class="dashboard-header frozen-pane">
-      <div class="dashboard-titlebar">
+    <header class="dashboard-header frozen-pane workspace-header">
+      <div class="dashboard-titlebar header-titlebar">
         <h1>Identity coverage dashboard</h1>
-        <button id="execute" disabled>Execute decisions (0)</button>
-      </div>
-      <div class="toolbar">
-        <label>Identity<select id="subject"></select></label
-        ><button id="refresh">Refresh data</button>
+        <div class="header-actions">
+          <div class="toolbar">
+            <label>Identity<select id="subject"></select></label>
+            <button id="refresh">Refresh data</button>
+          </div>
+          <button id="execute" disabled>Execute decisions (0)</button>
+        </div>
       </div>
     </header>
     <main>

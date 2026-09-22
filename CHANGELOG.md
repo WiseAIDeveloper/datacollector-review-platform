@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Give review pages consistent title/action rows and compact project context. Group filters separately, collapse them on phones, and keep save/execute controls visible instead of hiding them in horizontally scrolling toolbars.
+
 - Promote the project-based service to the main viewer name and port 8769; retain the original single-dataset deployment configuration for rollback.
 
 - Compact the dashboard header into one desktop row with a smaller project indicator; remove the Plan files section.

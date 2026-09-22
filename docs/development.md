@@ -127,3 +127,16 @@ application releases, also follow [deployment verification](deployment.md#verify
 
 The [structure validation report](structure-validation.md) records checks for the
 current folder reorganization and its Docker candidate.
+
+## Workspace headers
+
+The five review pages share header styles in `web/static/css/frozen_panes.css`.
+Keep project context in `.header-titlebar` and primary actions in
+`.header-actions`. Capture and quality filters use native `<details>` panels:
+open on desktop and initially collapsed at widths of 760px or less. Users can
+expand phone filters without scrolling sideways to reach Save or Execute.
+`project_context.js` updates the default when crossing that breakpoint.
+
+`tests/browser/test_frozen_panes.py` checks sticky positioning, compact height,
+horizontal overflow, mobile filter toggling, and reopening filters on desktop.
+Run it through `python -m tests.run_browser` with disposable fixture data.

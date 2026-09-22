@@ -102,21 +102,29 @@
       ><a href="/ingestion.html">Ingestion logs</a
       ><a href="/search.html">Image search</a>
     </nav>
-    <header class="frozen-pane">
-      <h1>Quality review</h1>
-      <div class="toolbar">
-        <label>Identity<select id="identity"></select></label
-        ><label>Batch<select id="batch"></select></label
-        ><label
-          >Quality status<select id="quality-filter">
-            <option value="">All</option>
-            <option value="unreviewed">Unreviewed</option>
-            <option value="error">Quality errors</option>
-            <option value="pass">Passed</option>
-          </select></label
-        ><button id="save-reviews" disabled>Save reviews (0)</button
-        ><button id="refresh-quality">Refresh</button>
+    <header class="frozen-pane workspace-header">
+      <div class="header-titlebar">
+        <h1>Quality review</h1>
+        <div class="header-actions">
+          <button id="save-reviews" disabled>Save reviews (0)</button>
+          <button id="refresh-quality">Refresh</button>
+        </div>
       </div>
+      <details class="header-filters" open>
+        <summary>Filters</summary>
+        <div class="toolbar">
+          <label>Identity<select id="identity"></select></label>
+          <label>Batch<select id="batch"></select></label>
+          <label
+            >Quality status<select id="quality-filter">
+              <option value="">All</option>
+              <option value="unreviewed">Unreviewed</option>
+              <option value="error">Quality errors</option>
+              <option value="pass">Passed</option>
+            </select></label
+          >
+        </div>
+      </details>
       <p id="quality-count" role="status"></p>
       <p id="page-error" role="alert"></p>
     </header>

@@ -63,6 +63,26 @@ with sync_playwright() as p:
                 width,
                 header.bounding_box(),
             )
+            filters = page.locator(".header-filters")
+            if filters.count():
+                assert filters.evaluate("node => node.open") == (width > 760)
+                if width == 390:
+                    action = page.locator(
+                        "#execute" if name == "index.html" else "#save-reviews"
+                    )
+                    assert action.is_visible(), (name, "hidden primary action")
+                    filters.locator("summary").click()
+                    assert filters.locator("select").first.is_visible()
+                    assert filters.evaluate(
+                        "node => node.scrollWidth <= node.clientWidth"
+                    )
+                    filters.locator("summary").click()
+                    assert not filters.locator("select").first.is_visible()
+                    page.set_viewport_size({"width": 1440, "height": 1000})
+                    page.wait_for_function(
+                        "document.querySelector('.header-filters').open"
+                    )
+                    page.set_viewport_size({"width": width, "height": 1000})
             page.evaluate(
                 'document.querySelector("main").style.minHeight="3000px";window.scrollTo(0,700)'
             )
