@@ -7,7 +7,7 @@ const parser = require("@babel/parser");
 
 // Exact batch labels and empty configured batches are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "4a0179ac258ebd6e5078c95cdae43e552eec03d7",
+  "coverage.html": "b6091f211b2120c5c65f12cad107d8c121913bef",
   "index.html": "c38cd68",
   "quality.html": "c38cd68",
   "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
