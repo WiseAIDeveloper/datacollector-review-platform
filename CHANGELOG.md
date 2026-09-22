@@ -12,6 +12,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Count collector `white` captures against `office-white` requirements, preserving original metadata and keeping other lighting conditions separate.
+
+- Preserve expanded batch lighting sections and expected requirements when dashboard data refreshes, independently per identity.
+
+- Keep the selected project in dashboard batch-quality links, and allow configured daylight metadata corrections to save successfully.
+
+- Count collector `yellow` captures against `office-yellow` dashboard requirements while preserving original capture metadata.
+
 - Use the capture_device label when a recognized native sensor reports an Unknown model, without changing its App classification.
 
 - Detect App/Web from recognized input sensor formats consistently across captures and ingestion. Native captures with a device label no longer become Web; unfamiliar sensors are explicitly unknown. Capture metadata is unchanged.

@@ -8,7 +8,7 @@ from .catalog import EXCLUDED
 from .deletion import INDEXES, SAFE_FOLDER, atomic_write
 
 FIELDS = {"subject", "lighting", "capture_device", "input_sensor", "user"}
-LIGHTING = {"dark", "office-white", "office-yellow"}
+LIGHTING = {"dark", "office-white", "office-yellow", "daylight"}
 
 
 class Conflict(ValueError):
@@ -28,7 +28,7 @@ def validate_changes(changes, allowed_fields):
     ):
         raise ValueError("Invalid field value")
     if "lighting" in changes and changes["lighting"] not in LIGHTING:
-        raise ValueError("Choose dark, office-white or office-yellow")
+        raise ValueError("Choose dark, office-white, office-yellow or daylight")
     if "subject" in changes and not changes["subject"].strip():
         raise ValueError("Identity cannot be empty")
 
