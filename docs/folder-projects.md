@@ -128,3 +128,8 @@ condition when matching captures to matrix requirements. Original CSV metadata,
 annotation JSON, and ingestion history remain unchanged. Other lighting values
 still match exactly. Use one yellow requirement per batch/SDK/device combination
 in generated matrices; do not create separate rows for the two equivalent labels.
+
+Dashboard batch-quality links preserve the project, batch, and selected identity.
+Metadata corrections accept `dark`, `office-white`, `office-yellow`, and
+`daylight`; saved corrections update both capture indexes and the current
+capture/ingestion views while retaining the original annotation JSON.

@@ -1016,6 +1016,9 @@
         review.href =
           "/quality.html?" +
           new URLSearchParams({
+            ...(new URLSearchParams(location.search).has("project")
+              ? { project: new URLSearchParams(location.search).get("project") }
+              : {}),
             batch: b.name,
             subject: $("subject").value,
           });

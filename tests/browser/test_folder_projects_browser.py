@@ -29,6 +29,19 @@ with running_server(folder_mode=True) as client, sync_playwright() as playwright
         "Project: 001_MyKad_ColourPrintEnhancement2"
     )
     page.locator(".batch").first.wait_for()
+    # Batch-card links must retain project context, not only sidebar links.
+    review = page.locator(".batch a.review-quality").first
+    expect(review).to_have_attribute(
+        "href", re.compile("project=001_MyKad_ColourPrintEnhancement2")
+    )
+    review.click()
+    expect(page.locator(".current-project-name")).to_have_text(
+        "001_MyKad_ColourPrintEnhancement2"
+    )
+    expect(page.locator(".quality-card")).to_have_count(5)
+    expect(page.locator("#page-error")).to_be_empty()
+    expect(page.locator("#batch")).to_have_value("genuine")
+    expect(page.locator("#identity")).to_have_value("fixture")
     for route in (
         "/coverage.html",
         "/",

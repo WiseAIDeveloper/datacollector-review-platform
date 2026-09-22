@@ -52,6 +52,16 @@ class EditTests(unittest.TestCase):
         self.assertEqual((self.folder / "one.jpg").read_bytes(), b"image")
         self.assertEqual((self.folder / "one.json").read_text(), "{}")
 
+    def test_daylight_updates_both_indexes(self):
+        """The configured daylight choice saves to both capture indexes."""
+        edit_capture(
+            self.root, "genuine", "one", "one.jpg", {"lighting": "daylight"}, self.row
+        )
+        for name in INDEXES:
+            with (self.folder / name).open() as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual([r["lighting"] for r in rows], ["daylight", "dark"])
+
     def test_secondary_index_without_filename(self):
         """Verify secondary index without filename."""
         fields = ["uuid", "ori_path", "ocr_path", "fraud_type", "batch_name"]

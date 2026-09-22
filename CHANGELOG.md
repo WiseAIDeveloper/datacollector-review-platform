@@ -12,6 +12,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Keep the selected project in dashboard batch-quality links, and allow configured daylight metadata corrections to save successfully.
+
 - Count collector `yellow` captures against `office-yellow` dashboard requirements while preserving original capture metadata.
 
 - Use the capture_device label when a recognized native sensor reports an Unknown model, without changing its App classification.
