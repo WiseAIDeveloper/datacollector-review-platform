@@ -278,6 +278,30 @@ with sync_playwright() as playwright:
             )
             == "rgb(244, 211, 94)"
         )
+    # A second project's collector plan must drive identity choices and coverage.
+    data["matrix"] = matrix
+    data["captures"] = [
+        dict(
+            rows[0],
+            metadata=dict(
+                rows[0]["metadata"],
+                subject="project-two-person",
+                test_plan_name="002_mykad26_initialcollection",
+            ),
+        ),
+        rows[-1],
+    ]
+    data["batches"] = [
+        dict(batch, test_plan_name="002_mykad26_initialcollection")
+        for batch in data["batches"]
+    ]
+    page.goto("http://fixture/coverage.html")
+    expect(page.locator("#subject option")).to_have_text(["project-two-person"])
+    expect(page.locator("#subject")).to_have_value("project-two-person")
+    expect(page.locator("#summary b")).to_have_text(["6", "1", "5", "0"])
+    expect(page.locator('#batch-filter button[data-batch="alpha"]')).to_have_attribute(
+        "data-status", "in-progress"
+    )
     # Configured batches must remain selectable even before any captures arrive.
     data["captures"] = []
     data["matrix"] = matrix

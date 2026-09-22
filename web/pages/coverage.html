@@ -351,11 +351,11 @@
       <button id="close">Close</button><img alt="Enlarged capture" />
     </dialog>
     <script>
-      const STORAGE = "idrecapture-review-v1",
-        MATRIX = "internal_colour_print_enhancement_2";
+      const STORAGE = "idrecapture-review-v1";
       let rows = [],
         matrix = [],
         batchDefs = [],
+        projectPlans = new Set(),
         decisions = {},
         qualityReviews = {},
         selectedBatch = "";
@@ -456,13 +456,19 @@
           sdk,
           device,
         ) => [folder, lighting, sdk, device].join("\u001f");
+      /* Respect selected project plans while supporting legacy definitions without a plan. */
+      function matchesProject(capture) {
+        return (
+          !projectPlans.size ||
+          projectPlans.has(capture.metadata.test_plan_name)
+        );
+      }
       /* Match captures to expected matrix groups for the selected identity. */
       function groups() {
         const subject = $("subject").value,
           caps = rows.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
-              r.metadata.subject === subject &&
-              r.metadata.test_plan_name === "colour_print_enhancement_2",
+              r.metadata.subject === subject && matchesProject(r),
           ),
           by = new Map();
         for (const r of caps) {
@@ -750,7 +756,7 @@
         for (const r of rows) {
           if (
             r.metadata.subject === $("subject").value &&
-            r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+            matchesProject(r) &&
             batches.has(r.folder)
           )
             batches.get(r.folder).actual++;
@@ -970,7 +976,7 @@
             /* Keep items that match the current selection criteria. */ (r) =>
               r.folder === b.name &&
               r.metadata.subject === $("subject").value &&
-              r.metadata.test_plan_name === "colour_print_enhancement_2",
+              matchesProject(r),
           ),
           reviewed = captures.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
@@ -1173,7 +1179,7 @@
               ) =>
                 r.folder === b.name &&
                 r.metadata.subject === $("subject").value &&
-                r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+                matchesProject(r) &&
                 !["pass", "error"].includes(qualityReviews[r.key]?.status),
             ),
         );
@@ -1246,7 +1252,7 @@
         return rows.filter(
           /* Keep items that match the current selection criteria. */ (r) =>
             r.metadata.subject === $("subject").value &&
-            r.metadata.test_plan_name === "colour_print_enhancement_2" &&
+            matchesProject(r) &&
             ["remove", "correct_metadata"].includes(decisions[r.key]?.decision),
         );
       }
@@ -1407,17 +1413,23 @@
           rows = await a.json();
           matrix = await b.json();
           batchDefs = await c.json();
+          projectPlans = new Set(
+            batchDefs
+              .map(
+                /* Read the collector plan identifiers configured for this project. */
+                (batch) => batch.test_plan_name,
+              )
+              .filter(Boolean),
+          );
           qualityReviews = await d.json();
-          const previous = $("subject").value || "koh-jia-yi",
+          const previous = $("subject").value,
             subjects = [
               ...new Set(
                 rows
                   .filter(
                     /* Keep items that match the current selection criteria. */ (
                       r,
-                    ) =>
-                      r.metadata.test_plan_name ===
-                      "colour_print_enhancement_2",
+                    ) => matchesProject(r),
                   )
                   .map(
                     /* Build the corresponding display or request value for each item. */ (

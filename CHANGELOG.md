@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Derive dashboard identities, coverage, review counts, and pending decisions from the selected project’s test plans instead of a hard-coded legacy plan.
+
 - Show canonical project batch names in the dashboard filter and include configured batches with no captures in Capture and Quality filters.
 
 ### Changed

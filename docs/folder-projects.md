@@ -74,3 +74,8 @@ Capture discovery requires an exact pair: the dataset folder name must equal
 collector. The CSV filename and `matrix_name` identify the review matrix and do
 not need to equal the collector's plan slug. Coverage additionally requires the
 capture's lighting, SDK, and device to match a matrix combination.
+
+The dashboard derives its identity selector, coverage, quality counts, and
+pending decisions from the selected project's configured test-plan identifiers.
+Only identities with existing captures are selectable; an empty project has no
+identity choices yet.
