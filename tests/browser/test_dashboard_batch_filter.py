@@ -302,6 +302,27 @@ with sync_playwright() as playwright:
     expect(page.locator('#batch-filter button[data-batch="alpha"]')).to_have_attribute(
         "data-status", "in-progress"
     )
+    # Both collector and review labels count in the same yellow requirement.
+    data["matrix"] = [
+        dict(matrix[0], lighting="office-yellow", expected_count_per_identity="2")
+    ]
+    sample = data["captures"][0]
+    data["captures"] = [
+        dict(
+            sample,
+            key=f"yellow-{i}",
+            metadata=dict(sample["metadata"], lighting=lighting),
+        )
+        for i, lighting in enumerate(["yellow", "office-yellow", "dark"])
+    ]
+    page.goto("http://fixture/coverage.html")
+    expect(page.locator("#summary b")).to_have_text(["2", "2", "0", "0"])
+    expect(page.locator('#batch-filter button[data-batch="alpha"]')).to_have_attribute(
+        "data-status", "completed"
+    )
+    data["matrix"] = [dict(data["matrix"][0], lighting="yellow")]
+    page.locator("#refresh").click()
+    expect(page.locator("#summary b")).to_have_text(["2", "2", "0", "0"])
     # Configured batches must remain selectable even before any captures arrive.
     data["captures"] = []
     data["matrix"] = matrix
