@@ -96,3 +96,27 @@ If that label is also empty, the device remains `unknown`.
 No capture metadata is rewritten. Existing history retains its original detection
 record; ingestion views overlay the current classification for captures still on
 disk. Unknown captures remain reviewable but do not match App/Web matrix rows.
+
+## Check device compatibility before collection
+
+Use the collector's emitted device values when preparing matrix rows and
+`expected_web_devices` / `expected_app_devices`. Reuse those values in any
+identity-expanded collection checklist. For example, Samsung Fold 5 Web uses
+`samsung-galaxy-z-fold-5`; its native App sensor reports `SM-F946U1`. These are
+SDK-specific identifiers, not interchangeable aliases. Keep display labels
+separate from these matching keys.
+
+After creating or regenerating a project's CSVs, run:
+
+```sh
+python scripts/audit_project_devices.py \
+  --projects-root /mnt5/auto-ekyc/datacollection_review/idrecapture/projects \
+  --dataset /mnt5/auto-ekyc/idrecapture \
+  --project 002_MyKad26_InitialCollection
+```
+
+This read-only check exits nonzero if device lists differ between the batch
+CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
+again after the first sample from each device/platform; uncollected devices
+cannot be checked against real metadata yet. It does not guess aliases or decide
+which source is correct when a phone label contradicts its native sensor model.

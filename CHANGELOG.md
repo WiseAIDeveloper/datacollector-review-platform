@@ -6,6 +6,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
+
 ### Fixed
 
 - Use the capture_device label when a recognized native sensor reports an Unknown model, without changing its App classification.
