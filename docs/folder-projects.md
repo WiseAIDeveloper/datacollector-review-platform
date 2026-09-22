@@ -120,3 +120,11 @@ CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
 again after the first sample from each device/platform; uncollected devices
 cannot be checked against real metadata yet. It does not guess aliases or decide
 which source is correct when a phone label contradicts its native sensor model.
+
+## Lighting compatibility
+
+Dashboard coverage treats `yellow` and `office-yellow` as the same lighting
+condition when matching captures to matrix requirements. Original CSV metadata,
+annotation JSON, and ingestion history remain unchanged. Other lighting values
+still match exactly. Use one yellow requirement per batch/SDK/device combination
+in generated matrices; do not create separate rows for the two equivalent labels.
