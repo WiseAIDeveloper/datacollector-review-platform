@@ -278,6 +278,31 @@ with sync_playwright() as playwright:
             )
             == "rgb(244, 211, 94)"
         )
+    # Refresh updates counts while preserving open and closed batch disclosures.
+    data["matrix"] = matrix
+    data["captures"] = rows
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    page.goto("http://fixture/coverage.html")
+    alpha_card = page.locator(".batch").filter(has=page.locator("h2", has_text="Alpha"))
+    lighting = alpha_card.locator("details[data-disclosure-key]").nth(1)
+    definition = alpha_card.locator(".batch-definition")
+    lighting.locator("summary").click()
+    definition.locator("summary").click()
+    data["captures"] = [*rows, dict(rows[0], key="new-capture")]
+    page.locator("#refresh").click()
+    expect(page.locator("#summary b")).to_have_text(["6", "5", "2", "1"])
+    assert lighting.evaluate("node => node.open")
+    assert definition.evaluate("node => node.open")
+    definition.locator("summary").click()
+    page.locator("#refresh").click()
+    page.wait_for_timeout(100)
+    assert not definition.evaluate("node => node.open")
+    assert lighting.evaluate("node => node.open")
+    page.locator("#subject").select_option("person-b")
+    assert not lighting.evaluate("node => node.open")
+    page.locator("#subject").select_option("person-a")
+    assert lighting.evaluate("node => node.open")
+    data["captures"] = rows
     # A second project's collector plan must drive identity choices and coverage.
     data["matrix"] = matrix
     data["captures"] = [

@@ -140,3 +140,7 @@ expand phone filters without scrolling sideways to reach Save or Execute.
 `tests/browser/test_frozen_panes.py` checks sticky positioning, compact height,
 horizontal overflow, mobile filter toggling, and reopening filters on desktop.
 Run it through `python -m tests.run_browser` with disposable fixture data.
+
+Dashboard batch lighting and expected-requirement disclosures retain their open
+or closed state when data refreshes or the view changes. The state is kept per
+batch and identity for the current page session; a full browser reload resets it.

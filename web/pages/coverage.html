@@ -971,6 +971,18 @@
         }
         return wrap;
       }
+      const expandedBatches = new Set();
+      /* Restore each batch disclosure independently for the current identity. */
+      function batchDisclosure(batch, section) {
+        const details = el("details");
+        details.dataset.disclosureKey = JSON.stringify([
+          $("subject").value,
+          batch,
+          section,
+        ]);
+        details.open = expandedBatches.has(details.dataset.disclosureKey);
+        return details;
+      }
       /* Render one batch’s coverage summary and quality-review links. */
       function batchCard(b, view) {
         const state = b.excess ? "excess" : b.missing ? "missing" : "complete";
@@ -1028,7 +1040,7 @@
         rawName.className = "muted";
         box.append(rawName);
         const d = b.definition || {},
-          definition = el("details");
+          definition = batchDisclosure(b.name, "requirements");
         definition.className = "batch-definition";
         definition.append(el("summary", "Expected batch requirements"));
         const title =
@@ -1074,7 +1086,7 @@
                   ? "Excess"
                   : "Complete";
           box.append(el("p", label));
-          const details = el("details");
+          const details = batchDisclosure(b.name, "lighting");
           details.append(
             el("summary", "Show batch grouped by lighting"),
             lightingBlocks(b.groups, "requirements"),
@@ -1139,6 +1151,12 @@
       }
       /* Render the current filters, review state, and matching captures. */
       function render() {
+        for (const details of document.querySelectorAll(
+          "details[data-disclosure-key]",
+        )) {
+          if (details.open) expandedBatches.add(details.dataset.disclosureKey);
+          else expandedBatches.delete(details.dataset.disclosureKey);
+        }
         if (!$("batch-content")) initBatchViews();
         const requested = location.hash.slice(1);
         currentView = Object.hasOwn(viewNames, requested)
