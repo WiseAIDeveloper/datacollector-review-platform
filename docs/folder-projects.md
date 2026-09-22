@@ -79,3 +79,16 @@ The dashboard derives its identity selector, coverage, quality counts, and
 pending decisions from the selected project's configured test-plan identifiers.
 Only identities with existing captures are selectable; an empty project has no
 identity choices yet.
+
+## SDK detection
+
+Capture pages and ingestion use the same `input_sensor` classifier:
+
+- `websdk;...` (case-insensitive) means Web; `capture_device` supplies its device label.
+- A JSON or Python-literal object with a nonempty string `model` means App; that model is the device.
+- The legacy iOS format `model:DEVICE,...` means App.
+- Missing, malformed, or unrecognized sensors mean `unknown`, even if `capture_device` is filled.
+
+No capture metadata is rewritten. Existing history retains its original detection
+record; ingestion views overlay the current classification for captures still on
+disk. Unknown captures remain reviewable but do not match App/Web matrix rows.

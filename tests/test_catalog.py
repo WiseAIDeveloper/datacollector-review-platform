@@ -71,8 +71,8 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(self.catalog.collection_annotation(folder, "capture-0"), {})
         self.assertEqual(self.catalog.records()[0]["annotation_lighting"], "")
 
-    def test_records_keep_legacy_device_values_and_order(self):
-        """Catalog parsing preserves raw non-dict sensors and the original empty fallback."""
+    def test_records_classify_known_sensors_and_keep_order(self):
+        """Known app sensors are recognized; unsupported values remain explicitly unknown."""
         sensors = [
             "{'model': 'phone'}",
             "{'model': 123}",
@@ -86,11 +86,49 @@ class CatalogTests(unittest.TestCase):
         records = self.catalog.records()
         self.assertEqual(
             [row["device"] for row in records],
-            ["phone", 123, "['raw', 'sensor']", "phone", ""],
+            ["phone", "unknown", "unknown", "phone", "unknown"],
         )
-        self.assertEqual([row["sdk"] for row in records], ["app"] * 5)
+        self.assertEqual(
+            [row["sdk"] for row in records],
+            ["app", "unknown", "unknown", "app", "unknown"],
+        )
         self.assertEqual([row["line"] for row in records], [2, 3, 4, 5, 6])
         self.assertEqual([row["metadata"] for row in records], self.rows)
+
+    def test_sdk_detection_uses_sensor_before_device_label(self):
+        """Catalog and ingestion agree on web, native, legacy iOS, and unknown sensors."""
+        catalog = load_application("capture_data")
+        ingestion = load_application("ingestion")
+        cases = [
+            ("websdk;chromemobile;android;mobile", "web", "friendly-phone"),
+            (" WEBSdk;browser ", "web", "friendly-phone"),
+            ("{'manufacturer': 'HUAWEI', 'model': 'JNY-LX2'}", "app", "JNY-LX2"),
+            (
+                '{"manufacturer":"Apple","model":"iPhone14","flag":true}',
+                "app",
+                "iPhone14",
+            ),
+            ("model:iPhone14,ios:26.2", "app", "iPhone14"),
+            ("", "unknown", "friendly-phone"),
+            ("unrecognized", "unknown", "friendly-phone"),
+            ("{broken", "unknown", "friendly-phone"),
+            ("{}", "unknown", "friendly-phone"),
+            ("{'model': 123}", "unknown", "friendly-phone"),
+            ("model:,ios:26.2", "unknown", "friendly-phone"),
+        ]
+        for sensor, sdk, device in cases:
+            with self.subTest(sensor=sensor):
+                row = {"input_sensor": sensor, "capture_device": "friendly-phone"}
+                self.assertEqual(catalog.capture_device(row), (sdk, device))
+                self.assertEqual(ingestion.device_info(row), (sdk, device))
+        self.assertEqual(
+            catalog.capture_device({"input_sensor": "websdk;browser"}),
+            ("web", "unknown"),
+        )
+        self.assertEqual(
+            catalog.capture_device({"input_sensor": None, "capture_device": None}),
+            ("unknown", "unknown"),
+        )
 
     def test_excluded_folders_are_not_catalogued(self):
         """Ignore administrative and excluded batches even when they contain valid indexes."""

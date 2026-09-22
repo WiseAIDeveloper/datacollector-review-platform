@@ -245,11 +245,11 @@ class IngestionEdgeTests(unittest.TestCase):
     def test_device_info_fallbacks_and_timestamp(self):
         """Preserve device fallbacks and timezone-aware UTC timestamps."""
         for row, expected in [
-            ({}, ("app", "unknown")),
-            ({"input_sensor": "{}"}, ("app", "unknown")),
-            ({"input_sensor": "['value']"}, ("app", "['value']")),
-            ({"capture_device": " device "}, ("web", "device")),
-            ({"input_sensor": "{'model': 123}"}, ("app", "123")),
+            ({}, ("unknown", "unknown")),
+            ({"input_sensor": "{}"}, ("unknown", "unknown")),
+            ({"input_sensor": "['value']"}, ("unknown", "unknown")),
+            ({"capture_device": " device "}, ("unknown", "device")),
+            ({"input_sensor": "{'model': 123}"}, ("unknown", "unknown")),
         ]:
             self.assertEqual(ingestion.device_info(row), expected)
         self.assertTrue(ingestion.now().endswith("+00:00"))

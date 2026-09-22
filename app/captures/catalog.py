@@ -25,17 +25,27 @@ def collection_annotation(folder, uuid):
 
 
 def capture_device(row):
-    """Preserve the catalog's web-device and legacy app-sensor parsing rules."""
-    device = row.get("capture_device", "").strip()
-    if device:
-        return "web", device
-    raw = row.get("input_sensor", "")
+    """Classify recognized sensor formats; a device label alone cannot identify an SDK."""
+    device = (row.get("capture_device") or "").strip()
+    raw = (row.get("input_sensor") or "").strip()
+    if raw.lower().startswith("websdk;"):
+        return "web", device or "unknown"
     try:
-        sensor = ast.literal_eval(raw)
-        device = sensor.get("model", "unknown") if isinstance(sensor, dict) else raw
-    except (ValueError, SyntaxError):
-        device = raw.split(",")[0].removeprefix("model:")
-    return "app", device
+        sensor = json.loads(raw)
+    except (ValueError, TypeError):
+        try:
+            sensor = ast.literal_eval(raw)
+        except (ValueError, SyntaxError):
+            sensor = None
+    if isinstance(sensor, dict):
+        model = sensor.get("model")
+        if isinstance(model, str) and model.strip():
+            return "app", model.strip()
+    if raw.startswith("model:"):
+        model = raw.split(",", 1)[0].removeprefix("model:").strip()
+        if model:
+            return "app", model
+    return "unknown", device or "unknown"
 
 
 def records(root):

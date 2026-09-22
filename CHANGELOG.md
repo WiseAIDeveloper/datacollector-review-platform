@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Detect App/Web from recognized input sensor formats consistently across captures and ingestion. Native captures with a device label no longer become Web; unfamiliar sensors are explicitly unknown. Capture metadata is unchanged.
+
 - Derive dashboard identities, coverage, review counts, and pending decisions from the selected project’s test plans instead of a hard-coded legacy plan.
 
 - Show canonical project batch names in the dashboard filter and include configured batches with no captures in Capture and Quality filters.
