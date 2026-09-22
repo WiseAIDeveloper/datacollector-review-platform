@@ -5,11 +5,11 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// PIN-free actions and legacy prompts are covered by the browser workflow suite.
+// Exact batch labels and empty configured batches are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
-  "index.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
-  "quality.html": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
+  "coverage.html": "c38cd68",
+  "index.html": "c38cd68",
+  "quality.html": "c38cd68",
   "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
 };
 const files = [
