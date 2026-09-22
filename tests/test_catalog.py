@@ -109,6 +109,9 @@ class CatalogTests(unittest.TestCase):
                 "iPhone14",
             ),
             ("model:iPhone14,ios:26.2", "app", "iPhone14"),
+            ("model:Unknown,ios:26.5", "app", "friendly-phone"),
+            ("model: UNKNOWN ,ios:26.5", "app", "friendly-phone"),
+            ('{"model":"Unknown"}', "app", "friendly-phone"),
             ("", "unknown", "friendly-phone"),
             ("unrecognized", "unknown", "friendly-phone"),
             ("{broken", "unknown", "friendly-phone"),
@@ -129,6 +132,14 @@ class CatalogTests(unittest.TestCase):
             catalog.capture_device({"input_sensor": None, "capture_device": None}),
             ("unknown", "unknown"),
         )
+
+    def test_unknown_native_model_without_label_remains_unknown(self):
+        """A native SDK stays App even when neither source provides a device name."""
+        catalog = load_application("capture_data")
+        for sensor in ["model:Unknown,ios:26.5", '{"model":"unknown"}']:
+            self.assertEqual(
+                catalog.capture_device({"input_sensor": sensor}), ("app", "unknown")
+            )
 
     def test_excluded_folders_are_not_catalogued(self):
         """Ignore administrative and excluded batches even when they contain valid indexes."""

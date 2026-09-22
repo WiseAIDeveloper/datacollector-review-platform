@@ -89,6 +89,10 @@ Capture pages and ingestion use the same `input_sensor` classifier:
 - The legacy iOS format `model:DEVICE,...` means App.
 - Missing, malformed, or unrecognized sensors mean `unknown`, even if `capture_device` is filled.
 
+When a recognized native sensor reports `Unknown` as its model (case-insensitive),
+use `capture_device` as the displayed device while retaining App classification.
+If that label is also empty, the device remains `unknown`.
+
 No capture metadata is rewritten. Existing history retains its original detection
 record; ingestion views overlay the current classification for captures still on
 disk. Unknown captures remain reviewable but do not match App/Web matrix rows.

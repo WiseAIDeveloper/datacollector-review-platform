@@ -40,11 +40,12 @@ def capture_device(row):
     if isinstance(sensor, dict):
         model = sensor.get("model")
         if isinstance(model, str) and model.strip():
-            return "app", model.strip()
+            model = model.strip()
+            return "app", (device or "unknown") if model.lower() == "unknown" else model
     if raw.startswith("model:"):
         model = raw.split(",", 1)[0].removeprefix("model:").strip()
         if model:
-            return "app", model
+            return "app", (device or "unknown") if model.lower() == "unknown" else model
     return "unknown", device or "unknown"
 
 
