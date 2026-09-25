@@ -38,11 +38,18 @@
         />
       </label>
       <p id="gallery-status" role="status" aria-live="polite">
-        Loading images…
+        Loading images… Open this page through the running preview, not as an
+        HTML file.
       </p>
       <p id="gallery-error" role="alert"></p>
     </header>
-    <main><div id="genuine-cards" class="genuine-cards"></div></main>
+    <main>
+      <noscript
+        >This gallery needs JavaScript. Open it in a browser through the running
+        preview.</noscript
+      >
+      <div id="genuine-cards" class="genuine-cards"></div>
+    </main>
     <link rel="stylesheet" href="/frozen_panes.css" />
   </body>
 </html>

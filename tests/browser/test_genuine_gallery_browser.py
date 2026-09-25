@@ -44,8 +44,11 @@ with running_server(genuine_gallery=True) as client, sync_playwright() as playwr
     page.locator("#refresh").click()
     expect(waiting).to_have_class("genuine-card collected")
     expect(waiting).to_contain_text("1 sample collected")
-    page.set_viewport_size({"width": 390, "height": 844})
+    page.set_viewport_size({"width": 390, "height": 500})
     assert not page.evaluate("document.documentElement.scrollWidth > innerWidth")
+    assert page.evaluate(
+        "document.querySelector('.genuine-card h2').getBoundingClientRect().top < innerHeight"
+    )
     assert not errors, errors
     browser.close()
 

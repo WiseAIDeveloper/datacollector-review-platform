@@ -40,7 +40,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  padding: 10px;
 }
 .genuine-gallery .card-actions a {
   display: inline-block;
@@ -53,6 +53,9 @@
   background: #244734;
 }
 @media (max-width: 540px) {
+  .genuine-gallery header > p:first-of-type {
+    display: none;
+  }
   .genuine-gallery .app-sidebar {
     box-sizing: border-box;
   }

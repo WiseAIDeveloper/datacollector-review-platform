@@ -45,8 +45,8 @@ function createCard(number) {
     link.textContent = label;
     actions.append(link);
   }
-  details.append(heading, status, actions);
-  article.append(image, details);
+  details.append(heading, status);
+  article.append(details, image, actions);
   article.statusElement = status;
   cards.set(number, article);
   return article;
