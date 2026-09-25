@@ -5,10 +5,10 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// Numbered gallery links and existing review behavior are covered by browser scenarios.
+// Numbered gallery filters and existing review behavior are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
-  "index.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
+  "coverage.html": "6ccc918",
+  "index.html": "6ccc918",
   "quality.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
   "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
 };
