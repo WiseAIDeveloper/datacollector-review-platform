@@ -5,11 +5,11 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// Exact batch labels and empty configured batches are covered by browser scenarios.
+// Numbered gallery links and existing review behavior are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "4a0179ac258ebd6e5078c95cdae43e552eec03d7",
-  "index.html": "c38cd68",
-  "quality.html": "c38cd68",
+  "coverage.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
+  "index.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
+  "quality.html": "277bfa0c6f0570d7ca53a59c7acddd83265bbe63",
   "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
 };
 const files = [
@@ -95,7 +95,7 @@ for (const filename of files) {
 }
 
 // Project behavior is exercised by the real upload and navigation browser scenario.
-for (const filename of ["project_context.js", "projects.js"]) {
+for (const filename of ["project_context.js", "projects.js", "genuine_gallery.js"]) {
   parser.parse(fs.readFileSync(path.join("web/static/js", filename), "utf8"));
   console.log(`PASS ${filename}: JavaScript parses`);
 }

@@ -89,9 +89,11 @@ verified optional-PIN feature commit as their baseline. Browser scenarios cover
 both PIN-free project workflows and the original PIN-protected behavior. Other
 pages retain the original baseline. An optional revision argument overrides all
 per-file defaults.
-An intentional frontend feature change needs behavior-focused tests and a reviewed
-update to the applicable baseline; do not treat a syntax difference alone as a bug
-or disable the check without explanation.
+The numbered genuine gallery and its links to Capture, Coverage, and Quality
+reviews are covered by a browser scenario. Their intentional JavaScript changes
+use the verified gallery feature commit as their baseline. Future frontend changes
+need behavior-focused tests and a reviewed update to the applicable baseline; do
+not treat a syntax difference alone as a bug or disable the check without explanation.
 
 ## Compare with the original implementation
 
