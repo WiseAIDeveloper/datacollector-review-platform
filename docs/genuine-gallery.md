@@ -1,12 +1,14 @@
 # Numbered genuine image gallery
 
 This optional mode shows the same numbered genuine reference images for every
-batch. Choose a batch, then one phone + lighting combination configured in that
+batch. Use the dashboard-style buttons to choose a batch, then one phone + lighting combination configured in that
 batch's matrix. A card turns green as soon as at least one collected capture in
 that batch and combination has the same number in its `subject` field. The card
 also shows the matching sample count. The page refreshes every five seconds while
 visible. Search narrows the cards by number; the slider shows 2, 4, or 8 images
-per row. On narrow screens, wider settings scroll sideways. Card links open the
+per row. Portrait frames display each full reference photo, and clicking a photo
+opens a larger view with zoom and pan. On narrow screens, wider settings scroll
+sideways. Card links open the
 existing Capture review, Coverage, and Quality review pages for that number and
 batch; Capture review also uses the selected phone and lighting filters. The
 existing pages and APIs remain available.

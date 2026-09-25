@@ -3,14 +3,18 @@ const gallery = document.getElementById("genuine-cards");
 const galleryStatus = document.getElementById("gallery-status");
 const galleryError = document.getElementById("gallery-error");
 const search = document.getElementById("number-search");
-const batch = document.getElementById("batch");
-const combination = document.getElementById("combination");
+const batchChoices = document.getElementById("batch-choices");
+const combinationChoices = document.getElementById("combination-choices");
 const density = document.getElementById("density");
+const zoom = document.getElementById("zoom");
 const project = new URLSearchParams(location.search).get("project");
 const cards = new Map();
 const columns = [2, 4, 8];
 let matrixRows = [];
 let currentRequest = null;
+let batchName = "";
+let combinationIndex = -1;
+let availableBatches = [];
 
 function apiUrl(path, parameters = {}) {
   /* Scope gallery requests to the project shown in this browser tab. */
@@ -23,8 +27,8 @@ function apiUrl(path, parameters = {}) {
 
 function selectedRequirement() {
   /* Return the configured combination currently selected for this batch. */
-  const row = matrixRows[Number(combination.value)];
-  return row?.folder === batch.value ? row : null;
+  const row = matrixRows[combinationIndex];
+  return row?.folder === batchName ? row : null;
 }
 
 function workspaceUrl(path, number) {
@@ -55,6 +59,21 @@ function createCard(number) {
     "/api/genuine-image?number=" +
     encodeURIComponent(number) +
     (project ? "&project=" + encodeURIComponent(project) : "");
+  const imageButton = document.createElement("button");
+  imageButton.type = "button";
+  imageButton.className = "reference-image";
+  imageButton.setAttribute(
+    "aria-label",
+    "Enlarge genuine image number " + number,
+  );
+  imageButton.append(image);
+  imageButton.addEventListener("click", () => {
+    /* Show the full reference image with the shared zoom and pan controls. */
+    const enlarged = zoom.querySelector("img");
+    enlarged.src = image.src;
+    enlarged.alt = image.alt;
+    zoom.showModal();
+  });
   const details = document.createElement("div");
   details.className = "card-details";
   const heading = document.createElement("h2");
@@ -75,7 +94,7 @@ function createCard(number) {
     actions.append(link);
   }
   details.append(heading, status);
-  article.append(details, image, actions);
+  article.append(details, imageButton, actions);
   article.statusElement = status;
   cards.set(number, article);
   return article;
@@ -94,25 +113,60 @@ function filterCards() {
     card.hidden = !!term && !number.includes(term);
 }
 
-function renderCombinations(previous) {
-  /* Offer only phone and lighting combinations configured for the batch. */
-  combination.replaceChildren();
-  for (const [index, row] of matrixRows.entries()) {
-    if (row.folder !== batch.value) continue;
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent =
-      row.device + " · " + row.lighting + " · " + row.sdk.toUpperCase();
-    combination.append(option);
-    if (
-      previous &&
-      ["folder", "lighting", "sdk", "device"].every(
-        (field) => row[field] === previous[field],
-      )
-    )
-      combination.value = String(index);
+function renderBatchChoices() {
+  /* Match the normal dashboard's pressed batch buttons. */
+  batchChoices.replaceChildren();
+  for (const name of availableBatches) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.batch = name;
+    button.textContent = name;
+    button.setAttribute("aria-pressed", String(name === batchName));
+    button.addEventListener("click", () => {
+      if (name === batchName) return;
+      batchName = name;
+      renderBatchChoices();
+      [...batchChoices.children]
+        .find((choice) => choice.dataset.batch === name)
+        ?.focus();
+      renderCombinations();
+      refreshGallery(true);
+    });
+    batchChoices.append(button);
   }
-  combination.disabled = !combination.options.length;
+}
+
+function renderCombinations(previous) {
+  /* Offer the configured phone and lighting combinations as pressed buttons. */
+  const indexes = matrixRows.flatMap((row, index) =>
+    row.folder === batchName ? [index] : [],
+  );
+  combinationIndex =
+    indexes.find((index) =>
+      previous
+        ? ["folder", "lighting", "sdk", "device"].every(
+            (field) => matrixRows[index][field] === previous[field],
+          )
+        : false,
+    ) ??
+    indexes[0] ??
+    -1;
+  combinationChoices.replaceChildren();
+  for (const index of indexes) {
+    const row = matrixRows[index];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent =
+      row.device + " · " + row.lighting + " · " + row.sdk.toUpperCase();
+    button.setAttribute("aria-pressed", String(index === combinationIndex));
+    button.addEventListener("click", () => {
+      combinationIndex = index;
+      for (const choice of combinationChoices.children)
+        choice.setAttribute("aria-pressed", String(choice === button));
+      refreshGallery(true);
+    });
+    combinationChoices.append(button);
+  }
 }
 
 async function loadOptions() {
@@ -130,19 +184,17 @@ async function loadOptions() {
       matrixResponse.json(),
     ]);
     matrixRows = requirements;
-    const previousBatch = batch.value;
-    const folders = [
+    availableBatches = [
       ...new Set(
         definitions
           .map((definition) => definition.batch_name)
           .filter((name) => matrixRows.some((row) => row.folder === name)),
       ),
     ];
-    batch.replaceChildren();
-    for (const name of folders) batch.add(new Option(name, name));
-    batch.value = folders.includes(previousBatch)
-      ? previousBatch
-      : folders[0] || "";
+    batchName = availableBatches.includes(batchName)
+      ? batchName
+      : availableBatches[0] || "";
+    renderBatchChoices();
     renderCombinations(previous);
     if (!selectedRequirement())
       throw new Error("This project has no phone + lighting choices");
@@ -213,7 +265,7 @@ async function refreshGallery(force = false) {
       collected +
       " of " +
       items.length +
-      " genuine images have samples for this choice · updates every 5 seconds";
+      " collected · updates every 5 seconds";
     galleryError.textContent = "";
   } catch (error) {
     if (error.name !== "AbortError") galleryError.textContent = error.message;
@@ -223,13 +275,11 @@ async function refreshGallery(force = false) {
 }
 
 search.addEventListener("input", filterCards);
-batch.addEventListener("change", () => {
-  renderCombinations();
-  refreshGallery(true);
-});
-combination.addEventListener("change", () => refreshGallery(true));
 density.addEventListener("input", setDensity);
 document.getElementById("refresh").addEventListener("click", loadOptions);
+document
+  .getElementById("close-zoom")
+  .addEventListener("click", () => zoom.close());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshGallery(true);
 });

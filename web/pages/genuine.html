@@ -26,11 +26,33 @@
           <button id="refresh">Refresh now</button>
         </div>
       </div>
-      <div class="gallery-filters">
-        <label for="batch">Batch<select id="batch"></select></label>
-        <label for="combination"
-          >Phone + lighting<select id="combination"></select
-        ></label>
+    </header>
+    <main>
+      <noscript
+        >This gallery needs JavaScript. Open it in a browser through the running
+        preview.</noscript
+      >
+      <section class="gallery-choices" aria-label="Collection setup">
+        <div>
+          <h2>Batch</h2>
+          <div
+            id="batch-choices"
+            class="choice-buttons"
+            role="group"
+            aria-label="Batch"
+          ></div>
+        </div>
+        <div>
+          <h2>Phone + lighting</h2>
+          <div
+            id="combination-choices"
+            class="choice-buttons"
+            role="group"
+            aria-label="Phone and lighting"
+          ></div>
+        </div>
+      </section>
+      <div class="gallery-tools">
         <label for="number-search"
           >Find a number
           <input
@@ -70,14 +92,13 @@
         HTML file.
       </p>
       <p id="gallery-error" role="alert"></p>
-    </header>
-    <main>
-      <noscript
-        >This gallery needs JavaScript. Open it in a browser through the running
-        preview.</noscript
-      >
       <div id="genuine-cards" class="genuine-cards"></div>
     </main>
+    <dialog id="zoom" aria-label="Genuine image preview">
+      <button id="close-zoom" type="button">Close</button>
+      <img alt="" />
+    </dialog>
     <link rel="stylesheet" href="/frozen_panes.css" />
+    <script src="/image_zoom.js" defer></script>
   </body>
 </html>

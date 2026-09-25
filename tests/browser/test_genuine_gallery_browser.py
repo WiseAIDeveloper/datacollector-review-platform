@@ -19,13 +19,30 @@ with running_server(genuine_gallery=True) as client, sync_playwright() as playwr
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(client.base + "/genuine.html")
     expect(page.locator(".genuine-card")).to_have_count(3)
-    expect(page.locator("#batch")).to_have_value("genuine")
+    assert page.locator(".app-sidebar").bounding_box()["x"] == 0
+    assert page.locator("header").bounding_box()["y"] == 0
+    expect(
+        page.locator('#batch-choices button[data-batch="genuine"]')
+    ).to_have_attribute("aria-pressed", "true")
     expect(page.locator('.genuine-card[data-number="1"]')).to_have_class(
         "genuine-card collected"
     )
+    first_image = page.locator('.genuine-card[data-number="1"] img')
+    expect(first_image).to_have_js_property("complete", True)
+    assert first_image.evaluate("image => image.naturalWidth > 0")
+    assert first_image.bounding_box()["height"] > 300
+    page.get_by_role("button", name="Enlarge genuine image number 1").click()
+    expect(page.locator("#zoom")).to_be_visible()
+    assert (
+        page.locator("#zoom img")
+        .get_attribute("src")
+        .endswith("/api/genuine-image?number=1")
+    )
+    page.locator("#close-zoom").click()
+    expect(page.locator("#zoom")).not_to_be_visible()
     waiting = page.locator('.genuine-card[data-number="3"]')
     expect(waiting).to_contain_text("Waiting for samples")
-    page.locator("#combination").select_option(label="iphone-13 · office-white · WEB")
+    page.get_by_role("button", name="iphone-13 · office-white · WEB").click()
     expect(page.locator('.genuine-card[data-number="1"]')).not_to_have_class(
         "genuine-card collected"
     )
@@ -38,9 +55,9 @@ with running_server(genuine_gallery=True) as client, sync_playwright() as playwr
     expect(page.locator("#status")).to_contain_text("1 matching captures")
     assert page.evaluate("filters.lighting.value") == "office-white"
     page.go_back()
-    page.locator("#batch").select_option("later")
+    page.locator('#batch-choices button[data-batch="later"]').click()
     expect(page.locator(".genuine-card.collected")).to_have_count(0)
-    page.locator("#batch").select_option("genuine")
+    page.locator('#batch-choices button[data-batch="genuine"]').click()
     expect(page.locator('.genuine-card[data-number="1"]')).to_have_class(
         "genuine-card collected"
     )

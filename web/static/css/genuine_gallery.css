@@ -1,19 +1,68 @@
-.genuine-gallery .gallery-filters {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  align-items: end;
-  margin-top: 10px;
-}
-.genuine-gallery .gallery-filters label {
-  display: grid;
-  min-width: 0;
-}
-.genuine-gallery .gallery-filters input,
-.genuine-gallery .gallery-filters select {
-  width: 100%;
-  min-width: 0;
+.genuine-gallery .app-sidebar {
   box-sizing: border-box;
+}
+.genuine-gallery .app-sidebar a {
+  display: block;
+}
+@media (min-width: 801px) {
+  .genuine-gallery .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    overflow-y: auto;
+  }
+}
+.genuine-gallery .gallery-choices {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.genuine-gallery .gallery-choices h2 {
+  margin: 0 0 6px;
+}
+.genuine-gallery .choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.genuine-gallery .choice-buttons button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 7px 10px;
+  color: #c4cbd2;
+  background: #151a20;
+  border: 1px solid #36404a;
+  box-shadow:
+    0 2px 0 #080a0c,
+    inset 0 1px 0 #ffffff0d;
+}
+.genuine-gallery .choice-buttons button:hover {
+  border-color: #8b9aaa;
+}
+.genuine-gallery .choice-buttons button[aria-pressed="true"] {
+  color: #96e6b3;
+  background: #242a30;
+  border-color: #8b9aaa;
+  box-shadow:
+    inset 0 2px 4px #0009,
+    inset 0 -1px 0 #ffffff0d;
+}
+.genuine-gallery .gallery-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+.genuine-gallery .gallery-tools > * {
+  width: min(260px, 100%);
+}
+.genuine-gallery .gallery-tools label {
+  display: grid;
+}
+.genuine-gallery .gallery-tools input {
+  box-sizing: border-box;
+  width: 100%;
 }
 .genuine-gallery .density-labels {
   display: flex;
@@ -22,7 +71,7 @@
 }
 .genuine-gallery .genuine-cards {
   display: grid;
-  grid-template-columns: repeat(var(--gallery-columns, 4), minmax(145px, 1fr));
+  grid-template-columns: repeat(var(--gallery-columns, 4), minmax(112px, 1fr));
   gap: 14px;
   overflow-x: auto;
 }
@@ -35,11 +84,37 @@
   border-color: #4aaf70;
   background: #173022;
 }
-.genuine-gallery .genuine-card img {
+.genuine-gallery .reference-image {
+  position: relative;
+  display: block;
   width: 100%;
-  height: clamp(110px, calc(800px / var(--gallery-columns, 4)), 280px);
-  object-fit: contain;
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  border: 0;
+  cursor: zoom-in;
   background: #080a0c;
+}
+.genuine-gallery .reference-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.genuine-gallery .reference-image::after {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 7px;
+  border: 1px solid #7e8c92;
+  border-radius: 3px;
+  color: #fff;
+  background: rgb(8 10 12 / 85%);
+  content: "View larger";
+  font: inherit;
+}
+.genuine-gallery .reference-image:hover::after,
+.genuine-gallery .reference-image:focus-visible::after {
+  background: #244734;
 }
 .genuine-gallery .card-details {
   padding: 10px;
@@ -70,19 +145,46 @@
 .genuine-gallery .card-actions a:hover {
   background: #244734;
 }
-@media (max-width: 900px) {
-  .genuine-gallery .gallery-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 540px) {
-  .genuine-gallery header > p:first-of-type {
-    display: none;
+  body.terminal.genuine-gallery .workspace-header .header-titlebar {
+    flex-wrap: nowrap;
   }
-  .genuine-gallery .app-sidebar {
-    box-sizing: border-box;
+  body.terminal.genuine-gallery .workspace-header h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
   }
-  .genuine-gallery .genuine-card img {
-    height: clamp(110px, calc(400px / var(--gallery-columns, 4)), 180px);
+  body.terminal.genuine-gallery .workspace-header .header-actions {
+    flex: 0 0 auto;
+    order: 0;
+    margin-left: auto;
+  }
+  .genuine-gallery .gallery-choices {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .genuine-gallery .gallery-choices h2 {
+    margin-bottom: 4px;
+  }
+  .genuine-gallery .choice-buttons {
+    gap: 6px;
+  }
+  .genuine-gallery .choice-buttons button {
+    padding: 5px 8px;
+  }
+  .genuine-gallery .gallery-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .genuine-gallery .gallery-tools > * {
+    width: auto;
+    min-width: 0;
+  }
+  .genuine-gallery .genuine-cards {
+    grid-template-columns: repeat(
+      var(--gallery-columns, 4),
+      minmax(145px, 1fr)
+    );
   }
 }
