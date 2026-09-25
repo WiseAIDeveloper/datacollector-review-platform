@@ -260,15 +260,26 @@
         ["sdk", "SDK"],
         ["device", "Device"],
       ];
-      const requestedSubject = new URLSearchParams(location.search).get(
-        "subject",
-      );
+      const query = new URLSearchParams(location.search);
+      const requestedSubject = query.get("subject");
+      const requestedFilters = {
+        subject: requestedSubject,
+        folder: query.get("batch"),
+        lighting: query.get("lighting"),
+        sdk: query.get("sdk"),
+        device: query.get("device"),
+      };
       const defaults = {
         subject: requestedSubject || "koh-jia-yi",
-        folder: requestedSubject ? "" : "psastationery_colour_print_cutout",
-        lighting: requestedSubject ? "" : "office-yellow",
-        sdk: requestedSubject ? "" : "web",
-        device: requestedSubject ? "" : "huawei-nova-7i",
+        folder:
+          requestedFilters.folder ||
+          (requestedSubject ? "" : "psastationery_colour_print_cutout"),
+        lighting:
+          requestedFilters.lighting ||
+          (requestedSubject ? "" : "office-yellow"),
+        sdk: requestedFilters.sdk || (requestedSubject ? "" : "web"),
+        device:
+          requestedFilters.device || (requestedSubject ? "" : "huawei-nova-7i"),
       };
       const filters = {};
       const el = /* Create a text-only DOM element. */ (tag, text) => {
@@ -281,6 +292,18 @@
           r,
           k,
         ) => r[k] ?? r.metadata[k] ?? "";
+      /* Compare collector lighting aliases to the configured review choice. */
+      function matchesFilter(r, field) {
+        const chosen = filters[field].value;
+        if (!chosen) return true;
+        const actual = val(r, field);
+        const normalized = (lighting) =>
+          ({ white: "office-white", yellow: "office-yellow" })[lighting] ||
+          lighting;
+        return field === "lighting"
+          ? normalized(actual) === normalized(chosen)
+          : actual === chosen;
+      }
       const url = /* Build an encoded URL for a capture resource. */ (
         type,
         r,
@@ -370,7 +393,7 @@
             fields.every(
               /* Check whether all items satisfy the required condition. */ ([
                 k,
-              ]) => !filters[k].value || val(r, k) === filters[k].value,
+              ]) => matchesFilter(r, k),
             ),
         );
         document.getElementById("status").textContent =
@@ -573,9 +596,7 @@
             s.append(all);
             for (const v of [
               ...new Set([
-                ...(k === "subject" && requestedSubject
-                  ? [requestedSubject]
-                  : []),
+                ...(requestedFilters[k] ? [requestedFilters[k]] : []),
                 ...(k === "folder"
                   ? batchDefs.map(
                       /* Include configured folders before their first capture. */

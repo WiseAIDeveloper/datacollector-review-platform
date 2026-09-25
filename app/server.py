@@ -239,7 +239,35 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(
                     b"Genuine gallery is not configured", "text/plain", 404
                 )
-            return self.send_json(self.app.genuine_gallery.cards(self.records()))
+            requirements = (
+                self.app.projects.get(self.project_id())["matrix"]
+                if self.project_id()
+                else matrix(self.app.settings.root)
+            )
+            selected = {
+                field: query.get(parameter, [""])[0]
+                for field, parameter in (
+                    ("folder", "batch"),
+                    ("lighting", "lighting"),
+                    ("sdk", "sdk"),
+                    ("device", "device"),
+                )
+            }
+            requirement = next(
+                (
+                    row
+                    for row in requirements
+                    if all(row.get(field) == value for field, value in selected.items())
+                ),
+                None,
+            )
+            if requirement is None:
+                return self.send(
+                    b"Select a configured batch and phone/lighting", "text/plain", 400
+                )
+            return self.send_json(
+                self.app.genuine_gallery.cards(self.records(), requirement)
+            )
         if path == "/api/genuine-image":
             if not self.app.genuine_gallery:
                 return self.send(

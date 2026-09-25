@@ -12,8 +12,8 @@
   <body class="terminal genuine-gallery">
     <nav class="app-sidebar" aria-label="Main navigation">
       <strong>Capture workspace</strong>
-      <a href="/genuine.html" aria-current="page">Genuine images</a>
-      <a href="/coverage.html">Dashboard</a>
+      <a href="/genuine.html" aria-current="page">Dashboard</a>
+      <a href="/coverage.html">Coverage detail</a>
       <a href="/">Capture review</a>
       <a href="/quality.html">Quality review</a>
       <a href="/ingestion.html">Ingestion logs</a>
@@ -26,17 +26,45 @@
           <button id="refresh">Refresh now</button>
         </div>
       </div>
-      <p>Choose a numbered genuine image to review its collected samples.</p>
-      <label class="number-search" for="number-search"
-        >Find a number
-        <input
-          id="number-search"
-          type="search"
-          inputmode="numeric"
-          autocomplete="off"
-          placeholder="1–50"
-        />
-      </label>
+      <div class="gallery-filters">
+        <label for="batch">Batch<select id="batch"></select></label>
+        <label for="combination"
+          >Phone + lighting<select id="combination"></select
+        ></label>
+        <label for="number-search"
+          >Find a number
+          <input
+            id="number-search"
+            type="search"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="1–50"
+          />
+        </label>
+        <div class="density-control">
+          <label for="density"
+            >Images per row:
+            <output id="density-value" for="density">4</output></label
+          >
+          <input
+            id="density"
+            type="range"
+            min="0"
+            max="2"
+            step="1"
+            value="1"
+            list="density-steps"
+          />
+          <datalist id="density-steps">
+            <option value="0" label="2"></option>
+            <option value="1" label="4"></option>
+            <option value="2" label="8"></option>
+          </datalist>
+          <div class="density-labels" aria-hidden="true">
+            <span>2</span><span>4</span><span>8</span>
+          </div>
+        </div>
+      </div>
       <p id="gallery-status" role="status" aria-live="polite">
         Loading images… Open this page through the running preview, not as an
         HTML file.

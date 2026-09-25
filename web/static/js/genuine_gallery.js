@@ -3,15 +3,43 @@ const gallery = document.getElementById("genuine-cards");
 const galleryStatus = document.getElementById("gallery-status");
 const galleryError = document.getElementById("gallery-error");
 const search = document.getElementById("number-search");
+const batch = document.getElementById("batch");
+const combination = document.getElementById("combination");
+const density = document.getElementById("density");
 const project = new URLSearchParams(location.search).get("project");
 const cards = new Map();
-let loading = false;
+const columns = [2, 4, 8];
+let matrixRows = [];
+let currentRequest = null;
 
-function workspaceUrl(path, number) {
-  /* Keep the selected project and assigned number in review navigation. */
+function apiUrl(path, parameters = {}) {
+  /* Scope gallery requests to the project shown in this browser tab. */
   const url = new URL(path, location.href);
   if (project) url.searchParams.set("project", project);
+  for (const [key, value] of Object.entries(parameters))
+    url.searchParams.set(key, value);
+  return url.pathname + url.search;
+}
+
+function selectedRequirement() {
+  /* Return the configured combination currently selected for this batch. */
+  const row = matrixRows[Number(combination.value)];
+  return row?.folder === batch.value ? row : null;
+}
+
+function workspaceUrl(path, number) {
+  /* Carry the current batch, capture combination, and number into review pages. */
+  const url = new URL(path, location.href);
+  const requirement = selectedRequirement();
+  if (project) url.searchParams.set("project", project);
   url.searchParams.set("subject", number);
+  if (requirement) {
+    url.searchParams.set("batch", requirement.folder);
+    if (path === "/") {
+      for (const field of ["lighting", "sdk", "device"])
+        url.searchParams.set(field, requirement[field]);
+    }
+  }
   return url.pathname + url.search;
 }
 
@@ -42,6 +70,7 @@ function createCard(number) {
   ]) {
     const link = document.createElement("a");
     link.href = workspaceUrl(path, number);
+    link.dataset.path = path;
     link.textContent = label;
     actions.append(link);
   }
@@ -52,6 +81,12 @@ function createCard(number) {
   return article;
 }
 
+function updateCardLinks(card, number) {
+  /* Keep normal review links aligned with the active batch and combination. */
+  for (const link of card.querySelectorAll(".card-actions a"))
+    link.href = workspaceUrl(link.dataset.path, number);
+}
+
 function filterCards() {
   /* Narrow the gallery by assigned number without reloading images. */
   const term = search.value.trim();
@@ -59,12 +94,94 @@ function filterCards() {
     card.hidden = !!term && !number.includes(term);
 }
 
-async function refreshGallery() {
-  /* Poll for new captures while retaining existing image elements and focus. */
-  if (loading || document.hidden) return;
-  loading = true;
+function renderCombinations(previous) {
+  /* Offer only phone and lighting combinations configured for the batch. */
+  combination.replaceChildren();
+  for (const [index, row] of matrixRows.entries()) {
+    if (row.folder !== batch.value) continue;
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent =
+      row.device + " · " + row.lighting + " · " + row.sdk.toUpperCase();
+    combination.append(option);
+    if (
+      previous &&
+      ["folder", "lighting", "sdk", "device"].every(
+        (field) => row[field] === previous[field],
+      )
+    )
+      combination.value = String(index);
+  }
+  combination.disabled = !combination.options.length;
+}
+
+async function loadOptions() {
+  /* Load valid batch and phone/lighting choices from the selected project. */
   try {
-    const response = await fetch("/api/genuine");
+    const previous = selectedRequirement();
+    const [batchResponse, matrixResponse] = await Promise.all([
+      fetch(apiUrl("/api/batches")),
+      fetch(apiUrl("/api/matrix")),
+    ]);
+    if (!batchResponse.ok || !matrixResponse.ok)
+      throw new Error("Could not load batch choices");
+    const [definitions, requirements] = await Promise.all([
+      batchResponse.json(),
+      matrixResponse.json(),
+    ]);
+    matrixRows = requirements;
+    const previousBatch = batch.value;
+    const folders = [
+      ...new Set(
+        definitions
+          .map((definition) => definition.batch_name)
+          .filter((name) => matrixRows.some((row) => row.folder === name)),
+      ),
+    ];
+    batch.replaceChildren();
+    for (const name of folders) batch.add(new Option(name, name));
+    batch.value = folders.includes(previousBatch)
+      ? previousBatch
+      : folders[0] || "";
+    renderCombinations(previous);
+    if (!selectedRequirement())
+      throw new Error("This project has no phone + lighting choices");
+    galleryError.textContent = "";
+    refreshGallery(true);
+  } catch (error) {
+    galleryError.textContent = error.message;
+    galleryStatus.textContent = "No collection status available.";
+    gallery.replaceChildren();
+    cards.clear();
+  }
+}
+
+function setDensity() {
+  /* Keep the selected number of image columns exact, with sideways scroll if needed. */
+  const count = columns[Number(density.value)] || 4;
+  gallery.style.setProperty("--gallery-columns", count);
+  document.getElementById("density-value").value = String(count);
+  density.setAttribute("aria-valuetext", count + " images per row");
+}
+
+async function refreshGallery(force = false) {
+  /* Poll only the selected combination, retaining image elements and focus. */
+  if (document.hidden || (currentRequest && !force)) return;
+  const requirement = selectedRequirement();
+  if (!requirement) return;
+  currentRequest?.abort();
+  const request = new AbortController();
+  currentRequest = request;
+  try {
+    const query = {
+      batch: requirement.folder,
+      lighting: requirement.lighting,
+      sdk: requirement.sdk,
+      device: requirement.device,
+    };
+    const response = await fetch(apiUrl("/api/genuine", query), {
+      signal: request.signal,
+    });
     if (!response.ok) throw new Error("Could not load the genuine gallery");
     const items = await response.json();
     const seen = new Set();
@@ -73,6 +190,7 @@ async function refreshGallery() {
       const number = String(item.number);
       seen.add(number);
       const card = cards.get(number) || createCard(number);
+      updateCardLinks(card, number);
       card.classList.toggle("collected", item.count > 0);
       card.statusElement.textContent =
         item.count > 0
@@ -95,19 +213,26 @@ async function refreshGallery() {
       collected +
       " of " +
       items.length +
-      " genuine images have samples · updates every 5 seconds";
+      " genuine images have samples for this choice · updates every 5 seconds";
     galleryError.textContent = "";
   } catch (error) {
-    galleryError.textContent = error.message;
+    if (error.name !== "AbortError") galleryError.textContent = error.message;
   } finally {
-    loading = false;
+    if (currentRequest === request) currentRequest = null;
   }
 }
 
 search.addEventListener("input", filterCards);
-document.getElementById("refresh").addEventListener("click", refreshGallery);
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) refreshGallery();
+batch.addEventListener("change", () => {
+  renderCombinations();
+  refreshGallery(true);
 });
-refreshGallery();
+combination.addEventListener("change", () => refreshGallery(true));
+density.addEventListener("input", setDensity);
+document.getElementById("refresh").addEventListener("click", loadOptions);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refreshGallery(true);
+});
+setDensity();
+loadOptions();
 setInterval(refreshGallery, 5000);

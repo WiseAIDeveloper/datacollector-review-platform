@@ -70,11 +70,15 @@
       ) {
         const gallery = document.createElement("a");
         gallery.href = "/genuine.html";
-        gallery.textContent = "Genuine images";
+        gallery.textContent = "Dashboard";
         nav.insertBefore(
           gallery,
           nav.querySelector('a[href="/coverage.html"]'),
         );
+      }
+      if (mode.genuine_gallery) {
+        const coverage = nav.querySelector('a[href="/coverage.html"]');
+        if (coverage) coverage.textContent = "Coverage detail";
       }
       const pin = document.getElementById("pin");
       if (pin && mode.write_pin_required === false) {

@@ -42,12 +42,23 @@ class GenuineGallery:
                 raise ValueError("Genuine reference image is missing or unsupported")
             self.images[number] = (path, kind)
 
-    def cards(self, captures):
-        """Count captures by their entered subject without exposing source metadata."""
+    def cards(self, captures, requirement):
+        """Count each number only within the chosen batch and capture combination."""
         counts = {number: 0 for number in self.images}
         for row in captures:
             number = row["metadata"].get("subject", "")
-            if number in counts:
+            lighting = row["metadata"].get("lighting", "")
+            normalized_lighting = {
+                "white": "office-white",
+                "yellow": "office-yellow",
+            }.get(lighting, lighting)
+            if (
+                number in counts
+                and row["folder"] == requirement["folder"]
+                and normalized_lighting == requirement["lighting"]
+                and row["sdk"] == requirement["sdk"]
+                and row["device"] == requirement["device"]
+            ):
                 counts[number] += 1
         return [
             {"number": number, "count": counts[number]}

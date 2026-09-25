@@ -1,11 +1,15 @@
 # Numbered genuine image gallery
 
-This optional mode shows a card for each numbered genuine reference image. A card
-turns green as soon as at least one collected capture has the same number in its
-`subject` field. The card also shows the current sample count. The page refreshes
-every five seconds while visible. Search narrows the cards by number; links open
-the existing Capture review, Coverage, and Quality review pages for that number.
-The existing pages and APIs remain available.
+This optional mode shows the same numbered genuine reference images for every
+batch. Choose a batch, then one phone + lighting combination configured in that
+batch's matrix. A card turns green as soon as at least one collected capture in
+that batch and combination has the same number in its `subject` field. The card
+also shows the matching sample count. The page refreshes every five seconds while
+visible. Search narrows the cards by number; the slider shows 2, 4, or 8 images
+per row. On narrow screens, wider settings scroll sideways. Card links open the
+existing Capture review, Coverage, and Quality review pages for that number and
+batch; Capture review also uses the selected phone and lighting filters. The
+existing pages and APIs remain available.
 
 ## Reference manifest
 

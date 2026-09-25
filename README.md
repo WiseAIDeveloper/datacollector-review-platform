@@ -20,7 +20,8 @@ For the separate service that automatically discovers project directories, see
 
 For numbered production genuine images, the optional
 [genuine image gallery](docs/genuine-gallery.md) shows each reference as a card and
-marks it green when a matching capture arrives. It keeps the existing review pages.
+marks it green when a matching capture arrives for the chosen batch and phone +
+lighting combination. It keeps the existing review pages.
 
 Open **Projects** in the sidebar to enter a project name and upload its test-plan
 and batches CSVs (UTF-8, up to 400 KB each). Creating a project requires the existing

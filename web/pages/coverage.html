@@ -358,7 +358,7 @@
         projectPlans = new Set(),
         decisions = {},
         qualityReviews = {},
-        selectedBatch = "";
+        selectedBatch = new URLSearchParams(location.search).get("batch") || "";
       const requestedSubject = new URLSearchParams(location.search).get(
         "subject",
       );

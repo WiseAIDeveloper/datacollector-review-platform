@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from app.genuine_gallery import GenuineGallery
-from tests.support import IMAGE, running_server, write_csv
+from tests.support import IMAGE, INDEXES, running_server, write_csv
 
 
 class GenuineGalleryTests(unittest.TestCase):
@@ -15,15 +15,47 @@ class GenuineGalleryTests(unittest.TestCase):
         """Show collection counts without publishing source paths or session IDs."""
         with running_server(genuine_gallery=True) as client:
             self.assertTrue(client.request("/api/project-mode")[1]["genuine_gallery"])
-            status, cards, _ = client.request("/api/genuine")
+            status, cards, _ = client.request(
+                "/api/genuine?batch=genuine&lighting=dark&sdk=web&device=iphone-13"
+            )
             self.assertEqual(status, 200)
             self.assertEqual(
                 cards,
                 [
                     {"number": "1", "count": 1},
-                    {"number": "2", "count": 4},
+                    {"number": "2", "count": 3},
                     {"number": "3", "count": 0},
                 ],
+            )
+            self.assertEqual(
+                client.request(
+                    "/api/genuine?batch=genuine&lighting=office-white&sdk=web&device=iphone-13"
+                )[1][1]["count"],
+                1,
+            )
+            alias_rows = [dict(row) for row in client.rows]
+            alias_rows[1]["lighting"] = "white"
+            write_csv(client.root / "genuine" / INDEXES[0], alias_rows)
+            self.assertEqual(
+                client.request(
+                    "/api/genuine?batch=genuine&lighting=office-white&sdk=web&device=iphone-13"
+                )[1][1]["count"],
+                1,
+            )
+            self.assertTrue(
+                all(
+                    card["count"] == 0
+                    for card in client.request(
+                        "/api/genuine?batch=later&lighting=dark&sdk=web&device=iphone-13"
+                    )[1]
+                )
+            )
+            self.assertEqual(client.request("/api/genuine")[0], 400)
+            self.assertEqual(
+                client.request(
+                    "/api/genuine?batch=genuine&lighting=dark&sdk=app&device=iphone-13"
+                )[0],
+                400,
             )
             self.assertNotIn("absolute_ori_path", str(cards))
             self.assertEqual(client.request("/api/genuine-image?number=1")[1], IMAGE)

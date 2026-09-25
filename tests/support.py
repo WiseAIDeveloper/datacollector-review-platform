@@ -225,7 +225,19 @@ def running_server(
             # All reference images and captures stay inside this disposable fixture.
             for index, row in enumerate(rows):
                 row["subject"] = "1" if index == 0 else "2"
+            rows[1]["lighting"] = "office-white"
             write_csv(root / "genuine" / INDEXES[0], rows)
+            matrix_path = root / f"{MATRIX_NAME}.csv"
+            with matrix_path.open(newline="", encoding="utf-8") as stream:
+                requirements = list(csv.DictReader(stream))
+            requirements.append(dict(requirements[0], lighting="office-white"))
+            requirements.append(dict(requirements[0], folder="later"))
+            write_csv(matrix_path, requirements)
+            batches_path = root / f"{MATRIX_NAME}_batches.csv"
+            with batches_path.open(newline="", encoding="utf-8") as stream:
+                definitions = list(csv.DictReader(stream))
+            definitions.append(dict(definitions[0], batch_name="later"))
+            write_csv(batches_path, definitions)
             references = []
             for number, row in enumerate(rows[:3], 1):
                 references.append(
