@@ -19,6 +19,7 @@ class Settings:
     host: str = "0.0.0.0"
     port: int = 8080
     projects_root: Path = None
+    genuine_reference_csv: Path = None
     write_pin_required: bool = True
     static_root: ClassVar[Path] = Path(__file__).resolve().parents[1] / "web"
 
@@ -47,6 +48,11 @@ class Settings:
             projects_root=(
                 Path(environment["PROJECTS_ROOT"]).resolve()
                 if environment.get("PROJECTS_ROOT")
+                else None
+            ),
+            genuine_reference_csv=(
+                Path(environment["GENUINE_REFERENCE_CSV"]).resolve()
+                if environment.get("GENUINE_REFERENCE_CSV")
                 else None
             ),
         )

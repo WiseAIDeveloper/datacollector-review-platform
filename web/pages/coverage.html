@@ -359,6 +359,10 @@
         decisions = {},
         qualityReviews = {},
         selectedBatch = "";
+      const requestedSubject = new URLSearchParams(location.search).get(
+        "subject",
+      );
+      let firstSubjectLoad = true;
       try {
         decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
       } catch (e) {}
@@ -1422,10 +1426,12 @@
               .filter(Boolean),
           );
           qualityReviews = await d.json();
-          const previous = $("subject").value,
+          const previous = firstSubjectLoad
+              ? requestedSubject || $("subject").value
+              : $("subject").value,
             subjects = [
-              ...new Set(
-                rows
+              ...new Set([
+                ...rows
                   .filter(
                     /* Keep items that match the current selection criteria. */ (
                       r,
@@ -1437,7 +1443,8 @@
                     ) => r.metadata.subject,
                   )
                   .filter(Boolean),
-              ),
+                ...(requestedSubject ? [requestedSubject] : []),
+              ]),
             ].sort();
           $("subject").replaceChildren(
             ...subjects.map(
@@ -1453,6 +1460,7 @@
           $("subject").value = subjects.includes(previous)
             ? previous
             : subjects[0] || "";
+          firstSubjectLoad = false;
           render();
         } catch (e) {
           $("summary").replaceChildren(stat("Load error", "Please refresh"));

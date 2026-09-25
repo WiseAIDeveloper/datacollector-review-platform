@@ -214,11 +214,29 @@ class FixtureServer(Client):
 
 
 @contextmanager
-def running_server(source=SOURCE, folder_mode=False, write_pin_required=True):
+def running_server(
+    source=SOURCE, folder_mode=False, write_pin_required=True, genuine_gallery=False
+):
     """Run either the original or current app against disposable data only."""
     with tempfile.TemporaryDirectory(prefix="review-test-") as temporary:
         root = Path(temporary)
         rows = dataset(root)
+        if genuine_gallery:
+            # All reference images and captures stay inside this disposable fixture.
+            for index, row in enumerate(rows):
+                row["subject"] = "1" if index == 0 else "2"
+            write_csv(root / "genuine" / INDEXES[0], rows)
+            references = []
+            for number, row in enumerate(rows[:3], 1):
+                references.append(
+                    {
+                        "assigned_number": str(number),
+                        "absolute_ori_path": str(
+                            (root / "genuine" / row["ori_path"]).resolve()
+                        ),
+                    }
+                )
+            write_csv(root / "references.csv", references)
         token = secrets.token_hex(24)
         pin = root / "pin"
         pin.write_text(token)
@@ -257,6 +275,9 @@ def running_server(source=SOURCE, folder_mode=False, write_pin_required=True):
             str(root / "project-folders") if folder_mode else ""
         )
         environment["WRITE_PIN_REQUIRED"] = "true" if write_pin_required else "false"
+        environment["GENUINE_REFERENCE_CSV"] = (
+            str(root / "references.csv") if genuine_gallery else ""
+        )
         client = FixtureServer(
             f"http://127.0.0.1:{port}",
             token,

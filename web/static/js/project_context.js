@@ -64,6 +64,18 @@
     try {
       const mode = await modePromise;
       folderMode = mode.folders;
+      if (
+        mode.genuine_gallery &&
+        !nav.querySelector('a[href="/genuine.html"]')
+      ) {
+        const gallery = document.createElement("a");
+        gallery.href = "/genuine.html";
+        gallery.textContent = "Genuine images";
+        nav.insertBefore(
+          gallery,
+          nav.querySelector('a[href="/coverage.html"]'),
+        );
+      }
       const pin = document.getElementById("pin");
       if (pin && mode.write_pin_required === false) {
         pin.required = false;

@@ -29,7 +29,11 @@
 !web/static/css/frozen_panes.css
 !app/projects.py
 !app/folder_projects.py
+!app/genuine_gallery.py
 !web/pages/projects.html
+!web/pages/genuine.html
 !web/static/js/projects.js
 !web/static/js/project_context.js
+!web/static/js/genuine_gallery.js
 !web/static/css/projects.css
+!web/static/css/genuine_gallery.css

@@ -260,12 +260,15 @@
         ["sdk", "SDK"],
         ["device", "Device"],
       ];
+      const requestedSubject = new URLSearchParams(location.search).get(
+        "subject",
+      );
       const defaults = {
-        subject: "koh-jia-yi",
-        folder: "psastationery_colour_print_cutout",
-        lighting: "office-yellow",
-        sdk: "web",
-        device: "huawei-nova-7i",
+        subject: requestedSubject || "koh-jia-yi",
+        folder: requestedSubject ? "" : "psastationery_colour_print_cutout",
+        lighting: requestedSubject ? "" : "office-yellow",
+        sdk: requestedSubject ? "" : "web",
+        device: requestedSubject ? "" : "huawei-nova-7i",
       };
       const filters = {};
       const el = /* Create a text-only DOM element. */ (tag, text) => {
@@ -570,6 +573,9 @@
             s.append(all);
             for (const v of [
               ...new Set([
+                ...(k === "subject" && requestedSubject
+                  ? [requestedSubject]
+                  : []),
                 ...(k === "folder"
                   ? batchDefs.map(
                       /* Include configured folders before their first capture. */

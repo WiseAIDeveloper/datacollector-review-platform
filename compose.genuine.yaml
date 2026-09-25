@@ -1,0 +1,9 @@
+# Add to compose.projects.yaml when running the numbered genuine gallery.
+services:
+  viewer:
+    environment:
+      GENUINE_REFERENCE_CSV: /genuine-references/manifest.csv
+    volumes:
+      - ${GENUINE_REFERENCES_DIR:?Set GENUINE_REFERENCES_DIR}:/genuine-references:ro
+      # Image paths in the CSV are absolute, so preserve that path in the container.
+      - ${GENUINE_IMAGE_ROOT:?Set GENUINE_IMAGE_ROOT}:${GENUINE_IMAGE_ROOT:?Set GENUINE_IMAGE_ROOT}:ro

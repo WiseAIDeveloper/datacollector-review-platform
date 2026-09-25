@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Genuine image collection</title>
+    <link rel="stylesheet" href="/terminal.css" />
+    <link rel="stylesheet" href="/genuine_gallery.css" />
+    <script src="/project_context.js"></script>
+    <script src="/genuine_gallery.js" defer></script>
+  </head>
+  <body class="terminal genuine-gallery">
+    <nav class="app-sidebar" aria-label="Main navigation">
+      <strong>Capture workspace</strong>
+      <a href="/genuine.html" aria-current="page">Genuine images</a>
+      <a href="/coverage.html">Dashboard</a>
+      <a href="/">Capture review</a>
+      <a href="/quality.html">Quality review</a>
+      <a href="/ingestion.html">Ingestion logs</a>
+      <a href="/search.html">Image search</a>
+    </nav>
+    <header class="frozen-pane workspace-header">
+      <div class="header-titlebar">
+        <h1>Genuine image collection</h1>
+        <div class="header-actions">
+          <button id="refresh">Refresh now</button>
+        </div>
+      </div>
+      <p>Choose a numbered genuine image to review its collected samples.</p>
+      <label class="number-search" for="number-search"
+        >Find a number
+        <input
+          id="number-search"
+          type="search"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="1–50"
+        />
+      </label>
+      <p id="gallery-status" role="status" aria-live="polite">
+        Loading images…
+      </p>
+      <p id="gallery-error" role="alert"></p>
+    </header>
+    <main><div id="genuine-cards" class="genuine-cards"></div></main>
+    <link rel="stylesheet" href="/frozen_panes.css" />
+  </body>
+</html>

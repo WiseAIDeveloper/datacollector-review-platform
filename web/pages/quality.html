@@ -412,15 +412,16 @@
           choose(
             "identity",
             [
-              ...new Set(
-                rows
+              ...new Set([
+                ...rows
                   .map(
                     /* Build the corresponding display or request value for each item. */ (
                       r,
                     ) => r.metadata.subject,
                   )
                   .filter(Boolean),
-              ),
+                ...(query.get("subject") ? [query.get("subject")] : []),
+              ]),
             ].sort(),
             first ? query.get("subject") : $("identity").value,
           );

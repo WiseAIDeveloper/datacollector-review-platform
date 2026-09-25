@@ -3,6 +3,18 @@ const list = document.getElementById("project-list");
 const listStatus = document.getElementById("list-status");
 let lastListing = null;
 const createStatus = document.getElementById("create-status");
+let projectHome = "/coverage.html";
+
+fetch("/api/project-mode")
+  .then((response) => response.json())
+  .then((mode) => {
+    /* Open the numbered gallery first when genuine mode is configured. */
+    if (mode.genuine_gallery) {
+      projectHome = "/genuine.html";
+      loadProjects();
+    }
+  })
+  .catch(() => {});
 
 async function loadProjects() {
   /* Render project names as text and offer a stable URL for each selection. */
@@ -10,7 +22,7 @@ async function loadProjects() {
     const response = await fetch("/api/projects");
     if (!response.ok) throw new Error(await response.text());
     const projects = await response.json();
-    const snapshot = JSON.stringify(projects);
+    const snapshot = JSON.stringify({ projects, projectHome });
     if (snapshot === lastListing) {
       listStatus.textContent = projects.length
         ? `${projects.length} projects available`
@@ -29,7 +41,7 @@ async function loadProjects() {
       const plan = document.createElement("p");
       plan.textContent = project.error || project.matrix_name;
       const open = document.createElement("a");
-      open.href = "/coverage.html?project=" + encodeURIComponent(project.id);
+      open.href = projectHome + "?project=" + encodeURIComponent(project.id);
       open.textContent = "Open project";
       if (new URLSearchParams(location.search).get("project") === project.id)
         open.textContent = "Open selected project";
@@ -84,7 +96,7 @@ document
         document.createTextNode("Project created. "),
       );
       const open = document.createElement("a");
-      open.href = "/coverage.html?project=" + encodeURIComponent(project.id);
+      open.href = projectHome + "?project=" + encodeURIComponent(project.id);
       open.textContent = "Open " + project.name;
       createStatus.append(open);
       await loadProjects();

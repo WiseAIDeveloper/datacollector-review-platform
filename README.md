@@ -18,6 +18,10 @@ matching CSV rows.
 For the separate service that automatically discovers project directories, see
 [folder-based projects](docs/folder-projects.md).
 
+For numbered production genuine images, the optional
+[genuine image gallery](docs/genuine-gallery.md) shows each reference as a card and
+marks it green when a matching capture arrives. It keeps the existing review pages.
+
 Open **Projects** in the sidebar to enter a project name and upload its test-plan
 and batches CSVs (UTF-8, up to 400 KB each). Creating a project requires the existing
 write PIN. Both files are validated together; invalid uploads create nothing.

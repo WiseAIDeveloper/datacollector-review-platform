@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add an optional numbered genuine-image gallery that turns cards green when a matching capture arrives, with links to the existing review and coverage workflows. Configure a private reference CSV for this mode; collectors must record the assigned number as the capture subject.
+
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 
 ### Fixed

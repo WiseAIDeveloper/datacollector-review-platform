@@ -17,6 +17,7 @@ from .captures.quality import read_reviews, save_review
 from .settings import Settings
 from .projects import Projects
 from .folder_projects import ProjectApplications
+from .genuine_gallery import GenuineGallery
 
 LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_BYTES = 1024 * 1024
@@ -34,6 +35,9 @@ STATIC_FILES = {
     "/image_zoom.js": "static/js/image_zoom.js",
     "/terminal.css": "static/css/terminal.css",
     "/frozen_panes.css": "static/css/frozen_panes.css",
+    "/genuine.html": "pages/genuine.html",
+    "/genuine_gallery.js": "static/js/genuine_gallery.js",
+    "/genuine_gallery.css": "static/css/genuine_gallery.css",
 }
 WRITE_ROUTES = {
     "/api/projects",
@@ -56,6 +60,11 @@ class Application:
         )
         self.projects = Projects(settings.database.parent / "projects", settings.root)
         self.quality_path = settings.log_path.with_name("quality_reviews.json")
+        self.genuine_gallery = (
+            GenuineGallery(settings.genuine_reference_csv)
+            if settings.genuine_reference_csv
+            else None
+        )
 
     def create_project(self, request):
         """Serialize project creation to prevent duplicate names in concurrent requests."""
@@ -220,8 +229,27 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "folders": bool(self.server.application.settings.projects_root),
                     "write_pin_required": self.server.application.settings.write_pin_required,
+                    "genuine_gallery": bool(
+                        self.server.application.settings.genuine_reference_csv
+                    ),
                 }
             )
+        if path == "/api/genuine":
+            if not self.app.genuine_gallery:
+                return self.send(
+                    b"Genuine gallery is not configured", "text/plain", 404
+                )
+            return self.send_json(self.app.genuine_gallery.cards(self.records()))
+        if path == "/api/genuine-image":
+            if not self.app.genuine_gallery:
+                return self.send(
+                    b"Genuine gallery is not configured", "text/plain", 404
+                )
+            image = self.app.genuine_gallery.image(query.get("number", [""])[0])
+            if image is None:
+                return self.send(b"Genuine image not found", "text/plain", 404)
+            path, kind = image
+            return self.send(path.read_bytes(), kind)
         if path == "/api/projects":
             return self.send_json(self.app.projects.listing())
         if path == "/api/project":
