@@ -53,6 +53,9 @@
   background: #244734;
 }
 @media (max-width: 540px) {
+  .genuine-gallery .app-sidebar {
+    box-sizing: border-box;
+  }
   .genuine-gallery .genuine-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
