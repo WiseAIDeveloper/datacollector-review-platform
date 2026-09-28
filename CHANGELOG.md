@@ -10,6 +10,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add an optional shared naming file (`NAMING_FILE`) with one block each for lighting, identity, and device: the column it is read from (App devices use `capture_device`, falling back to the auto-detected model), the accepted values, and device spellings keyed by column. Devices are shown by standard name; missing or unaccepted values are highlighted and edits must use accepted values. The project compose file mounts the shared `naming/` folder read-only. See `docs/naming.md`.
 
+- Add `scripts/normalize_names.py` to convert old lighting values and device spellings in capture indexes, annotations, and project plans to standard names, with a dry run and per-file backups.
+
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 
 ### Fixed

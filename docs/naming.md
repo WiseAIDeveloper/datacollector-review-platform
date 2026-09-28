@@ -86,3 +86,28 @@ Values are compared exactly after trimming spaces.
   last valid version and shows the error on the ingestion page.
 - `python scripts/audit_project_devices.py ... --naming <file>` lists every
   unaccepted value with its capture count.
+
+## Converting existing data
+
+`scripts/normalize_names.py` rewrites old lighting values (given as
+`--lighting old=new`) and every listed device spelling to standard names in
+the capture index CSVs, collection annotation JSON, and project plan CSVs. It
+is a dry run unless `--apply` is given with a new `--backup` directory, which
+receives a copy of every file before it is replaced. Only the mapped cells
+change; other rows keep their bytes and JSON keeps its formatting. Test and
+webcam folders are skipped. Collector files are owned by root, so run it in a
+container:
+
+```sh
+docker run --rm -v "$PWD":/src:ro -v /mnt5/auto-ekyc/idrecapture:/data \
+  -v /mnt5/auto-ekyc/datacollection_review/idrecapture/projects:/projects \
+  -v /mnt5/auto-ekyc/datacollection_review/idrecapture/naming:/naming:ro \
+  -v /mnt5/auto-ekyc/datacollection_review/backups:/backups \
+  python:3.10.10-slim python /src/scripts/normalize_names.py \
+  --dataset /data --projects-root /projects --naming /naming/naming.json \
+  --lighting dark=office_dark --lighting white=office_white ... \
+  --apply --backup /backups/normalize-YYYYMMDD
+```
+
+Change the collector's option values first so no new captures arrive with old
+names.
