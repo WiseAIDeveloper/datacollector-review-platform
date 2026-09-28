@@ -9,6 +9,7 @@ from pathlib import Path
 LOGGER = logging.getLogger(__name__)
 MAX_BYTES = 1_000_000
 SDKS = ("app", "web")
+ALIAS_KINDS = ("model", "label")
 SENSOR_MODEL = "input_sensor.model"
 SOURCE_FIELDS = ("lighting", "identity", "app_device", "web_device")
 SOURCE = re.compile(r"input_sensor\.model|annotation\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]+")
@@ -90,21 +91,23 @@ class Naming:
         if not isinstance(devices, dict) or not devices:
             raise ValueError("Naming file: devices must be a nonempty object")
         self.devices = set(devices)
-        self.aliases = {sdk: {} for sdk in SDKS}
+        self.aliases = {kind: {} for kind in ALIAS_KINDS}
         for device, entry in devices.items():
             names([device], "device names")
-            if not isinstance(entry, dict) or not set(entry) <= set(SDKS):
-                raise ValueError(f"Naming file: devices.{device} may only have app/web")
-            for sdk in SDKS:
-                raw_values = entry.get(sdk, [])
-                for raw in names(raw_values, f"devices.{device}.{sdk}", True):
+            if not isinstance(entry, dict) or not set(entry) <= set(ALIAS_KINDS):
+                raise ValueError(
+                    f"Naming file: devices.{device} may only have model/label"
+                )
+            for kind in ALIAS_KINDS:
+                raw_values = entry.get(kind, [])
+                for raw in names(raw_values, f"devices.{device}.{kind}", True):
                     if raw in self.devices:
                         raise ValueError(f"Naming file: alias {raw} is a device name")
-                    if raw in self.aliases[sdk]:
+                    if raw in self.aliases[kind]:
                         raise ValueError(
-                            f"Naming file: {sdk} alias {raw} maps to two devices"
+                            f"Naming file: {kind} alias {raw} maps to two devices"
                         )
-                    self.aliases[sdk][raw] = device
+                    self.aliases[kind][raw] = device
         configured = document.get("sources")
         if not isinstance(configured, dict) or set(configured) != set(SOURCE_FIELDS):
             raise ValueError(
@@ -127,11 +130,16 @@ class Naming:
                 return column, value
         return self.sources[key], ""
 
-    def device(self, sdk, raw):
-        """Return the standard device for a raw value, or None when it is not listed."""
+    def device(self, column, raw):
+        """Return the standard device for a raw value, or None when it is not listed.
+
+        Sensor model codes use the model aliases; any other field (such as the
+        capture_device label shared by App and Web) uses the label aliases.
+        """
         if raw in self.devices:
             return raw
-        return self.aliases.get(sdk, {}).get(raw)
+        kind = "model" if column == SENSOR_MODEL else "label"
+        return self.aliases[kind].get(raw)
 
     def standardize(self, sdk, row, annotation, sensor_model):
         """Report each field's standard value, raw value, source column, and issue."""
@@ -159,7 +167,7 @@ class Naming:
             return dict(
                 value="", raw="", source=column, issue=f"Missing device ({column})"
             )
-        standard = self.device(sdk, raw)
+        standard = self.device(column, raw)
         if standard is None:
             issue = f"{raw} ({column}) is not mapped to a standard device"
             return dict(value=raw, raw=raw, source=column, issue=issue)

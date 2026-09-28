@@ -53,7 +53,7 @@ class ProjectDeviceTests(unittest.TestCase):
                     "web_device": {"field": "capture_device"},
                 },
                 "lighting": ["office_dark"],
-                "devices": {"galaxy": {"app": ["SM-1"]}},
+                "devices": {"galaxy": {"model": ["SM-1"]}},
             }
         )
         project = {

@@ -31,8 +31,11 @@ add `NAMING_FILE: /projects/naming.json` to the service environment.
   },
   "lighting": ["office_white", "office_yellow", "office_dark", "random_bg"],
   "devices": {
-    "galaxy_z_fold_5": { "app": ["SM-F946U1"] },
-    "huawei_nova_7i": { "app": ["JNY-LX2"] },
+    "galaxy_z_fold_5": {
+      "model": ["SM-F946U1"],
+      "label": ["samsung-galaxy-z-fold-5"]
+    },
+    "huawei_nova_7i": { "model": ["JNY-LX2"] },
     "iphone_13": {}
   },
   "identities": ["ang-kuan-liang", "heng-zen-kit"]
@@ -41,14 +44,17 @@ add `NAMING_FILE: /projects/naming.json` to the service environment.
 
 ## Rules
 
-| Field    | Rule                                                                           |
-| -------- | ------------------------------------------------------------------------------ |
-| Lighting | Must exactly equal one listed name. Lighting is never translated.              |
-| Device   | A standard device name matches itself. `app`/`web` lists map raw values to it. |
-| Identity | Must be listed. An empty list disables the identity check.                     |
+| Field    | Rule                                                                        |
+| -------- | --------------------------------------------------------------------------- |
+| Lighting | Must exactly equal one listed name. Lighting is never translated.           |
+| Device   | A standard name matches itself; `model`/`label` list other spellings of it. |
+| Identity | Must be listed. An empty list disables the identity check.                  |
 
-Values are compared exactly after trimming spaces. A raw device value may appear
-only once per SDK and may not itself be a standard device name.
+Values are compared exactly after trimming spaces. A device value read from
+`input_sensor.model` is looked up in `model` (codes the App SDK auto-detects).
+A value read from any other field, such as the `capture_device` label that App
+and Web captures share, is looked up in `label`. A value may appear only once per
+list and may not itself be a standard device name.
 
 ## Sources
 

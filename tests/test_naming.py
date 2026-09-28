@@ -26,8 +26,8 @@ DOCUMENT = {
     "sources": SOURCES,
     "lighting": ["office_white", "office_yellow", "office_dark", "random_bg"],
     "devices": {
-        "galaxy_z_fold_5": {"app": ["SM-F946U1"]},
-        "iphone_13": {"web": ["iphone-13"]},
+        "galaxy_z_fold_5": {"model": ["SM-F946U1"]},
+        "iphone_13": {"label": ["iphone-13"]},
     },
     "identities": ["fixture", "another"],
 }
@@ -46,9 +46,13 @@ class NamingDocumentTests(unittest.TestCase):
     def test_valid_document_builds_aliases(self):
         """Aliases resolve per SDK and a standard name always matches itself."""
         names = naming.Naming(document())
-        self.assertEqual(names.device("app", "SM-F946U1"), "galaxy_z_fold_5")
-        self.assertEqual(names.device("web", "galaxy_z_fold_5"), "galaxy_z_fold_5")
-        self.assertIsNone(names.device("web", "SM-F946U1"))
+        self.assertEqual(names.device(SENSOR, "SM-F946U1"), "galaxy_z_fold_5")
+        self.assertEqual(
+            names.device("capture_device", "galaxy_z_fold_5"), "galaxy_z_fold_5"
+        )
+        self.assertEqual(names.device("capture_device", "iphone-13"), "iphone_13")
+        self.assertIsNone(names.device("capture_device", "SM-F946U1"))
+        self.assertIsNone(names.device(SENSOR, "iphone-13"))
         self.assertEqual(names.sources, FIELDS)
         self.assertEqual(
             names.source_descriptions["app_device"],
@@ -63,11 +67,11 @@ class NamingDocumentTests(unittest.TestCase):
             "empty lighting": document(lighting=[]),
             "duplicate lighting": document(lighting=["office_white"] * 2),
             "untrimmed identity": document(identities=[" fixture"]),
-            "bad sdk": document(devices={"phone": {"ios": ["x"]}}),
+            "sdk alias keys": document(devices={"phone": {"app": ["x"]}}),
             "alias twice": document(
-                devices={"a": {"app": ["X1"]}, "b": {"app": ["X1"]}}
+                devices={"a": {"model": ["X1"]}, "b": {"model": ["X1"]}}
             ),
-            "alias is a name": document(devices={"a": {"app": ["b"]}, "b": {}}),
+            "alias is a name": document(devices={"a": {"label": ["b"]}, "b": {}}),
             "sources missing": {k: v for k, v in DOCUMENT.items() if k != "sources"},
             "source incomplete": document(
                 sources={k: v for k, v in SOURCES.items() if k != "web_device"}
@@ -97,13 +101,14 @@ class NamingDocumentTests(unittest.TestCase):
             with self.subTest(label), self.assertRaises(ValueError):
                 naming.Naming(value)
 
-    def test_same_alias_may_appear_for_different_sdks(self):
-        """App and web are separate namespaces for raw device values."""
+    def test_models_and_labels_are_separate_namespaces(self):
+        """A sensor model code and a device label may share text but differ."""
         names = naming.Naming(
-            document(devices={"a": {"app": ["X1"]}, "b": {"web": ["X1"]}})
+            document(devices={"a": {"model": ["X1"]}, "b": {"label": ["X1"]}})
         )
         self.assertEqual(
-            (names.device("app", "X1"), names.device("web", "X1")), ("a", "b")
+            (names.device(SENSOR, "X1"), names.device("capture_device", "X1")),
+            ("a", "b"),
         )
 
 
@@ -173,6 +178,12 @@ class StandardizeTests(unittest.TestCase):
         cases = [
             (
                 {"capture_device": "iphone_13"},
+                "SM-F946U1",
+                "iphone_13",
+                "capture_device",
+            ),
+            (
+                {"capture_device": "iphone-13"},
                 "SM-F946U1",
                 "iphone_13",
                 "capture_device",
