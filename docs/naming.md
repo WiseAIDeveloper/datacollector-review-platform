@@ -20,8 +20,9 @@ add `NAMING_FILE: /projects/naming.json` to the service environment.
       "description": "Person holding the card"
     },
     "app_device": {
-      "field": "input_sensor.model",
-      "description": "Phone model auto-detected by the App SDK"
+      "field": "capture_device",
+      "fallback": "input_sensor.model",
+      "description": "Phone label, else the model auto-detected by the App SDK"
     },
     "web_device": {
       "field": "capture_device",
@@ -51,11 +52,11 @@ only once per SDK and may not itself be a standard device name.
 
 ## Sources
 
-`sources` is required. Each of its four keys names exactly one `field` to read,
-with an optional `description`; there is no fallback to another field. A field is
-an index CSV column name, `input_sensor.model` (the native model the App SDK
-reports; `Unknown` counts as missing), or `annotation.<key>` (a key in the
-capture's collection annotation JSON).
+`sources` is required. Each of its four keys names one `field` to read, an
+optional `fallback` field read only when `field` is empty, and an optional
+`description`. A field is an index CSV column name, `input_sensor.model` (the
+native model the App SDK reports; `Unknown` counts as missing), or
+`annotation.<key>` (a key in the capture's collection annotation JSON).
 
 | Key          | Read for                   |
 | ------------ | -------------------------- |
@@ -64,7 +65,7 @@ capture's collection annotation JSON).
 | `app_device` | Device of App SDK captures |
 | `web_device` | Device of Web SDK captures |
 
-An empty field is highlighted as missing. The SDK itself is still detected from
+When both are empty, the value is highlighted as missing. The SDK itself is still detected from
 `input_sensor`. The edit form edits the `lighting`, `subject`, and
 `capture_device` columns.
 

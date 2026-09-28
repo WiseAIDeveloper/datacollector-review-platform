@@ -25,27 +25,39 @@ def names(value, label, allow_empty=False):
     return value
 
 
+def field_name(value, label):
+    """Validate one field name: a CSV column, the sensor model, or an annotation key."""
+    if not isinstance(value, str) or not SOURCE.fullmatch(value):
+        raise ValueError(
+            f"Naming file: {label} must be one CSV column, "
+            f"{SENSOR_MODEL} or annotation.<key>"
+        )
+    return value
+
+
 def source(value, label):
-    """Validate one source: the field it is read from and an optional description."""
+    """Validate one source: its field, an optional fallback field, and a description."""
     if not isinstance(value, dict) or not {"field"} <= set(value) <= {
         "field",
+        "fallback",
         "description",
     }:
         raise ValueError(
-            f"Naming file: sources.{label} needs a field and optional description"
+            f"Naming file: sources.{label} needs a field, "
+            "with optional fallback and description"
         )
-    field = value["field"]
-    if not isinstance(field, str) or not SOURCE.fullmatch(field):
-        raise ValueError(
-            f"Naming file: sources.{label}.field must be one CSV column, "
-            f"{SENSOR_MODEL} or annotation.<key>"
-        )
+    field = field_name(value["field"], f"sources.{label}.field")
+    fallback = value.get("fallback")
+    if fallback is not None:
+        fallback = field_name(fallback, f"sources.{label}.fallback")
+        if fallback == field:
+            raise ValueError(f"Naming file: sources.{label}.fallback repeats field")
     text = value.get("description", "")
     if not isinstance(text, str) or len(text) > 1000:
         raise ValueError(
             f"Naming file: sources.{label}.description must be text up to 1000 characters"
         )
-    return field, text
+    return field, fallback, text
 
 
 def read_source(source, row, annotation, sensor_model):
@@ -101,8 +113,19 @@ class Naming:
                 + " (one field each)"
             )
         parsed = {key: source(configured[key], key) for key in SOURCE_FIELDS}
-        self.sources = {key: field for key, (field, _) in parsed.items()}
-        self.source_descriptions = {key: text for key, (_, text) in parsed.items()}
+        self.sources = {key: field for key, (field, _, _) in parsed.items()}
+        self.fallbacks = {key: fallback for key, (_, fallback, _) in parsed.items()}
+        self.source_descriptions = {key: text for key, (_, _, text) in parsed.items()}
+
+    def read(self, key, row, annotation, sensor_model):
+        """Read a source's field, or its fallback when the field is empty.
+
+        Returns the field actually used (the main field when both are empty).
+        """
+        for column in (self.sources[key], self.fallbacks[key]):
+            if column and (value := read_source(column, row, annotation, sensor_model)):
+                return column, value
+        return self.sources[key], ""
 
     def device(self, sdk, raw):
         """Return the standard device for a raw value, or None when it is not listed."""
@@ -117,8 +140,7 @@ class Naming:
             ("lighting", self.lighting),
             ("identity", self.identities),
         ):
-            column = self.sources[field]
-            raw = read_source(column, row, annotation, sensor_model)
+            column, raw = self.read(field, row, annotation, sensor_model)
             issue = ""
             if not raw:
                 issue = f"Missing {field} ({column})"
@@ -129,11 +151,10 @@ class Naming:
         return result
 
     def standardize_device(self, sdk, row, annotation, sensor_model):
-        """Map the SDK's one device field to a standard device name."""
+        """Map the SDK's device field (or its fallback) to a standard device name."""
         if sdk not in SDKS:
             return dict(value="", raw="", source="", issue="SDK not recognized")
-        column = self.sources[f"{sdk}_device"]
-        raw = read_source(column, row, annotation, sensor_model)
+        column, raw = self.read(f"{sdk}_device", row, annotation, sensor_model)
         if not raw:
             return dict(
                 value="", raw="", source=column, issue=f"Missing device ({column})"

@@ -31,6 +31,7 @@ DOCUMENT = {
     },
     "identities": ["fixture", "another"],
 }
+SENSOR = "input_sensor.model"
 FOLD_SENSOR = "{'manufacturer': 'samsung', 'model': 'SM-F946U1'}"
 
 
@@ -83,6 +84,14 @@ class NamingDocumentTests(unittest.TestCase):
             ),
             "device description": document(devices={"a": {"description": "Phone"}}),
             "file description": document(description="x"),
+            "fallback repeats field": document(
+                sources=dict(
+                    SOURCES, lighting={"field": "lighting", "fallback": "lighting"}
+                )
+            ),
+            "bad fallback": document(
+                sources=dict(SOURCES, lighting={"field": "lighting", "fallback": 3})
+            ),
         }
         for label, value in cases.items():
             with self.subTest(label), self.assertRaises(ValueError):
@@ -148,18 +157,44 @@ class StandardizeTests(unittest.TestCase):
             self.standardize("unknown", {})["device"]["issue"], "SDK not recognized"
         )
 
-    def test_each_field_reads_only_its_one_source(self):
-        """App devices use only the sensor model; the device label is ignored."""
-        unknown = self.standardize(
+    def test_app_device_reads_label_then_detected_model(self):
+        """The App label has priority; an empty label falls back to the sensor model."""
+        names = naming.Naming(
+            document(
+                sources=dict(
+                    SOURCES,
+                    app_device={
+                        "field": "capture_device",
+                        "fallback": "input_sensor.model",
+                    },
+                )
+            )
+        )
+        cases = [
+            (
+                {"capture_device": "iphone_13"},
+                "SM-F946U1",
+                "iphone_13",
+                "capture_device",
+            ),
+            ({"capture_device": ""}, "SM-F946U1", "galaxy_z_fold_5", SENSOR),
+            ({"capture_device": " "}, "Unknown", "", "capture_device"),
+        ]
+        for row, model, value, column in cases:
+            with self.subTest(row=row, model=model):
+                device = names.standardize("app", row, {}, model)["device"]
+                self.assertEqual((device["value"], device["source"]), (value, column))
+        self.assertEqual(
+            names.standardize("app", {}, {}, "")["device"]["issue"],
+            "Missing device (capture_device)",
+        )
+
+    def test_without_fallback_only_the_field_is_read(self):
+        """No fallback means an empty field is missing, even with a sensor model."""
+        device = self.standardize(
             "app", {"capture_device": "galaxy_z_fold_5"}, model="Unknown"
         )["device"]
-        self.assertEqual(unknown["issue"], "Missing device (input_sensor.model)")
-        labelled = self.standardize(
-            "app", {"capture_device": "iphone_13"}, model="SM-F946U1"
-        )["device"]
-        self.assertEqual(
-            (labelled["value"], labelled["issue"]), ("galaxy_z_fold_5", "")
-        )
+        self.assertEqual(device["issue"], "Missing device (input_sensor.model)")
 
     def test_configured_sources(self):
         """Fields can be read from another column or the collection annotation."""
