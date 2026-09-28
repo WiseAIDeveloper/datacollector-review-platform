@@ -329,8 +329,15 @@ def with_current_metadata(snapshot, records):
         event["available"] = row is not None
         if row is not None:
             metadata = row["metadata"]
-            event.update(batch=row["folder"], sdk=row["sdk"], device=row["device"])
-            for name in ("filename", "uuid", "lighting", "subject", "creation_time"):
+            event.update(
+                batch=row["folder"],
+                sdk=row["sdk"],
+                device=row["device"],
+                lighting=row.get("lighting", metadata.get("lighting", "")),
+                subject=row.get("identity", metadata.get("subject", "")),
+                naming=row.get("naming", {}),
+            )
+            for name in ("filename", "uuid", "creation_time"):
                 event[name] = metadata.get(name, "")
             event["test_plan"] = metadata.get("test_plan_name", "")
         events.append(event)

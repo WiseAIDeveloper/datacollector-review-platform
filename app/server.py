@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from .captures.catalog import annotation_path, batches, matrix, records
 from .captures.deletion import delete_capture
 from .captures.editing import Conflict, edit_capture
+from .captures.naming import NamingFile
 from .ingestion import IngestionLog, with_current_metadata
 from .captures.quality import read_reviews, save_review
 from .settings import Settings
@@ -56,6 +57,11 @@ class Application:
         )
         self.projects = Projects(settings.database.parent / "projects", settings.root)
         self.quality_path = settings.log_path.with_name("quality_reviews.json")
+        self.naming = NamingFile(settings.naming_file) if settings.naming_file else None
+
+    def current_naming(self):
+        """Return the current naming document, or None when none is configured."""
+        return self.naming.current() if self.naming else None
 
     def create_project(self, request):
         """Serialize project creation to prevent duplicate names in concurrent requests."""
@@ -64,7 +70,7 @@ class Application:
 
     def records(self):
         """Read the current annotation rows for this application's dataset."""
-        rows = records(self.settings.root)
+        rows = records(self.settings.root, self.current_naming())
         return (
             self.projects.filter_records(self.project_id, rows)
             if hasattr(self, "project_id")
@@ -81,6 +87,7 @@ class Application:
                 request.get("filename", ""),
                 request.get("changes"),
                 request.get("expected"),
+                naming=self.current_naming(),
             )
             changes = {
                 key: {"from": request["expected"].get(key, ""), "to": value}
@@ -300,6 +307,8 @@ class Handler(BaseHTTPRequestHandler):
             result = with_current_metadata(
                 self.app.ingestion.snapshot(limit, before), self.app.records()
             )
+        if self.app.naming and self.app.naming.error:
+            result["errors"] = [*result["errors"], self.app.naming.error]
         self.send_json(result)
 
     def capture_resource(self, route, query):

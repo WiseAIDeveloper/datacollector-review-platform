@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add an optional shared naming file (`NAMING_FILE`) listing the allowed lighting names, standard device names with their App/Web aliases, identities, and which columns each field is read from. Devices are shown by standard name; nonstandard values are reported per capture and edits must use listed names. See `docs/naming.md`.
+
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 
 ### Fixed
