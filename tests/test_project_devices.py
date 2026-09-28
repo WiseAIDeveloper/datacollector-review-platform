@@ -46,14 +46,13 @@ class ProjectDeviceTests(unittest.TestCase):
         """Group capture naming issues and flag plan values outside the naming file."""
         naming = Naming(
             {
-                "sources": {
-                    "lighting": {"field": "lighting"},
-                    "identity": {"field": "subject"},
-                    "app_device": {"field": "input_sensor.model"},
-                    "web_device": {"field": "capture_device"},
+                "lighting": {"column": "lighting", "accepted": ["office_dark"]},
+                "identity": {"column": "subject", "accepted": []},
+                "device": {
+                    "app": {"column": "input_sensor.model"},
+                    "web": {"column": "capture_device"},
+                    "accepted": {"galaxy": {"input_sensor.model": ["SM-1"]}},
                 },
-                "lighting": ["office_dark"],
-                "devices": {"galaxy": {"model": ["SM-1"]}},
             }
         )
         project = {
@@ -62,7 +61,7 @@ class ProjectDeviceTests(unittest.TestCase):
             ],
             "batches": [{"batch_name": "b"}],
         }
-        issue = dict(raw="dark", issue="dark is not a standard lighting name")
+        issue = dict(raw="dark", issue="dark is not an accepted lighting")
         capture = {
             "folder": "b",
             "sdk": "app",

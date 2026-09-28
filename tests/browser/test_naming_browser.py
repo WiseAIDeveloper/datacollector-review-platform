@@ -10,7 +10,7 @@ BASE = os.environ["VIEWER_URL"]
 OK = dict(value="", raw="", source="", issue="")
 NAMING = dict(
     lighting=dict(
-        OK, value="white", raw="white", issue="white is not a standard lighting name"
+        OK, value="white", raw="white", issue="white is not an accepted lighting"
     ),
     identity=dict(OK, value="fixture", raw="fixture"),
     device=dict(
@@ -18,7 +18,7 @@ NAMING = dict(
         value="SM-A556E",
         raw="SM-A556E",
         source="input_sensor.model",
-        issue="SM-A556E (input_sensor.model) is not mapped to a standard device",
+        issue="SM-A556E (input_sensor.model) is not an accepted device",
     ),
 )
 
@@ -70,7 +70,7 @@ with sync_playwright() as p:
     flagged = page.locator("#logs td.naming-issue")
     expect(flagged).to_have_count(2)
     assert flagged.all_text_contents() == ["white", "SM-A556E"]
-    assert "not mapped" in flagged.nth(1).get_attribute("title")
+    assert "not an accepted device" in flagged.nth(1).get_attribute("title")
     assert (
         flagged.first.evaluate("e => getComputedStyle(e).backgroundColor")
         == "rgb(253, 224, 71)"

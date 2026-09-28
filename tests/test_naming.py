@@ -1,5 +1,6 @@
 """Validate the shared naming file and its effect on capture records and edits."""
 
+import copy
 import json
 import os
 import tempfile
@@ -14,97 +15,122 @@ if not (SOURCE / "app/captures/naming.py").is_file():
 from app.captures import catalog, naming
 from app.captures.editing import Conflict, edit_capture
 
-FIELDS = {
-    "lighting": "lighting",
-    "identity": "subject",
-    "app_device": "input_sensor.model",
-    "web_device": "capture_device",
-}
-SOURCES = {key: {"field": field} for key, field in FIELDS.items()}
-SOURCES["app_device"]["description"] = "Native model reported by the App SDK"
-DOCUMENT = {
-    "sources": SOURCES,
-    "lighting": ["office_white", "office_yellow", "office_dark", "random_bg"],
-    "devices": {
-        "galaxy_z_fold_5": {"model": ["SM-F946U1"]},
-        "iphone_13": {"label": ["iphone-13"]},
-    },
-    "identities": ["fixture", "another"],
-}
 SENSOR = "input_sensor.model"
+DOCUMENT = {
+    "lighting": {
+        "description": "Lighting chosen in the collector",
+        "column": "lighting",
+        "accepted": ["office_white", "office_yellow", "office_dark", "random_bg"],
+    },
+    "identity": {"column": "subject", "accepted": ["fixture", "another"]},
+    "device": {
+        "description": "Phone used for the capture",
+        "app": {"column": "capture_device", "fallback": SENSOR},
+        "web": {"column": "capture_device"},
+        "accepted": {
+            "galaxy_z_fold_5": {SENSOR: ["SM-F946U1"]},
+            "iphone_13": {"capture_device": ["iphone-13"]},
+        },
+    },
+}
 FOLD_SENSOR = "{'manufacturer': 'samsung', 'model': 'SM-F946U1'}"
 
 
-def document(**changes):
-    """Return a copy of the sample naming document with top-level overrides."""
-    return {**json.loads(json.dumps(DOCUMENT)), **changes}
+def document(**blocks):
+    """Return a copy of the sample document with blocks updated key by key."""
+    result = copy.deepcopy(DOCUMENT)
+    for field, changes in blocks.items():
+        if changes is None:
+            del result[field]
+        elif field in result:
+            result[field].update(changes)
+        else:
+            result[field] = changes
+    return result
+
+
+def with_identities(accepted):
+    """Return the sample document with another accepted identity list."""
+    return document(identity={"accepted": accepted})
 
 
 class NamingDocumentTests(unittest.TestCase):
     """Reject naming files that would be ambiguous or silently misread."""
 
-    def test_valid_document_builds_aliases(self):
-        """Aliases resolve per SDK and a standard name always matches itself."""
+    def test_valid_document(self):
+        """Columns, descriptions, and column-keyed device spellings are loaded."""
         names = naming.Naming(document())
-        self.assertEqual(names.device(SENSOR, "SM-F946U1"), "galaxy_z_fold_5")
         self.assertEqual(
-            names.device("capture_device", "galaxy_z_fold_5"), "galaxy_z_fold_5"
+            names.columns,
+            {
+                "lighting": ("lighting",),
+                "identity": ("subject",),
+                "app_device": ("capture_device", SENSOR),
+                "web_device": ("capture_device",),
+            },
         )
+        self.assertEqual(names.lighting, set(DOCUMENT["lighting"]["accepted"]))
+        self.assertEqual(names.descriptions["identity"], "")
+        self.assertEqual(names.device(SENSOR, "SM-F946U1"), "galaxy_z_fold_5")
         self.assertEqual(names.device("capture_device", "iphone-13"), "iphone_13")
+        self.assertEqual(names.device(SENSOR, "iphone_13"), "iphone_13")
         self.assertIsNone(names.device("capture_device", "SM-F946U1"))
         self.assertIsNone(names.device(SENSOR, "iphone-13"))
-        self.assertEqual(names.sources, FIELDS)
-        self.assertEqual(
-            names.source_descriptions["app_device"],
-            "Native model reported by the App SDK",
-        )
-        self.assertEqual(names.source_descriptions["lighting"], "")
 
     def test_invalid_documents(self):
-        """Unknown keys, duplicates, conflicting aliases, and bad sources fail."""
+        """Unknown keys, duplicates, conflicting spellings, and bad columns fail."""
+        accepted = DOCUMENT["device"]["accepted"]
         cases = {
-            "unknown key": document(colour=[]),
-            "empty lighting": document(lighting=[]),
-            "duplicate lighting": document(lighting=["office_white"] * 2),
-            "untrimmed identity": document(identities=[" fixture"]),
-            "sdk alias keys": document(devices={"phone": {"app": ["x"]}}),
-            "alias twice": document(
-                devices={"a": {"model": ["X1"]}, "b": {"model": ["X1"]}}
+            "unknown top key": document(colour={}),
+            "missing block": document(identity=None),
+            "unknown block key": document(lighting={"values": []}),
+            "no lighting": document(lighting={"accepted": []}),
+            "duplicate lighting": document(lighting={"accepted": ["office_dark"] * 2}),
+            "untrimmed identity": document(identity={"accepted": [" fixture"]}),
+            "missing web": dict(
+                DOCUMENT,
+                device={k: v for k, v in DOCUMENT["device"].items() if k != "web"},
             ),
-            "alias is a name": document(devices={"a": {"label": ["b"]}, "b": {}}),
-            "sources missing": {k: v for k, v in DOCUMENT.items() if k != "sources"},
-            "source incomplete": document(
-                sources={k: v for k, v in SOURCES.items() if k != "web_device"}
+            "missing column": document(device={"web": {"fallback": "x"}}),
+            "bad column": document(lighting={"column": "../lighting"}),
+            "fallback repeats column": document(
+                lighting={"column": "lighting", "fallback": "lighting"}
             ),
-            "source is text": document(sources=dict(SOURCES, lighting="lighting")),
-            "bad source": document(
-                sources=dict(SOURCES, lighting={"field": "../lighting"})
+            "bad description": document(lighting={"description": 5}),
+            "sdk description": document(
+                device={"web": {"column": "capture_device", "description": "x"}}
             ),
-            "extra source key": document(
-                sources=dict(SOURCES, lighting={"field": "lighting", "x": 1})
+            "column not read": document(
+                device={"accepted": {"phone": {"capture_devce": ["x"]}}}
             ),
-            "bad source description": document(
-                sources=dict(SOURCES, lighting={"field": "lighting", "description": 5})
+            "spelling twice": document(
+                device={
+                    "accepted": {
+                        "a": {"capture_device": ["X1"]},
+                        "b": {"capture_device": ["X1"]},
+                    }
+                }
             ),
-            "device description": document(devices={"a": {"description": "Phone"}}),
-            "file description": document(description="x"),
-            "fallback repeats field": document(
-                sources=dict(
-                    SOURCES, lighting={"field": "lighting", "fallback": "lighting"}
-                )
+            "spelling is a name": document(
+                device={"accepted": {**accepted, "a": {SENSOR: ["iphone_13"]}}}
             ),
-            "bad fallback": document(
-                sources=dict(SOURCES, lighting={"field": "lighting", "fallback": 3})
-            ),
+            "no devices": document(device={"accepted": {}}),
         }
         for label, value in cases.items():
             with self.subTest(label), self.assertRaises(ValueError):
                 naming.Naming(value)
 
-    def test_models_and_labels_are_separate_namespaces(self):
-        """A sensor model code and a device label may share text but differ."""
+    def test_columns_are_separate_namespaces(self):
+        """A detected model and a label may share text but name different devices."""
         names = naming.Naming(
-            document(devices={"a": {"model": ["X1"]}, "b": {"label": ["X1"]}})
+            document(
+                device={
+                    "accepted": {
+                        "a": {SENSOR: ["X1"]},
+                        "b": {"capture_device": ["X1"]},
+                    }
+                }
+            )
         )
         self.assertEqual(
             (names.device(SENSOR, "X1"), names.device("capture_device", "X1")),
@@ -113,7 +139,7 @@ class NamingDocumentTests(unittest.TestCase):
 
 
 class StandardizeTests(unittest.TestCase):
-    """Report standard values, raw values, sources, and issues per field."""
+    """Report standard values, raw values, columns, and issues per field."""
 
     def setUp(self):
         """Use the sample naming document."""
@@ -123,8 +149,8 @@ class StandardizeTests(unittest.TestCase):
         """Standardize one synthetic CSV row."""
         return self.names.standardize(sdk, row, annotation or {}, model)
 
-    def test_standard_values_have_no_issues(self):
-        """Allowed lighting and identity pass; an app model maps to its device."""
+    def test_accepted_values_have_no_issues(self):
+        """Accepted lighting and identity pass; a detected model maps to its device."""
         result = self.standardize(
             "app",
             {"lighting": "office_dark", "subject": "fixture"},
@@ -132,29 +158,26 @@ class StandardizeTests(unittest.TestCase):
         )
         self.assertEqual(
             result["device"],
-            dict(
-                value="galaxy_z_fold_5",
-                raw="SM-F946U1",
-                source="input_sensor.model",
-                issue="",
-            ),
+            dict(value="galaxy_z_fold_5", raw="SM-F946U1", source=SENSOR, issue=""),
         )
         self.assertEqual(result["lighting"]["issue"], "")
         self.assertEqual(result["identity"]["issue"], "")
 
-    def test_nonstandard_values_are_flagged_not_changed(self):
-        """Lighting is never translated; unknown names keep their raw value."""
+    def test_other_values_are_flagged_not_changed(self):
+        """Lighting is never translated; unknown values keep their raw text."""
         result = self.standardize(
             "app", {"lighting": "white", "subject": "stranger"}, model="SM-A556E"
         )
         self.assertEqual(result["lighting"]["value"], "white")
-        self.assertIn("not a standard lighting", result["lighting"]["issue"])
-        self.assertIn("not a standard identity", result["identity"]["issue"])
+        self.assertIn("not an accepted lighting", result["lighting"]["issue"])
+        self.assertIn("not an accepted identity", result["identity"]["issue"])
         self.assertEqual(result["device"]["value"], "SM-A556E")
-        self.assertIn("not mapped", result["device"]["issue"])
+        self.assertIn(
+            "(input_sensor.model) is not an accepted device", result["device"]["issue"]
+        )
 
     def test_missing_values(self):
-        """Empty sources are reported as missing."""
+        """Empty columns are reported as missing with the column name."""
         result = self.standardize("web", {})
         self.assertEqual(result["lighting"]["issue"], "Missing lighting (lighting)")
         self.assertEqual(result["device"]["issue"], "Missing device (capture_device)")
@@ -162,19 +185,14 @@ class StandardizeTests(unittest.TestCase):
             self.standardize("unknown", {})["device"]["issue"], "SDK not recognized"
         )
 
+    def test_empty_identity_list_disables_the_check(self):
+        """Only a missing identity is flagged when no identities are listed."""
+        names = naming.Naming(with_identities([]))
+        issue = names.standardize("web", {"subject": "anyone"}, {}, "")["identity"]
+        self.assertEqual(issue["issue"], "")
+
     def test_app_device_reads_label_then_detected_model(self):
         """The App label has priority; an empty label falls back to the sensor model."""
-        names = naming.Naming(
-            document(
-                sources=dict(
-                    SOURCES,
-                    app_device={
-                        "field": "capture_device",
-                        "fallback": "input_sensor.model",
-                    },
-                )
-            )
-        )
         cases = [
             (
                 {"capture_device": "iphone_13"},
@@ -193,29 +211,20 @@ class StandardizeTests(unittest.TestCase):
         ]
         for row, model, value, column in cases:
             with self.subTest(row=row, model=model):
-                device = names.standardize("app", row, {}, model)["device"]
+                device = self.standardize("app", row, model=model)["device"]
                 self.assertEqual((device["value"], device["source"]), (value, column))
-        self.assertEqual(
-            names.standardize("app", {}, {}, "")["device"]["issue"],
-            "Missing device (capture_device)",
-        )
 
-    def test_without_fallback_only_the_field_is_read(self):
-        """No fallback means an empty field is missing, even with a sensor model."""
-        device = self.standardize(
-            "app", {"capture_device": "galaxy_z_fold_5"}, model="Unknown"
-        )["device"]
-        self.assertEqual(device["issue"], "Missing device (input_sensor.model)")
+    def test_web_device_has_no_fallback(self):
+        """Web reads only its column, even when a sensor model is available."""
+        device = self.standardize("web", {}, model="SM-F946U1")["device"]
+        self.assertEqual(device["issue"], "Missing device (capture_device)")
 
-    def test_configured_sources(self):
+    def test_other_columns(self):
         """Fields can be read from another column or the collection annotation."""
         names = naming.Naming(
             document(
-                sources=dict(
-                    SOURCES,
-                    lighting={"field": "annotation.lighting"},
-                    identity={"field": "person"},
-                )
+                lighting={"column": "annotation.lighting"},
+                identity={"column": "person"},
             )
         )
         result = names.standardize(
@@ -255,7 +264,7 @@ class NamingFileTests(unittest.TestCase):
     def test_reload_keeps_last_valid_version(self):
         """Edits apply without restart; a broken edit reports an error."""
         names = naming.NamingFile(self.path)
-        self.write(document(identities=["new-person"]), stamp=10**18)
+        self.write(with_identities(["new-person"]), stamp=10**18)
         self.assertEqual(names.current().identities, {"new-person"})
         self.write("{", stamp=2 * 10**18)
         self.assertEqual(names.current().identities, {"new-person"})
@@ -294,7 +303,7 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(
             (web["device"], app["device"]), ("iphone_13", "galaxy_z_fold_5")
         )
-        self.assertIn("not a standard lighting", web["naming"]["lighting"]["issue"])
+        self.assertIn("not an accepted lighting", web["naming"]["lighting"]["issue"])
         self.assertEqual(app["naming"]["lighting"]["issue"], "")
         self.assertEqual(app["metadata"], self.rows[1])
 
@@ -341,7 +350,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(event["device"], "iphone_13")
             self.assertEqual(event["lighting"], "dark")
             self.assertIn(
-                "not a standard lighting", event["naming"]["lighting"]["issue"]
+                "not an accepted lighting", event["naming"]["lighting"]["issue"]
             )
             self.assertEqual(event["naming"]["identity"]["issue"], "")
             record = client.request("/api/captures")[1][0]

@@ -12,11 +12,13 @@ services:
     environment:
       WRITE_PIN_REQUIRED: "false"
       PROJECTS_ROOT: /projects
+      NAMING_FILE: /naming/naming.json
     ports:
       - "${PROJECT_REVIEW_BIND_ADDRESS:-127.0.0.1}:${PROJECT_REVIEW_PORT:-8769}:8080"
     volumes:
       - ${DATASET_PATH:?Set DATASET_PATH}:/data
       - ${PROJECTS_PATH:?Set PROJECTS_PATH}:/projects
+      - ${NAMING_PATH:?Set NAMING_PATH to the shared naming folder}:/naming:ro
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
