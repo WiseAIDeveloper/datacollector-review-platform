@@ -9,6 +9,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import re
 import shutil
 import sys
@@ -188,7 +189,10 @@ def process(path, kind, changes, mappings, apply, backup, base):
         changes.skipped.append((str(path), "changed while converting"))
         changes.files.pop()
         return
-    atomic_write(path, bom + after.encode("utf-8"), path.stat().st_mode & 0o777)
+    status = path.stat()
+    atomic_write(path, bom + after.encode("utf-8"), status.st_mode & 0o777)
+    # The replacement is a new file; give it the original owner and group back.
+    os.chown(path, status.st_uid, status.st_gid)
 
 
 def main():

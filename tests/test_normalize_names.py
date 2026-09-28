@@ -122,6 +122,8 @@ class NormalizeNamesTests(unittest.TestCase):
         """Applying rewrites only mapped cells and backs up the originals."""
         index = self.data / "genuine" / INDEXES[0]
         original = index.read_bytes()
+        index.chmod(0o640)
+        owner = (index.stat().st_uid, index.stat().st_gid)
         backup = self.root / "backup"
         code, report = self.run_script("--apply", "--backup", str(backup))
         self.assertEqual(code, 0)
@@ -132,6 +134,10 @@ class NormalizeNamesTests(unittest.TestCase):
         self.assertIn(",strange,iphone_13,", lines[3])
         self.assertIn('"a, b"', lines[3])
         self.assertEqual((backup / "data/genuine" / INDEXES[0]).read_bytes(), original)
+        status = index.stat()
+        self.assertEqual(
+            (status.st_uid, status.st_gid, status.st_mode & 0o777), (*owner, 0o640)
+        )
         annotation = self.annotation.read_text()
         self.assertEqual(
             annotation,
