@@ -28,6 +28,7 @@ When run directly, the server accepts these additional environment variables:
 | `INGESTION_LOG` | `/logs/ingestion.jsonl`   | Ingestion log output                       |
 | `HOST`          | `0.0.0.0`                 | Server bind address inside its environment |
 | `PORT`          | `8080`                    | Server port inside its environment         |
+| `NAMING_FILE`   | unset                     | Optional [standard names](naming.md) file  |
 
 The supplied Compose file uses these internal defaults. Host storage paths and
 the published address/port are controlled by the variables in `.env.example`.

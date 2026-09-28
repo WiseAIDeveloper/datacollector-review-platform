@@ -20,6 +20,7 @@ class Settings:
     port: int = 8080
     projects_root: Path = None
     write_pin_required: bool = True
+    naming_file: Path = None
     static_root: ClassVar[Path] = Path(__file__).resolve().parents[1] / "web"
 
     @classmethod
@@ -47,6 +48,11 @@ class Settings:
             projects_root=(
                 Path(environment["PROJECTS_ROOT"]).resolve()
                 if environment.get("PROJECTS_ROOT")
+                else None
+            ),
+            naming_file=(
+                Path(environment["NAMING_FILE"]).resolve()
+                if environment.get("NAMING_FILE")
                 else None
             ),
         )

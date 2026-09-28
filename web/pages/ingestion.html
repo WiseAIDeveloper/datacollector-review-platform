@@ -412,7 +412,11 @@
             "device",
             "creation_time",
           ])
-            cell(row, event[key]);
+            window.markNamingIssue?.(
+              cell(row, event[key]),
+              event,
+              key === "subject" ? "identity" : key,
+            );
           const action = cell(row, "");
           const edit = document.createElement("button");
           edit.textContent = event.available === false ? "Unavailable" : "Edit";

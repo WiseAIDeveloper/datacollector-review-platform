@@ -53,18 +53,20 @@ class ApiTests(unittest.TestCase):
         status, rows, _ = self.client.request("/api/captures")
         self.assertEqual(status, 200)
         self.assertEqual(len(rows), 5)
-        self.assertEqual(
-            rows[0],
-            dict(
-                key=self.key,
-                folder="genuine",
-                line=2,
-                sdk="web",
-                device="iphone-13",
-                annotation_lighting="office-white",
-                metadata=self.row,
-            ),
+        expected = dict(
+            key=self.key,
+            folder="genuine",
+            line=2,
+            sdk="web",
+            device="iphone-13",
+            annotation_lighting="office-white",
+            metadata=self.row,
         )
+        self.assertEqual({key: rows[0][key] for key in expected}, expected)
+        # Standardized fields are additive; without a naming file they echo the CSV.
+        self.assertLessEqual(set(rows[0]) - set(expected), {"lighting", "identity"})
+        self.assertEqual(rows[0].get("lighting", "dark"), "dark")
+        self.assertEqual(rows[0].get("identity", "fixture"), "fixture")
         self.assertEqual(
             self.client.request("/api/capture?key=" + quote(self.key))[1], rows[0]
         )

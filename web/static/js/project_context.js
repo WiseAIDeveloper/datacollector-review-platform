@@ -116,3 +116,33 @@
     }
   });
 })();
+
+/* Highlight a displayed capture value that is not in the shared naming file. */
+window.markNamingIssue = (element, record, field) => {
+  const issue = record?.naming?.[field]?.issue;
+  if (issue) {
+    element.classList.add("naming-issue");
+    element.title = issue;
+  }
+  return element;
+};
+
+/* Build a highlighted note listing a capture's naming issues, or null if none. */
+window.namingIssueNote = (record) => {
+  const issues = Object.entries(record?.naming || {})
+    .filter(
+      /* Keep fields whose value is missing, unlisted, or unmapped. */ ([
+        ,
+        v,
+      ]) => v.issue,
+    )
+    .map(
+      /* Label each issue with the field it belongs to. */ ([field, v]) =>
+        field + ": " + v.issue,
+    );
+  if (!issues.length) return null;
+  const note = document.createElement("p");
+  note.className = "naming-issue";
+  note.textContent = "Not in naming file — " + issues.join("; ");
+  return note;
+};

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .projects import Projects, parse_csv, validate_pair, MATRIX_FIELDS, BATCH_FIELDS
 from .captures.catalog import records
+from .captures.naming import NamingFile
 
 
 class FolderProjects:
@@ -142,10 +143,11 @@ class ProjectApplications:
         self.lock = threading.RLock()
         self.applications = {}
         self.ingestion = self
+        self.naming = NamingFile(settings.naming_file) if settings.naming_file else None
 
     def records(self):
         """Resolve globally keyed image links in the shared source capture dataset."""
-        return records(self.settings.root)
+        return records(self.settings.root, self.naming and self.naming.current())
 
     def start(self):
         """Project workers start only after a valid selection."""
@@ -171,6 +173,7 @@ class ProjectApplications:
                 application.lock = self.lock
                 application.ingestion.dataset_lock = self.lock
                 application.projects = self.projects
+                application.naming = self.naming
                 application.project_id = identifier
                 try:
                     application.ingestion.restore_logs()

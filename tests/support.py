@@ -214,7 +214,9 @@ class FixtureServer(Client):
 
 
 @contextmanager
-def running_server(source=SOURCE, folder_mode=False, write_pin_required=True):
+def running_server(
+    source=SOURCE, folder_mode=False, write_pin_required=True, naming=None
+):
     """Run either the original or current app against disposable data only."""
     with tempfile.TemporaryDirectory(prefix="review-test-") as temporary:
         root = Path(temporary)
@@ -257,6 +259,9 @@ def running_server(source=SOURCE, folder_mode=False, write_pin_required=True):
             str(root / "project-folders") if folder_mode else ""
         )
         environment["WRITE_PIN_REQUIRED"] = "true" if write_pin_required else "false"
+        if naming is not None:
+            (root / "naming.json").write_text(json.dumps(naming))
+            environment["NAMING_FILE"] = str(root / "naming.json")
         client = FixtureServer(
             f"http://127.0.0.1:{port}",
             token,

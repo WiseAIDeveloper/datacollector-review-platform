@@ -34,7 +34,9 @@ Capture edits and deletions operate on that shared dataset; project selection is
 not an independent copy of the images or collection annotations.
 
 Create a private `.env.projects` with mode 600, containing `DATASET_PATH`,
-`PROJECTS_PATH`, `PROJECT_REVIEW_BIND_ADDRESS`, `PROJECT_REVIEW_PORT`, and
+`PROJECTS_PATH`, `PROJECT_REVIEW_BIND_ADDRESS`, `PROJECT_REVIEW_PORT`,
+`NAMING_PATH` (the shared [naming](naming.md) folder,
+`/mnt5/auto-ekyc/datacollection_review/idrecapture/naming`), and
 `PROJECT_REVIEW_GID` (the numeric group owning the
 project directories, obtained with `id -g` for directories created by you). The
 container joins that group to access the copied files. No write PIN is needed.
@@ -120,3 +122,7 @@ CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
 again after the first sample from each device/platform; uncollected devices
 cannot be checked against real metadata yet. It does not guess aliases or decide
 which source is correct when a phone label contradicts its native sensor model.
+
+Add `--naming /path/to/naming.json` to also list capture values that are not
+standard [names](naming.md), grouped with their capture counts, and test-plan
+lighting or device values that are not standard names.

@@ -15,8 +15,8 @@ class Conflict(ValueError):
     """The stored capture or review differs from the user's expected snapshot."""
 
 
-def validate_changes(changes, allowed_fields):
-    """Reject unsupported metadata columns and invalid field values."""
+def validate_changes(changes, allowed_fields, naming=None):
+    """Reject unsupported metadata columns and values outside the standard names."""
     if (
         not isinstance(changes, dict)
         or not changes
@@ -27,10 +27,17 @@ def validate_changes(changes, allowed_fields):
         not isinstance(value, str) or len(value) > 4096 for value in changes.values()
     ):
         raise ValueError("Invalid field value")
-    if "lighting" in changes and changes["lighting"] not in LIGHTING:
-        raise ValueError("Choose dark, office-white or office-yellow")
+    lighting = naming.lighting if naming else LIGHTING
+    if "lighting" in changes and changes["lighting"] not in lighting:
+        raise ValueError("Choose " + ", ".join(sorted(lighting)))
     if "subject" in changes and not changes["subject"].strip():
         raise ValueError("Identity cannot be empty")
+    if naming is None:
+        return
+    if naming.identities and changes.get("subject", "") not in {"", *naming.identities}:
+        raise ValueError("Identity is not in the naming file")
+    if changes.get("capture_device", "") not in {"", *naming.devices}:
+        raise ValueError("Device is not a standard device name")
 
 
 def prepare_edit(path, folder, uuid, filename, changes, expected):
@@ -64,7 +71,15 @@ def prepare_edit(path, folder, uuid, filename, changes, expected):
 
 
 def edit_capture(
-    root, folder_name, uuid, filename, changes, expected, *, allowed_fields=FIELDS
+    root,
+    folder_name,
+    uuid,
+    filename,
+    changes,
+    expected,
+    *,
+    allowed_fields=FIELDS,
+    naming=None,
 ):
     """Update both indexes, preserving optimistic checks and rolling back failed writes."""
     root = Path(root).resolve()
@@ -73,7 +88,7 @@ def edit_capture(
     folder = (root / folder_name).resolve()
     if folder.parent != root or folder_name in EXCLUDED:
         raise ValueError("Invalid folder")
-    validate_changes(changes, allowed_fields)
+    validate_changes(changes, allowed_fields, naming)
     prepared = [
         prepare_edit(folder / name, folder, uuid, filename, changes, expected)
         for name in INDEXES

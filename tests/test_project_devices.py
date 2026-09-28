@@ -1,6 +1,8 @@
 """Check device audits without reading live captures or changing project definitions."""
 
 import unittest
+
+from app.captures.naming import Naming
 from scripts.audit_project_devices import audit
 
 
@@ -39,3 +41,39 @@ class ProjectDeviceTests(unittest.TestCase):
         }
         captures = [{"folder": "batch", "sdk": "app", "device": "phone"}]
         self.assertEqual(audit(project, captures)["unmatched_devices"][0]["sdk"], "app")
+
+    def test_naming_issues_and_nonstandard_plan_values(self):
+        """Group capture naming issues and flag plan values outside the naming file."""
+        naming = Naming(
+            {
+                "lighting": {"column": "lighting", "accepted": ["office_dark"]},
+                "identity": {"column": "subject", "accepted": []},
+                "device": {
+                    "app": {"column": "input_sensor.model"},
+                    "web": {"column": "capture_device"},
+                    "accepted": {"galaxy": {"input_sensor.model": ["SM-1"]}},
+                },
+            }
+        )
+        project = {
+            "matrix": [
+                {"folder": "b", "sdk": "app", "device": "galaxy", "lighting": "dark"}
+            ],
+            "batches": [{"batch_name": "b"}],
+        }
+        issue = dict(raw="dark", issue="dark is not an accepted lighting")
+        capture = {
+            "folder": "b",
+            "sdk": "app",
+            "device": "galaxy",
+            "naming": {"lighting": issue, "device": dict(raw="SM-1", issue="")},
+        }
+        result = audit(project, [capture] * 3, naming)
+        self.assertEqual(
+            result["naming_issues"],
+            [dict(field="lighting", sdk="app", captures=3, **issue)],
+        )
+        self.assertEqual(
+            result["nonstandard_plan_values"],
+            [dict(batch="b", field="lighting", value="dark")],
+        )

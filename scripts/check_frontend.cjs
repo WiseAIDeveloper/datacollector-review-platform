@@ -5,11 +5,13 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// Exact batch labels and empty configured batches are covered by browser scenarios.
+// Naming highlights and standardized fields are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "4a0179ac258ebd6e5078c95cdae43e552eec03d7",
-  "index.html": "c38cd68",
-  "quality.html": "c38cd68",
+  "coverage.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
+  "index.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
+  "quality.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
+  "search.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
+  "ingestion.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
   "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
 };
 const files = [

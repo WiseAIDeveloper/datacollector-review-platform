@@ -300,17 +300,18 @@
         $("results").replaceChildren();
         for (const row of data.results) {
           const tr = document.createElement("tr");
-          for (const value of [
-            row.metadata.filename,
-            row.folder,
-            row.metadata.lighting,
-            row.metadata.subject,
-            row.sdk,
-            row.device,
+          for (const [field, value] of [
+            ["filename", row.metadata.filename],
+            ["folder", row.folder],
+            ["lighting", row.lighting ?? row.metadata.lighting],
+            ["identity", row.identity ?? row.metadata.subject],
+            ["sdk", row.sdk],
+            ["device", row.device],
           ]) {
             const td = document.createElement("td");
             td.textContent = value || "—";
             tr.append(td);
+            window.markNamingIssue?.(td, row, field);
           }
           const td = document.createElement("td"),
             button = document.createElement("button");

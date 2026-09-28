@@ -24,12 +24,11 @@ def collection_annotation(folder, uuid):
         return {}
 
 
-def capture_device(row):
-    """Classify recognized sensor formats; a device label alone cannot identify an SDK."""
-    device = (row.get("capture_device") or "").strip()
+def sensor_model(row):
+    """Classify the SDK from input_sensor and return the native model text, if any."""
     raw = (row.get("input_sensor") or "").strip()
     if raw.lower().startswith("websdk;"):
-        return "web", device or "unknown"
+        return "web", ""
     try:
         sensor = json.loads(raw)
     except (ValueError, TypeError):
@@ -40,17 +39,29 @@ def capture_device(row):
     if isinstance(sensor, dict):
         model = sensor.get("model")
         if isinstance(model, str) and model.strip():
-            model = model.strip()
-            return "app", (device or "unknown") if model.lower() == "unknown" else model
+            return "app", model.strip()
     if raw.startswith("model:"):
         model = raw.split(",", 1)[0].removeprefix("model:").strip()
         if model:
-            return "app", (device or "unknown") if model.lower() == "unknown" else model
-    return "unknown", device or "unknown"
+            return "app", model
+    return "unknown", ""
 
 
-def records(root):
-    """Return capture records in batch and CSV order with their original line numbers."""
+def capture_device(row):
+    """Classify recognized sensor formats; a device label alone cannot identify an SDK."""
+    device = (row.get("capture_device") or "").strip()
+    sdk, model = sensor_model(row)
+    if sdk == "app" and model.lower() != "unknown":
+        return sdk, model
+    return sdk, device or "unknown"
+
+
+def records(root, naming=None):
+    """Return capture records in batch and CSV order with their original line numbers.
+
+    With a naming document, device is its standard name and lighting, identity, and
+    naming report each field's raw value, source column, and any issue.
+    """
     root = Path(root).resolve()
     result = []
     for folder in sorted(root.iterdir()):
@@ -61,19 +72,31 @@ def records(root):
             for line, row in enumerate(csv.DictReader(stream), 2):
                 sdk, device = capture_device(row)
                 annotation = collection_annotation(folder, row.get("uuid", ""))
-                result.append(
-                    dict(
-                        key="/".join(
-                            (folder.name, row.get("uuid", ""), row.get("filename", ""))
-                        ),
-                        folder=folder.name,
-                        line=line,
-                        sdk=sdk,
-                        device=device,
-                        annotation_lighting=annotation.get("lighting", ""),
-                        metadata=row,
-                    )
+                record = dict(
+                    key="/".join(
+                        (folder.name, row.get("uuid", ""), row.get("filename", ""))
+                    ),
+                    folder=folder.name,
+                    line=line,
+                    sdk=sdk,
+                    device=device,
+                    lighting=row.get("lighting", ""),
+                    identity=row.get("subject", ""),
+                    annotation_lighting=annotation.get("lighting", ""),
+                    metadata=row,
                 )
+                if naming is not None:
+                    standard = naming.standardize(
+                        sdk, row, annotation, sensor_model(row)[1]
+                    )
+                    record.update(
+                        lighting=standard["lighting"]["value"],
+                        identity=standard["identity"]["value"],
+                        naming=standard,
+                    )
+                    if sdk != "unknown":
+                        record["device"] = standard["device"]["value"] or device
+                result.append(record)
     return result
 
 
