@@ -14,7 +14,16 @@ if not (SOURCE / "app/captures/naming.py").is_file():
 from app.captures import catalog, naming
 from app.captures.editing import Conflict, edit_capture
 
+FIELDS = {
+    "lighting": "lighting",
+    "identity": "subject",
+    "app_device": "input_sensor.model",
+    "web_device": "capture_device",
+}
+SOURCES = {key: {"field": field} for key, field in FIELDS.items()}
+SOURCES["app_device"]["description"] = "Native model reported by the App SDK"
 DOCUMENT = {
+    "sources": SOURCES,
     "lighting": ["office_white", "office_yellow", "office_dark", "random_bg"],
     "devices": {
         "galaxy_z_fold_5": {"app": ["SM-F946U1"]},
@@ -39,7 +48,12 @@ class NamingDocumentTests(unittest.TestCase):
         self.assertEqual(names.device("app", "SM-F946U1"), "galaxy_z_fold_5")
         self.assertEqual(names.device("web", "galaxy_z_fold_5"), "galaxy_z_fold_5")
         self.assertIsNone(names.device("web", "SM-F946U1"))
-        self.assertEqual(names.sources, naming.DEFAULT_SOURCES)
+        self.assertEqual(names.sources, FIELDS)
+        self.assertEqual(
+            names.source_descriptions["app_device"],
+            "Native model reported by the App SDK",
+        )
+        self.assertEqual(names.source_descriptions["lighting"], "")
 
     def test_invalid_documents(self):
         """Unknown keys, duplicates, conflicting aliases, and bad sources fail."""
@@ -53,10 +67,22 @@ class NamingDocumentTests(unittest.TestCase):
                 devices={"a": {"app": ["X1"]}, "b": {"app": ["X1"]}}
             ),
             "alias is a name": document(devices={"a": {"app": ["b"]}, "b": {}}),
-            "bad source": document(sources={"lighting": ["../lighting"]}),
-            "device sources incomplete": document(
-                sources={"device": {"app": ["capture_device"]}}
+            "sources missing": {k: v for k, v in DOCUMENT.items() if k != "sources"},
+            "source incomplete": document(
+                sources={k: v for k, v in SOURCES.items() if k != "web_device"}
             ),
+            "source is text": document(sources=dict(SOURCES, lighting="lighting")),
+            "bad source": document(
+                sources=dict(SOURCES, lighting={"field": "../lighting"})
+            ),
+            "extra source key": document(
+                sources=dict(SOURCES, lighting={"field": "lighting", "x": 1})
+            ),
+            "bad source description": document(
+                sources=dict(SOURCES, lighting={"field": "lighting", "description": 5})
+            ),
+            "device description": document(devices={"a": {"description": "Phone"}}),
+            "file description": document(description="x"),
         }
         for label, value in cases.items():
             with self.subTest(label), self.assertRaises(ValueError):
@@ -116,35 +142,34 @@ class StandardizeTests(unittest.TestCase):
     def test_missing_values(self):
         """Empty sources are reported as missing."""
         result = self.standardize("web", {})
-        self.assertEqual(result["lighting"]["issue"], "Missing lighting")
-        self.assertEqual(result["device"]["issue"], "Missing device")
+        self.assertEqual(result["lighting"]["issue"], "Missing lighting (lighting)")
+        self.assertEqual(result["device"]["issue"], "Missing device (capture_device)")
         self.assertEqual(
             self.standardize("unknown", {})["device"]["issue"], "SDK not recognized"
         )
 
-    def test_device_sources_fall_back_and_flag_disagreement(self):
-        """An Unknown model falls back to the label; mapped sources must agree."""
-        fallback = self.standardize(
+    def test_each_field_reads_only_its_one_source(self):
+        """App devices use only the sensor model; the device label is ignored."""
+        unknown = self.standardize(
             "app", {"capture_device": "galaxy_z_fold_5"}, model="Unknown"
         )["device"]
-        self.assertEqual(
-            (fallback["value"], fallback["source"], fallback["issue"]),
-            ("galaxy_z_fold_5", "capture_device", ""),
-        )
-        conflict = self.standardize(
+        self.assertEqual(unknown["issue"], "Missing device (input_sensor.model)")
+        labelled = self.standardize(
             "app", {"capture_device": "iphone_13"}, model="SM-F946U1"
         )["device"]
-        self.assertEqual(conflict["value"], "galaxy_z_fold_5")
-        self.assertIn("capture_device says iphone_13", conflict["issue"])
+        self.assertEqual(
+            (labelled["value"], labelled["issue"]), ("galaxy_z_fold_5", "")
+        )
 
     def test_configured_sources(self):
-        """Fields can be read from other columns or the collection annotation."""
+        """Fields can be read from another column or the collection annotation."""
         names = naming.Naming(
             document(
-                sources={
-                    "lighting": ["annotation.lighting", "lighting"],
-                    "identity": ["person"],
-                }
+                sources=dict(
+                    SOURCES,
+                    lighting={"field": "annotation.lighting"},
+                    identity={"field": "person"},
+                )
             )
         )
         result = names.standardize(

@@ -45,7 +45,16 @@ class ProjectDeviceTests(unittest.TestCase):
     def test_naming_issues_and_nonstandard_plan_values(self):
         """Group capture naming issues and flag plan values outside the naming file."""
         naming = Naming(
-            {"lighting": ["office_dark"], "devices": {"galaxy": {"app": ["SM-1"]}}}
+            {
+                "sources": {
+                    "lighting": {"field": "lighting"},
+                    "identity": {"field": "subject"},
+                    "app_device": {"field": "input_sensor.model"},
+                    "web_device": {"field": "capture_device"},
+                },
+                "lighting": ["office_dark"],
+                "devices": {"galaxy": {"app": ["SM-1"]}},
+            }
         )
         project = {
             "matrix": [

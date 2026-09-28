@@ -10,11 +10,7 @@ LOGGER = logging.getLogger(__name__)
 MAX_BYTES = 1_000_000
 SDKS = ("app", "web")
 SENSOR_MODEL = "input_sensor.model"
-DEFAULT_SOURCES = {
-    "lighting": ["lighting"],
-    "identity": ["subject"],
-    "device": {"app": [SENSOR_MODEL, "capture_device"], "web": ["capture_device"]},
-}
+SOURCE_FIELDS = ("lighting", "identity", "app_device", "web_device")
 SOURCE = re.compile(r"input_sensor\.model|annotation\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]+")
 
 
@@ -29,15 +25,27 @@ def names(value, label, allow_empty=False):
     return value
 
 
-def sources(value, label):
-    """Validate an ordered list of columns a field may be read from."""
-    names(value, f"sources.{label}")
-    if any(not SOURCE.fullmatch(source) for source in value):
+def source(value, label):
+    """Validate one source: the field it is read from and an optional description."""
+    if not isinstance(value, dict) or not {"field"} <= set(value) <= {
+        "field",
+        "description",
+    }:
         raise ValueError(
-            f"Naming file: sources.{label} must name CSV columns, "
+            f"Naming file: sources.{label} needs a field and optional description"
+        )
+    field = value["field"]
+    if not isinstance(field, str) or not SOURCE.fullmatch(field):
+        raise ValueError(
+            f"Naming file: sources.{label}.field must be one CSV column, "
             f"{SENSOR_MODEL} or annotation.<key>"
         )
-    return value
+    text = value.get("description", "")
+    if not isinstance(text, str) or len(text) > 1000:
+        raise ValueError(
+            f"Naming file: sources.{label}.description must be text up to 1000 characters"
+        )
+    return field, text
 
 
 def read_source(source, row, annotation, sensor_model):
@@ -75,7 +83,8 @@ class Naming:
             names([device], "device names")
             if not isinstance(entry, dict) or not set(entry) <= set(SDKS):
                 raise ValueError(f"Naming file: devices.{device} may only have app/web")
-            for sdk, raw_values in entry.items():
+            for sdk in SDKS:
+                raw_values = entry.get(sdk, [])
                 for raw in names(raw_values, f"devices.{device}.{sdk}", True):
                     if raw in self.devices:
                         raise ValueError(f"Naming file: alias {raw} is a device name")
@@ -84,21 +93,16 @@ class Naming:
                             f"Naming file: {sdk} alias {raw} maps to two devices"
                         )
                     self.aliases[sdk][raw] = device
-        configured = document.get("sources", {})
-        if not isinstance(configured, dict) or not set(configured) <= set(
-            DEFAULT_SOURCES
-        ):
-            raise ValueError("Naming file: sources may set lighting, identity, device")
-        self.sources = {
-            "lighting": sources(configured.get("lighting", ["lighting"]), "lighting"),
-            "identity": sources(configured.get("identity", ["subject"]), "identity"),
-        }
-        device_sources = configured.get("device", DEFAULT_SOURCES["device"])
-        if not isinstance(device_sources, dict) or set(device_sources) != set(SDKS):
-            raise ValueError("Naming file: sources.device needs app and web lists")
-        self.sources["device"] = {
-            sdk: sources(device_sources[sdk], f"device.{sdk}") for sdk in SDKS
-        }
+        configured = document.get("sources")
+        if not isinstance(configured, dict) or set(configured) != set(SOURCE_FIELDS):
+            raise ValueError(
+                "Naming file: sources needs exactly "
+                + ", ".join(SOURCE_FIELDS)
+                + " (one field each)"
+            )
+        parsed = {key: source(configured[key], key) for key in SOURCE_FIELDS}
+        self.sources = {key: field for key, (field, _) in parsed.items()}
+        self.source_descriptions = {key: text for key, (_, text) in parsed.items()}
 
     def device(self, sdk, raw):
         """Return the standard device for a raw value, or None when it is not listed."""
@@ -113,53 +117,32 @@ class Naming:
             ("lighting", self.lighting),
             ("identity", self.identities),
         ):
-            source, raw = first_value(
-                self.sources[field], row, annotation, sensor_model
-            )
+            column = self.sources[field]
+            raw = read_source(column, row, annotation, sensor_model)
             issue = ""
             if not raw:
-                issue = f"Missing {field}"
+                issue = f"Missing {field} ({column})"
             elif allowed and raw not in allowed:
                 issue = f"{raw} is not a standard {field} name"
-            result[field] = dict(value=raw, raw=raw, source=source, issue=issue)
+            result[field] = dict(value=raw, raw=raw, source=column, issue=issue)
         result["device"] = self.standardize_device(sdk, row, annotation, sensor_model)
         return result
 
     def standardize_device(self, sdk, row, annotation, sensor_model):
-        """Map the first available device source and flag disagreeing sources."""
+        """Map the SDK's one device field to a standard device name."""
         if sdk not in SDKS:
             return dict(value="", raw="", source="", issue="SDK not recognized")
-        found = [
-            (source, value)
-            for source in self.sources["device"][sdk]
-            if (value := read_source(source, row, annotation, sensor_model))
-        ]
-        if not found:
-            return dict(value="", raw="", source="", issue="Missing device")
-        source, raw = found[0]
+        column = self.sources[f"{sdk}_device"]
+        raw = read_source(column, row, annotation, sensor_model)
+        if not raw:
+            return dict(
+                value="", raw="", source=column, issue=f"Missing device ({column})"
+            )
         standard = self.device(sdk, raw)
         if standard is None:
-            issue = f"{raw} ({source}) is not mapped to a standard device"
-            return dict(value=raw, raw=raw, source=source, issue=issue)
-        issue = next(
-            (
-                f"{source} says {standard} but {other} says {other_standard}"
-                for other, other_raw in found[1:]
-                if (other_standard := self.device(sdk, other_raw))
-                and other_standard != standard
-            ),
-            "",
-        )
-        return dict(value=standard, raw=raw, source=source, issue=issue)
-
-
-def first_value(field_sources, row, annotation, sensor_model):
-    """Return the first configured source holding a value, else the first source."""
-    for source in field_sources:
-        value = read_source(source, row, annotation, sensor_model)
-        if value:
-            return source, value
-    return field_sources[0], ""
+            issue = f"{raw} ({column}) is not mapped to a standard device"
+            return dict(value=raw, raw=raw, source=column, issue=issue)
+        return dict(value=standard, raw=raw, source=column, issue="")
 
 
 def load(path):

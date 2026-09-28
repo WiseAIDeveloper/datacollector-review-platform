@@ -10,21 +10,31 @@ add `NAMING_FILE: /projects/naming.json` to the service environment.
 
 ```json
 {
+  "sources": {
+    "lighting": {
+      "field": "lighting",
+      "description": "Lighting chosen in the collector"
+    },
+    "identity": {
+      "field": "subject",
+      "description": "Person holding the card"
+    },
+    "app_device": {
+      "field": "input_sensor.model",
+      "description": "Phone model auto-detected by the App SDK"
+    },
+    "web_device": {
+      "field": "capture_device",
+      "description": "Phone selected in the Web collector"
+    }
+  },
   "lighting": ["office_white", "office_yellow", "office_dark", "random_bg"],
   "devices": {
     "galaxy_z_fold_5": { "app": ["SM-F946U1"] },
     "huawei_nova_7i": { "app": ["JNY-LX2"] },
     "iphone_13": {}
   },
-  "identities": ["ang-kuan-liang", "heng-zen-kit"],
-  "sources": {
-    "lighting": ["lighting"],
-    "identity": ["subject"],
-    "device": {
-      "app": ["input_sensor.model", "capture_device"],
-      "web": ["capture_device"]
-    }
-  }
+  "identities": ["ang-kuan-liang", "heng-zen-kit"]
 }
 ```
 
@@ -41,15 +51,22 @@ only once per SDK and may not itself be a standard device name.
 
 ## Sources
 
-`sources` states which capture column each field is read from, in priority order;
-the first nonempty value is used. It is optional; the defaults are shown above.
-A source is an index CSV column name, `input_sensor.model` (the native model the
-App SDK reports; `Unknown` counts as empty), or `annotation.<key>` (a key in the
+`sources` is required. Each of its four keys names exactly one `field` to read,
+with an optional `description`; there is no fallback to another field. A field is
+an index CSV column name, `input_sensor.model` (the native model the App SDK
+reports; `Unknown` counts as missing), or `annotation.<key>` (a key in the
 capture's collection annotation JSON).
 
-When App captures have both a sensor model and a `capture_device` label and both
-map to different standard devices, the capture is flagged with the disagreement.
-The edit form still edits the `lighting`, `subject`, and `capture_device` columns.
+| Key          | Read for                   |
+| ------------ | -------------------------- |
+| `lighting`   | Lighting of every capture  |
+| `identity`   | Identity of every capture  |
+| `app_device` | Device of App SDK captures |
+| `web_device` | Device of Web SDK captures |
+
+An empty field is highlighted as missing. The SDK itself is still detected from
+`input_sensor`. The edit form edits the `lighting`, `subject`, and
+`capture_device` columns.
 
 ## Behavior
 
