@@ -120,3 +120,7 @@ CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
 again after the first sample from each device/platform; uncollected devices
 cannot be checked against real metadata yet. It does not guess aliases or decide
 which source is correct when a phone label contradicts its native sensor model.
+
+Add `--naming /path/to/naming.json` to also list capture values that are not
+standard [names](naming.md), grouped with their capture counts, and test-plan
+lighting or device values that are not standard names.
