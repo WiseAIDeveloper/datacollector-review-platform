@@ -321,3 +321,13 @@ body.terminal .workspace-header p {
     font-size: 11px;
   }
 }
+
+/* Capture values missing from the shared naming file, like a highlighter pen. */
+.naming-issue {
+  background: #fde047;
+  color: #1f2937;
+  border-radius: 3px;
+}
+p.naming-issue {
+  padding: 4px 8px;
+}

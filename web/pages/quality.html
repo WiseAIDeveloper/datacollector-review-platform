@@ -164,7 +164,7 @@
         return rows.filter(
           /* Keep items that match the current selection criteria. */ (r) =>
             (!$("identity").value ||
-              r.metadata.subject === $("identity").value) &&
+              (r.identity ?? r.metadata.subject) === $("identity").value) &&
             (!$("batch").value || r.folder === $("batch").value),
         );
       }
@@ -214,16 +214,18 @@
         box.dataset.status = existing?.status || "unreviewed";
         box.append(
           el("h2", r.metadata.filename),
-          el("p", r.folder + " · " + r.metadata.subject),
+          el("p", r.folder + " · " + (r.identity ?? r.metadata.subject)),
           el(
             "p",
-            r.metadata.lighting +
+            (r.lighting ?? r.metadata.lighting) +
               " · " +
               r.sdk.toUpperCase() +
               " / " +
               r.device,
           ),
         );
+        const namingNote = window.namingIssueNote?.(r);
+        if (namingNote) box.append(namingNote);
         const img = el("img");
         img.className = "quality-photo";
         img.loading = "lazy";
@@ -417,7 +419,7 @@
                   .map(
                     /* Build the corresponding display or request value for each item. */ (
                       r,
-                    ) => r.metadata.subject,
+                    ) => r.identity ?? r.metadata.subject,
                   )
                   .filter(Boolean),
               ),

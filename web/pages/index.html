@@ -326,7 +326,7 @@
                     .map(
                       /* Build the corresponding display or request value for each item. */ (
                         x,
-                      ) => x.metadata.subject,
+                      ) => x.identity ?? x.metadata.subject,
                     )
                     .filter(Boolean),
                 ),
@@ -346,8 +346,8 @@
             filename: r.metadata.filename,
             uuid: r.metadata.uuid,
             csv_row_at_review: r.line,
-            subject: r.metadata.subject,
-            lighting: r.metadata.lighting,
+            subject: r.identity ?? r.metadata.subject,
+            lighting: r.lighting ?? r.metadata.lighting,
             sdk: r.sdk,
             device: r.device,
             decision: "undecided",
@@ -405,6 +405,8 @@
               r.sdk.toUpperCase() + " · " + r.device + " · CSV row " + r.line,
             ),
           );
+          const namingNote = window.namingIssueNote?.(r);
+          if (namingNote) card.append(namingNote);
           const img = el("img");
           img.className = "photo";
           img.loading = "lazy";
@@ -699,7 +701,7 @@
             r,
             d,
           }) =>
-            r.metadata.subject +
+            (r.identity ?? r.metadata.subject) +
             " / " +
             r.folder +
             " / " +

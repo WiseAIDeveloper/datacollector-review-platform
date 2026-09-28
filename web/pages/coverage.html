@@ -415,7 +415,7 @@
                     .map(
                       /* Build the corresponding display or request value for each item. */ (
                         x,
-                      ) => x.metadata.subject,
+                      ) => x.identity ?? x.metadata.subject,
                     )
                     .filter(Boolean),
                 ),
@@ -435,8 +435,8 @@
             filename: r.metadata.filename,
             uuid: r.metadata.uuid,
             csv_row_at_review: r.line,
-            subject: r.metadata.subject,
-            lighting: r.metadata.lighting,
+            subject: r.identity ?? r.metadata.subject,
+            lighting: r.lighting ?? r.metadata.lighting,
             sdk: r.sdk,
             device: r.device,
             decision: "undecided",
@@ -468,11 +468,17 @@
         const subject = $("subject").value,
           caps = rows.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
-              r.metadata.subject === subject && matchesProject(r),
+              (r.identity ?? r.metadata.subject) === subject &&
+              matchesProject(r),
           ),
           by = new Map();
         for (const r of caps) {
-          const k = key(r.folder, r.metadata.lighting || "", r.sdk, r.device);
+          const k = key(
+            r.folder,
+            (r.lighting ?? r.metadata.lighting) || "",
+            r.sdk,
+            r.device,
+          );
           if (!by.has(k)) by.set(k, []);
           by.get(k).push(r);
         }
@@ -618,6 +624,8 @@
         );
         original.className = "facts";
         card.append(original);
+        const namingNote = window.namingIssueNote?.(r);
+        if (namingNote) card.append(namingNote);
         const controls = el("div");
         controls.className = "decisions";
         const current = decisions[r.key]?.decision || "undecided";
@@ -755,7 +763,7 @@
         }
         for (const r of rows) {
           if (
-            r.metadata.subject === $("subject").value &&
+            (r.identity ?? r.metadata.subject) === $("subject").value &&
             matchesProject(r) &&
             batches.has(r.folder)
           )
@@ -975,7 +983,7 @@
         const captures = rows.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
               r.folder === b.name &&
-              r.metadata.subject === $("subject").value &&
+              (r.identity ?? r.metadata.subject) === $("subject").value &&
               matchesProject(r),
           ),
           reviewed = captures.filter(
@@ -1178,7 +1186,7 @@
                 r,
               ) =>
                 r.folder === b.name &&
-                r.metadata.subject === $("subject").value &&
+                (r.identity ?? r.metadata.subject) === $("subject").value &&
                 matchesProject(r) &&
                 !["pass", "error"].includes(qualityReviews[r.key]?.status),
             ),
@@ -1251,7 +1259,7 @@
       function pendingDecisions() {
         return rows.filter(
           /* Keep items that match the current selection criteria. */ (r) =>
-            r.metadata.subject === $("subject").value &&
+            (r.identity ?? r.metadata.subject) === $("subject").value &&
             matchesProject(r) &&
             ["remove", "correct_metadata"].includes(decisions[r.key]?.decision),
         );
@@ -1434,7 +1442,7 @@
                   .map(
                     /* Build the corresponding display or request value for each item. */ (
                       r,
-                    ) => r.metadata.subject,
+                    ) => r.identity ?? r.metadata.subject,
                   )
                   .filter(Boolean),
               ),
