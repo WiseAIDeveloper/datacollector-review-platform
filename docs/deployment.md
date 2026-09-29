@@ -28,7 +28,7 @@ When run directly, the server accepts these additional environment variables:
 | `INGESTION_LOG` | `/logs/ingestion.jsonl`   | Ingestion log output                       |
 | `HOST`          | `0.0.0.0`                 | Server bind address inside its environment |
 | `PORT`          | `8080`                    | Server port inside its environment         |
-| `NAMING_FILE`   | unset                     | Optional [standard names](naming.md) file  |
+| `NAMING_FILE`   | required                  | [Naming file](naming.md) defining fields   |
 
 The supplied Compose file uses these internal defaults. Host storage paths and
 the published address/port are controlled by the variables in `.env.example`.
@@ -42,6 +42,7 @@ the published address/port are controlled by the variables in `.env.example`.
 | Capture dataset       | `${DATASET_PATH}` mounted at `/data`                 |
 | Ingestion state       | `capture_viewer_ingestion_state` mounted at `/state` |
 | Logs and review state | `${LOGS_PATH}` mounted at `/logs`                    |
+| Naming file folder    | `${NAMING_PATH}` mounted read-only at `/naming`      |
 
 Preserve the existing paths and volume on every upgrade. **`docker compose down -v`
 deletes the named ingestion-state volume.** Release tags preserve code and image

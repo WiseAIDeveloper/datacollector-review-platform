@@ -274,13 +274,10 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr>
+          <tr id="logs-head">
             <th>Picture</th>
             <th>Batch</th>
-            <th>Lighting</th>
-            <th>Identity</th>
             <th>SDK</th>
-            <th>Device</th>
             <th>Capture time</th>
             <th></th>
           </tr>
@@ -322,6 +319,7 @@
     </div>
   </dialog>
   <script src="/project_context.js"></script>
+  <script src="/fields.js"></script>
   <script>
     const $ = /* Find an element by its page identifier. */ (id) =>
       document.getElementById(id);
@@ -384,6 +382,19 @@
         );
         if (!response.ok) throw Error("HTTP " + response.status);
         const data = await response.json();
+        const naming = await window.captureFields.load();
+        $("logs-head").replaceChildren(
+          ...["Picture", "Batch", "SDK"]
+            .concat(
+              naming.checked.map((f) => f.key),
+              ["Capture time", ""],
+            )
+            .map((label) => {
+              const th = document.createElement("th");
+              th.textContent = label;
+              return th;
+            }),
+        );
         renderActions(data);
         for (const k of ["total", "ingested", "existing"])
           $(k).textContent = data[k];
@@ -404,19 +415,15 @@
         for (const event of data.events) {
           const row = document.createElement("tr");
           cell(row, event.filename);
-          for (const key of [
-            "batch",
-            "lighting",
-            "subject",
-            "sdk",
-            "device",
-            "creation_time",
-          ])
+          cell(row, event.batch);
+          cell(row, event.sdk);
+          for (const f of naming.checked)
             window.markNamingIssue?.(
-              cell(row, event[key]),
+              cell(row, event.fields?.[f.key]),
               event,
-              key === "subject" ? "identity" : key,
+              f.key,
             );
+          cell(row, event.creation_time);
           const action = cell(row, "");
           const edit = document.createElement("button");
           edit.textContent = event.available === false ? "Unavailable" : "Edit";

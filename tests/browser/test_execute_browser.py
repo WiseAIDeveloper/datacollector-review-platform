@@ -5,7 +5,7 @@ import os
 
 
 from pathlib import Path
-from tests.support import asset_path
+from tests.support import asset_path, mock_fields, with_fields
 from playwright.sync_api import sync_playwright, expect
 
 src = Path(os.environ["REVIEW_SOURCE"])
@@ -29,7 +29,7 @@ with sync_playwright() as p:
                 uuid=i,
                 filename=i + ".jpg",
                 subject="fixture",
-                lighting="dark",
+                capture_env_lighting="dark",
                 capture_device="iphone-13",
                 test_plan_name="colour_print_enhancement_2",
             ),
@@ -44,14 +44,15 @@ with sync_playwright() as p:
                 dict(
                     batch_name="genuine",
                     test_plan_name="colour_print_enhancement_2",
-                    expected_lighting="dark;office-white;office-yellow",
-                    expected_identities="fixture;another",
-                    expected_web_devices="iphone-13",
+                    expected_capture_env_lighting="dark;office-white;office-yellow",
+                    expected_subject="fixture;another",
+                    expected_capture_device="iphone-13",
                 )
             ]
         ),
     )
-    page.route("**/api/captures", lambda r: r.fulfill(json=rows))
+    page.route("**/api/captures", lambda r: r.fulfill(json=with_fields(rows)))
+    mock_fields(page, src)
     page.route(
         "**/review",
         lambda r: r.fulfill(
@@ -79,13 +80,13 @@ with sync_playwright() as p:
         "button", name="Correct metadata", exact=True
     ).click()
     page.locator("article").first.get_by_label(
-        "Correct lighting", exact=True
+        "Correct capture_env_lighting", exact=True
     ).select_option("office-white")
     page.locator("article").nth(1).get_by_role(
         "button", name="Remove", exact=True
     ).click()
     page.evaluate(
-        "filters.subject.append(new Option('other identity','other'));filters.subject.value='other';apply()"
+        "filters.identity.append(new Option('other identity','other'));filters.identity.value='other';apply()"
     )
     expect(page.locator("#execute")).to_have_text("Execute decisions (2)")
     page.once("dialog", lambda d: d.dismiss())
@@ -104,7 +105,7 @@ with sync_playwright() as p:
     fail[0] = False
     page.locator("#execute").click()
     expect(page.locator("#execute")).to_have_text("Execute decisions (0)")
-    assert writes[1][1]["changes"] == {"lighting": "office-white"}
+    assert writes[1][1]["changes"] == {"capture_env_lighting": "office-white"}
     assert writes[2][1]["remove"][0]["uuid"] == "b"
     assert page.locator("#export,#csv").count() == 0
     assert not errors, errors

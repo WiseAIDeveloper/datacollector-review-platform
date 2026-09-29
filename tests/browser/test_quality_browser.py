@@ -5,7 +5,7 @@ import os
 
 
 from pathlib import Path
-from tests.support import asset_path
+from tests.support import asset_path, fixture_fields, mock_record
 from playwright.sync_api import sync_playwright, expect
 
 src = Path(os.environ["REVIEW_SOURCE"])
@@ -20,24 +20,29 @@ with sync_playwright() as p:
     saved = {}
     writes = []
     rows = [
-        dict(
-            key="batch/" + str(i) + "/image.jpg",
-            folder="batch",
-            sdk="web",
-            device="iphone-13",
-            metadata=dict(
-                uuid=str(i), filename=str(i) + ".jpg", subject="person", lighting="dark"
+        mock_record(
+            "batch/" + str(i) + "/image.jpg",
+            "batch",
+            "web",
+            "iphone-13",
+            dict(
+                uuid=str(i),
+                filename=str(i) + ".jpg",
+                subject="person",
+                capture_env_lighting="dark",
             ),
         )
         for i in range(5)
     ]
     rows.append(
-        dict(
-            key="other/x/x.jpg",
-            folder="other",
-            sdk="app",
-            device="phone",
-            metadata=dict(uuid="x", filename="x.jpg", subject="other", lighting="dark"),
+        mock_record(
+            "other/x/x.jpg",
+            "other",
+            "app",
+            "phone",
+            dict(
+                uuid="x", filename="x.jpg", subject="other", capture_env_lighting="dark"
+            ),
         )
     )
     page.route("**/*", lambda r: r.fulfill(body=""))
@@ -53,6 +58,14 @@ with sync_playwright() as p:
             body=asset_path(src, "quality.html").read_text(), content_type="text/html"
         ),
     )
+    page.route(
+        "**/fields.js",
+        lambda r: r.fulfill(
+            body=asset_path(src, "fields.js").read_text(),
+            content_type="text/javascript",
+        ),
+    )
+    page.route("**/api/fields", lambda r: r.fulfill(json=fixture_fields()))
     page.route("**/api/captures", lambda r: r.fulfill(json=rows))
     page.route("**/api/batches", lambda r: r.fulfill(json=[]))
 

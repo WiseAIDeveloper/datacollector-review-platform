@@ -27,12 +27,81 @@ MODULES = {
     "edit_capture": "app.captures.editing",
     "quality_reviews": "app.captures.quality",
     "ingestion": "app.ingestion",
+    "naming": "app.captures.naming",
 }
 MATRIX_NAME = "internal_colour_print_enhancement_2"
 INDEXES = ("index_annotation_.csv", "index_annotation_mykadfront.csv")
+# Fixture fields, as a naming file defines them. Field names are also the index
+# columns, the matrix columns, and the expected_<field> batch lists.
+NAMING = {
+    "subject": {"role": "identity", "accepted": []},
+    "capture_env_lighting": {
+        "required": True,
+        "accepted": ["dark", "office-white", "office-yellow"],
+    },
+    "capture_device": {
+        "role": "device",
+        "app": {"column": "capture_device", "fallback": "input_sensor.model"},
+        "web": {"column": "capture_device"},
+        "accepted": {"iphone-13": {}, "huawei-nova-7i": {}, "SM-F946U1": {}},
+    },
+    "input_sensor": {},
+    "user": {},
+}
 IMAGE = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
 )
+
+
+def fixture_fields():
+    """The /api/fields response for the fixture naming file."""
+    return load_application("naming").Naming(NAMING).describe()
+
+
+def mock_record(key, folder, sdk, device, metadata, naming=None):
+    """Build an /api/captures record for mocked browser scenarios."""
+    fields = {name: metadata.get(name, "") for name in NAMING}
+    fields["capture_device"] = device
+    return dict(
+        key=key,
+        folder=folder,
+        sdk=sdk,
+        device=device,
+        identity=metadata.get("subject", ""),
+        fields=fields,
+        annotation={},
+        naming=naming or {},
+        metadata=metadata,
+    )
+
+
+def with_fields(rows):
+    """Give mocked capture records the identity and fields the pages read."""
+    return [
+        mock_record(
+            r["key"], r["folder"], r["sdk"], r["device"], r["metadata"], r.get("naming")
+        )
+        | {k: v for k, v in r.items() if k not in {"naming"}}
+        for r in rows
+    ]
+
+
+def mock_fields(page, source):
+    """Serve fields.js and /api/fields to a page whose other requests are mocked."""
+    page.route(
+        "**/fields.js",
+        lambda r: r.fulfill(
+            body=asset_path(source, "fields.js").read_text(),
+            content_type="text/javascript",
+        ),
+    )
+    page.route("**/api/fields", lambda r: r.fulfill(json=fixture_fields()))
+
+
+def fixture_naming():
+    """Return a function giving the fixture naming document, as the app passes it."""
+    naming = load_application("naming").Naming(NAMING)
+    return lambda: naming
 
 
 def application_module(name, source=SOURCE):
@@ -81,7 +150,7 @@ def dataset(root, count=5):
             uuid=uuid,
             filename=f"{uuid}.jpg",
             subject="fixture",
-            lighting="dark",
+            capture_env_lighting="dark",
             capture_device="iphone-13",
             input_sensor="websdk;mobilesafari;ios;mobile",
             user="fixture-user",
@@ -97,7 +166,9 @@ def dataset(root, count=5):
             image.write_bytes(IMAGE)
         annotation = folder / "mykadfront/datacollector_annotation" / f"{uuid}.json"
         annotation.parent.mkdir(parents=True, exist_ok=True)
-        annotation.write_text(json.dumps({"lighting": "office-white", "uuid": uuid}))
+        annotation.write_text(
+            json.dumps({"capture_env_lighting": "office-white", "uuid": uuid})
+        )
     write_csv(folder / INDEXES[0], rows)
     write_csv(
         folder / INDEXES[1],
@@ -109,9 +180,9 @@ def dataset(root, count=5):
             dict(
                 matrix_name=MATRIX_NAME,
                 folder="genuine",
-                lighting="dark",
+                capture_env_lighting="dark",
                 sdk="web",
-                device="iphone-13",
+                capture_device="iphone-13",
                 expected_count_per_identity=str(count),
             )
         ],
@@ -122,9 +193,9 @@ def dataset(root, count=5):
             dict(
                 batch_name="genuine",
                 test_plan_name="colour_print_enhancement_2",
-                expected_lighting="dark;office-white;office-yellow",
-                expected_identities="fixture;another",
-                expected_web_devices="iphone-13",
+                expected_capture_env_lighting="dark;office-white;office-yellow",
+                expected_subject="fixture;another",
+                expected_capture_device="iphone-13",
             )
         ],
     )
@@ -259,9 +330,8 @@ def running_server(
             str(root / "project-folders") if folder_mode else ""
         )
         environment["WRITE_PIN_REQUIRED"] = "true" if write_pin_required else "false"
-        if naming is not None:
-            (root / "naming.json").write_text(json.dumps(naming))
-            environment["NAMING_FILE"] = str(root / "naming.json")
+        (root / "naming.json").write_text(json.dumps(naming or NAMING))
+        environment["NAMING_FILE"] = str(root / "naming.json")
         client = FixtureServer(
             f"http://127.0.0.1:{port}",
             token,

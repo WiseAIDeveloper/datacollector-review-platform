@@ -26,7 +26,7 @@ with sync_playwright() as p:
     expect(page.locator("#results")).to_contain_text(row["metadata"]["filename"])
     page.locator("#results button").first.click()
     expect(page.locator("#review")).to_be_visible()
-    page.locator("#edit-lighting").wait_for()
+    page.locator("#edit-capture_env_lighting").wait_for()
     page.wait_for_function('document.getElementById("review-image").naturalWidth>0')
     page.route("**/api/capture?*", lambda r: r.fulfill(json=row))
 
@@ -47,10 +47,10 @@ with sync_playwright() as p:
     )
     new_light = (
         "office-yellow"
-        if row["metadata"].get("lighting") != "office-yellow"
+        if row["metadata"].get("capture_env_lighting") != "office-yellow"
         else "dark"
     )
-    page.locator("#edit-lighting").select_option(new_light)
+    page.locator("#edit-capture_env_lighting").select_option(new_light)
     page.once("dialog", lambda d: d.dismiss())
     page.locator("#save-metadata").click()
     assert not writes
@@ -61,9 +61,9 @@ with sync_playwright() as p:
 
     page.on("dialog", confirm)
     page.locator("#save-metadata").click()
-    expect(page.locator("#edit-lighting")).to_have_value(new_light)
+    expect(page.locator("#edit-capture_env_lighting")).to_have_value(new_light)
     page.wait_for_function("!editing")
-    assert writes[0]["changes"] == {"lighting": new_light}
+    assert writes[0]["changes"] == {"capture_env_lighting": new_light}
     page.locator("#remove-capture").click()
     expect(page.locator("#review")).not_to_be_visible()
     assert writes[-1]["confirm_count"] == 1

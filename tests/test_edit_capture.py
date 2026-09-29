@@ -4,7 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-edit_capture = support.load_application("edit_capture").edit_capture
+NAMING = support.fixture_naming()()
+
+
+def edit_capture(*args, **options):
+    """Edit with the fixture naming file, which defines the editable columns."""
+    edit = support.load_application("edit_capture").edit_capture
+    return edit(*args, naming=NAMING, **options)
+
+
 Conflict = support.load_application("edit_capture").Conflict
 INDEXES = support.INDEXES
 
@@ -20,7 +28,7 @@ class EditTests(unittest.TestCase):
             uuid="one",
             filename="one.jpg",
             subject="person",
-            lighting="dark",
+            capture_env_lighting="dark",
             capture_device="iphone-13",
         )
         for name in INDEXES:
@@ -42,13 +50,15 @@ class EditTests(unittest.TestCase):
             "genuine",
             "one",
             "one.jpg",
-            {"lighting": "office-white"},
+            {"capture_env_lighting": "office-white"},
             self.row,
         )
         for name in INDEXES:
             with (self.folder / name).open() as f:
                 rows = list(csv.DictReader(f))
-            self.assertEqual([r["lighting"] for r in rows], ["office-white", "dark"])
+            self.assertEqual(
+                [r["capture_env_lighting"] for r in rows], ["office-white", "dark"]
+            )
         self.assertEqual((self.folder / "one.jpg").read_bytes(), b"image")
         self.assertEqual((self.folder / "one.json").read_text(), "{}")
 
@@ -73,12 +83,12 @@ class EditTests(unittest.TestCase):
             "genuine",
             "one",
             "one.jpg",
-            {"lighting": "office-yellow"},
+            {"capture_env_lighting": "office-yellow"},
             self.row,
         )
         with (self.folder / INDEXES[1]).open() as f:
             row = next(csv.DictReader(f))
-        self.assertEqual(row["lighting"], "office-yellow")
+        self.assertEqual(row["capture_env_lighting"], "office-yellow")
         self.assertNotIn("filename", row)
 
     def test_stale_metadata_rejected(self):
@@ -89,15 +99,15 @@ class EditTests(unittest.TestCase):
                 "genuine",
                 "one",
                 "one.jpg",
-                {"lighting": "office-white"},
-                dict(self.row, lighting="office-yellow"),
+                {"capture_env_lighting": "office-white"},
+                dict(self.row, capture_env_lighting="office-yellow"),
             )
 
     def test_protected_fields_and_bad_values(self):
         """Verify protected fields and bad values."""
         for change in [
             {"ori_path": "elsewhere"},
-            {"lighting": "invalid"},
+            {"capture_env_lighting": "invalid"},
             {"subject": ""},
         ]:
             with self.assertRaises(ValueError):
@@ -113,7 +123,7 @@ class EditTests(unittest.TestCase):
                 "genuine",
                 "one",
                 "one.jpg",
-                {"lighting": "office-white"},
+                {"capture_env_lighting": "office-white"},
                 self.row,
             )
         self.assertEqual((self.folder / INDEXES[0]).read_bytes(), before)

@@ -11,7 +11,9 @@ class IngestionTests(unittest.TestCase):
         """Create disposable fixtures for this test."""
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.log = IngestionLog(self.root, self.root / "history.sqlite")
+        self.log = IngestionLog(
+            self.root, self.root / "history.sqlite", support.fixture_naming()
+        )
 
     def tearDown(self):
         """Close fixture resources and remove temporary files."""
@@ -27,7 +29,7 @@ class IngestionTests(unittest.TestCase):
                 uuid=n,
                 filename=n + ".jpg",
                 ori_path="orig/" + n + ".jpg",
-                lighting="dark",
+                capture_env_lighting="dark",
                 subject="fixture",
                 capture_device="iphone-13",
                 input_sensor="websdk;mobilesafari;ios;mobile",
@@ -54,7 +56,12 @@ class IngestionTests(unittest.TestCase):
         self.assertEqual((state["total"], state["ingested"]), (2, 1))
         event = state["events"][0]
         self.assertEqual(
-            (event["filename"], event["lighting"], event["sdk"], event["device"]),
+            (
+                event["filename"],
+                event["fields"]["capture_env_lighting"],
+                event["sdk"],
+                event["fields"]["capture_device"],
+            ),
             ("new.jpg", "dark", "web", "iphone-13"),
         )
 
@@ -63,7 +70,9 @@ class IngestionTests(unittest.TestCase):
         folder = self.write_batch(["old"])
         self.log.scan()
         self.log.db.close()
-        self.log = IngestionLog(self.root, self.root / "history.sqlite")
+        self.log = IngestionLog(
+            self.root, self.root / "history.sqlite", support.fixture_naming()
+        )
         self.log.scan()
         (folder / "orig/old.jpg").unlink()
         self.log.scan()
@@ -121,7 +130,9 @@ class IngestionTests(unittest.TestCase):
         lines = [json.loads(line) for line in path.read_text().splitlines()]
         self.assertEqual([r["filename"] for r in lines], ["one.jpg", "two.jpg"])
         self.assertEqual([r["status"] for r in lines], ["existing", "ingested"])
-        self.assertEqual(lines[1]["lighting"], "dark")
+        self.assertEqual(lines[1]["capture_env_lighting"], "dark")
+        self.assertEqual(lines[1]["capture_device"], "iphone-13")
+        self.assertNotIn("fields", lines[1])
         path.unlink()
         self.log.scan()
         self.assertEqual(len(path.read_text().splitlines()), 2)
@@ -141,31 +152,47 @@ class IngestionTests(unittest.TestCase):
             key=original["key"],
             folder="genuine",
             sdk="app",
-            device="JNY-LX2",
-            metadata=dict(
-                uuid="one",
-                filename="one.jpg",
-                lighting="office-yellow",
-                subject="corrected",
-                test_plan_name="plan",
-            ),
+            fields=dict(capture_env_lighting="office-yellow", subject="corrected"),
+            naming={},
+            metadata=dict(uuid="one", filename="one.jpg", test_plan_name="plan"),
         )
         result = with_current_metadata(snapshot, [live])
+        event = result["events"][0]
         self.assertEqual(
-            (
-                result["events"][0]["lighting"],
-                result["events"][0]["subject"],
-                result["events"][0]["sdk"],
-                result["events"][0]["device"],
-            ),
-            ("office-yellow", "corrected", "app", "JNY-LX2"),
+            (event["fields"], event["sdk"], event["test_plan"]),
+            (live["fields"], "app", "plan"),
         )
-        self.assertEqual(snapshot["events"][0]["lighting"], "dark")
+        self.assertEqual(
+            snapshot["events"][0]["fields"]["capture_env_lighting"], "dark"
+        )
         self.assertEqual(self.log.log_path.read_bytes(), before)
         self.assertFalse(with_current_metadata(snapshot, [])["events"][0]["available"])
-        live["metadata"]["lighting"] = ""
+
+    def test_older_columns_move_into_fields(self):
+        """An older database keeps each per-field column under its own name."""
+        import sqlite3
+
+        self.log.db.close()
+        path = self.root / "old.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE events (id INTEGER PRIMARY KEY, key TEXT UNIQUE, status TEXT, detected_at TEXT, batch TEXT, filename TEXT, uuid TEXT, lighting TEXT, subject TEXT, sdk TEXT, device TEXT, test_plan TEXT, creation_time TEXT)"
+        )
+        db.execute(
+            "INSERT INTO events (key, status, lighting, subject, sdk, device) "
+            "VALUES ('a/b/c', 'existing', 'dark', 'fixture', 'web', 'iphone-13')"
+        )
+        db.commit()
+        db.close()
+        self.log = IngestionLog(self.root, path, support.fixture_naming())
+        event = self.log.snapshot()["events"][0]
         self.assertEqual(
-            with_current_metadata(snapshot, [live])["events"][0]["lighting"], ""
+            (event["key"], event["sdk"], event["fields"]),
+            (
+                "a/b/c",
+                "web",
+                dict(lighting="dark", subject="fixture", device="iphone-13"),
+            ),
         )
 
     def test_action_history_and_physical_file(self):
@@ -188,20 +215,21 @@ class IngestionTests(unittest.TestCase):
         ]
         self.assertEqual(lines[0]["changes"]["lighting"]["to"], "office-white")
         self.log.db.close()
-        self.log = IngestionLog(self.root, self.root / "history.sqlite")
+        self.log = IngestionLog(
+            self.root, self.root / "history.sqlite", support.fixture_naming()
+        )
         self.assertEqual(self.log.snapshot()["action_total"], 2)
 
     def test_app_sensor(self):
-        """Verify app sensor."""
-        device_info = support.load_application("ingestion").device_info
-
-        self.assertEqual(
-            device_info({"input_sensor": "{'model':'JNY-LX2'}"}), ("app", "JNY-LX2")
-        )
-        self.assertEqual(
-            device_info({"input_sensor": "model:iPhone14,ios:26.2"}),
-            ("app", "iPhone14"),
-        )
+        """App captures log the detected model as their device."""
+        logged_fields = support.load_application("ingestion").logged_fields
+        naming = support.fixture_naming()()
+        for sensor, model in [
+            ("{'model':'JNY-LX2'}", "JNY-LX2"),
+            ("model:iPhone14,ios:26.2", "iPhone14"),
+        ]:
+            sdk, fields = logged_fields(naming, {"input_sensor": sensor})
+            self.assertEqual((sdk, fields["capture_device"]), ("app", model))
 
     def test_scanner_loop(self):
         """Verify scanner loop."""

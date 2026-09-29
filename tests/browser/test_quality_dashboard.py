@@ -1,7 +1,7 @@
 import shutil
 import os
 from pathlib import Path
-from tests.support import asset_path
+from tests.support import asset_path, mock_fields, with_fields
 from playwright.sync_api import sync_playwright, expect
 
 src = Path(os.environ["REVIEW_SOURCE"])
@@ -25,7 +25,7 @@ with sync_playwright() as p:
                 uuid=str(i),
                 filename=str(i) + ".jpg",
                 subject="person",
-                lighting="dark",
+                capture_env_lighting="dark",
                 test_plan_name="colour_print_enhancement_2",
             ),
         )
@@ -44,7 +44,8 @@ with sync_playwright() as p:
             body=asset_path(src, "terminal.css").read_text(), content_type="text/css"
         ),
     )
-    page.route("**/api/captures", lambda r: r.fulfill(json=rows))
+    page.route("**/api/captures", lambda r: r.fulfill(json=with_fields(rows)))
+    mock_fields(page, src)
     page.route("**/api/batches", lambda r: r.fulfill(json=[]))
     page.route(
         "**/api/matrix",
@@ -52,9 +53,9 @@ with sync_playwright() as p:
             json=[
                 dict(
                     folder="genuine",
-                    lighting="dark",
+                    capture_env_lighting="dark",
                     sdk="web",
-                    device="iphone-13",
+                    capture_device="iphone-13",
                     expected_count_per_identity="3",
                 )
             ]
@@ -81,7 +82,7 @@ with sync_playwright() as p:
     page.locator('[data-view="batches"]').click()
     expect(button).to_have_text("Reviewed · 3/3")
     assert "reviewed" in button.get_attribute("class")
-    page.get_by_text("Show batch grouped by lighting", exact=True).click()
+    page.get_by_text("Show batch grouped by capture_env_lighting", exact=True).click()
     expect(page.locator(".reviewed-check")).to_be_checked()
     assert (
         button.evaluate("(e)=>getComputedStyle(e).backgroundColor") == "rgb(21, 26, 32)"

@@ -1,20 +1,7 @@
 let capture = null,
   editing = false,
-  opening = 0;
-const editable = [
-  "subject",
-  "lighting",
-  "capture_device",
-  "input_sensor",
-  "user",
-];
-const labels = {
-  subject: "Identity",
-  lighting: "Lighting",
-  capture_device: "Web capture device (blank for App SDK)",
-  input_sensor: "Input sensor / App device metadata",
-  user: "User",
-};
+  opening = 0,
+  editable = [];
 /* Enable review actions only when a capture is ready and no edit is running. */
 function controls(disabled) {
   $("save-metadata").disabled = disabled;
@@ -33,7 +20,8 @@ async function openCapture(key) {
   controls(true);
   $("review").showModal();
   try {
-    const responses = await Promise.all([
+    const [fields, ...responses] = await Promise.all([
+      window.captureFields.load(),
       fetch("/api/capture?key=" + encodeURIComponent(key)),
       fetch("/api/batches"),
       fetch("/api/captures"),
@@ -61,51 +49,27 @@ async function openCapture(key) {
     );
     if (!batch)
       throw Error("This batch has no matching definition in the batches CSV.");
-    const split =
-      /* Read nonempty choices from a semicolon-separated batch setting. */ (
-        value,
-      ) =>
-        (value || "")
-          .split(";")
-          .map(
-            /* Build the corresponding display or request value for each item. */ (
-              v,
-            ) => v.trim(),
-          )
-          .filter(Boolean);
-    const identities = split(batch.expected_identities);
-    const choices = {
-      subject: identities.length
-        ? identities
-        : [
-            ...new Set(
-              rows
-                .filter(
-                  /* Keep items that match the current selection criteria. */ (
-                    r,
-                  ) =>
-                    r.metadata.test_plan_name === row.metadata.test_plan_name,
-                )
-                .map(
-                  /* Build the corresponding display or request value for each item. */ (
-                    r,
-                  ) => r.metadata.subject,
-                )
-                .filter(Boolean),
-            ),
-          ].sort(),
-      lighting: split(batch.expected_lighting),
-      capture_device: ["", ...split(batch.expected_web_devices)],
-    };
+    editable = fields.editable;
+    const choices = Object.fromEntries(
+      editable.map((field) => [
+        field.column,
+        window.captureFields.choices(
+          field,
+          batch,
+          rows,
+          row.metadata.test_plan_name,
+        ),
+      ]),
+    );
     $("review-title").textContent = row.folder + " / " + row.metadata.filename;
     $("review-image").src = "/api/image?key=" + encodeURIComponent(row.key);
     $("all-metadata").textContent = JSON.stringify(row.metadata, null, 2);
-    for (const k of editable) {
+    for (const field of editable) {
+      const k = field.column;
       const label = document.createElement("label");
-      label.textContent = labels[k];
-      const input = document.createElement(
-        choices[k] ? "select" : k === "input_sensor" ? "textarea" : "input",
-      );
+      label.textContent = field.key;
+      label.title = field.description;
+      const input = document.createElement(choices[k] ? "select" : "input");
       input.id = "edit-" + k;
       const current = row.metadata[k] || "";
       if (choices[k]) {
@@ -120,11 +84,7 @@ async function openCapture(key) {
         for (const value of [...new Set(choices[k])]) {
           const option = document.createElement("option");
           option.value = value;
-          option.textContent =
-            value ||
-            (k === "capture_device"
-              ? "App SDK — use input sensor"
-              : "(missing)");
+          option.textContent = value || window.captureFields.blank(field);
           input.append(option);
         }
       }
@@ -134,10 +94,7 @@ async function openCapture(key) {
     }
     const hint = document.createElement("p");
     hint.textContent =
-      "Lighting and Web devices: batch CSV. Identities: " +
-      (identities.length
-        ? "batch CSV."
-        : "annotated identities in this test plan.");
+      "Choices: the batch's expected_<field> list, else the naming file.";
     $("review-fields").append(hint);
     capture = row;
     controls(false);
@@ -151,6 +108,7 @@ async function executeEdit(remove) {
   const row = capture;
   const changes = Object.fromEntries(
     editable
+      .map((field) => field.column)
       .filter(
         /* Keep items that match the current selection criteria. */ (k) =>
           $("edit-" + k).value !== (row.metadata[k] || ""),

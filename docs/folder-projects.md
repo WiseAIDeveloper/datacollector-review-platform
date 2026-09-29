@@ -75,7 +75,8 @@ Capture discovery requires an exact pair: the dataset folder name must equal
 `test_plan_name`. Keep that plan value consistent in both project CSVs and the
 collector. The CSV filename and `matrix_name` identify the review matrix and do
 not need to equal the collector's plan slug. Coverage additionally requires the
-capture's lighting, SDK, and device to match a matrix combination.
+capture's SDK and every [naming-file field](naming.md) the matrix plans (each
+matrix column named after a field) to match a matrix combination.
 
 The dashboard derives its identity selector, coverage, quality counts, and
 pending decisions from the selected project's configured test-plan identifiers.
@@ -101,8 +102,9 @@ disk. Unknown captures remain reviewable but do not match App/Web matrix rows.
 
 ## Check device compatibility before collection
 
-Use the collector's emitted device values when preparing matrix rows and
-`expected_web_devices` / `expected_app_devices`. Reuse those values in any
+Use the collector's emitted device values when preparing matrix rows and the
+batch list `expected_<device field>` (for example `expected_capture_device`),
+which holds the devices of both SDKs. Reuse those values in any
 identity-expanded collection checklist. For example, Samsung Fold 5 Web uses
 `samsung-galaxy-z-fold-5`; its native App sensor reports `SM-F946U1`. These are
 SDK-specific identifiers, not interchangeable aliases. Keep display labels
@@ -114,15 +116,24 @@ After creating or regenerating a project's CSVs, run:
 python scripts/audit_project_devices.py \
   --projects-root /mnt5/auto-ekyc/datacollection_review/idrecapture/projects \
   --dataset /mnt5/auto-ekyc/idrecapture \
-  --project 002_MyKad26_InitialCollection
+  --project 002_MyKad26_InitialCollection \
+  --naming /mnt5/auto-ekyc/datacollection_review/idrecapture/naming/naming.json
 ```
 
-This read-only check exits nonzero if device lists differ between the batch
-CSV and matrix, or observed SDK/device pairs are absent from the matrix. Run it
+This read-only check exits nonzero if any batch `expected_<field>` list differs
+from the values the matrix plans for that batch, or captures have a batch, SDK,
+and planned field values that no matrix row has. Run it
 again after the first sample from each device/platform; uncollected devices
 cannot be checked against real metadata yet. It does not guess aliases or decide
 which source is correct when a phone label contradicts its native sensor model.
 
-Add `--naming /path/to/naming.json` to also list capture values that are not
-standard [names](naming.md), grouped with their capture counts, and test-plan
-lighting or device values that are not standard names.
+It also lists capture values that are not standard [names](naming.md), grouped
+with their capture counts, and matrix values that are not standard names.
+
+Add `--options <file>` (repeatable) with the collector's option files for the
+project to check what the collector offers. A plan may offer any subset of the
+naming-file fields and values, but each value it offers for a field must be one
+of that field's standard names. Unknown capture option fields are reported;
+collector metadata (`batch`, `test_plan_name`, and `idType`) is excluded. Form
+files that point to option lists with `$ref` are followed, and broken references
+fail the audit.

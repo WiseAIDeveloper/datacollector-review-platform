@@ -33,7 +33,7 @@ with sync_playwright() as p:
             detected_at=datetime.now(timezone.utc).isoformat(),
             filename=name,
             batch="fixture_batch",
-            lighting="dark",
+            capture_env_lighting="dark",
             subject="fixture",
             sdk="web",
             device="iphone-13",

@@ -7,37 +7,34 @@ from pathlib import Path
 from .catalog import EXCLUDED
 from .deletion import INDEXES, SAFE_FOLDER, atomic_write
 
-FIELDS = {"subject", "lighting", "capture_device", "input_sensor", "user"}
-LIGHTING = {"dark", "office-white", "office-yellow"}
-
 
 class Conflict(ValueError):
     """The stored capture or review differs from the user's expected snapshot."""
 
 
 def validate_changes(changes, allowed_fields, naming=None):
-    """Reject unsupported metadata columns and values outside the standard names."""
-    if (
-        not isinstance(changes, dict)
-        or not changes
-        or not set(changes) <= allowed_fields
-    ):
+    """Reject columns no field edits and values outside each field's standard names.
+
+    Without `allowed_fields`, every naming-file field column may be edited. A blank
+    device column means the App SDK's detected model is used instead.
+    """
+    columns = naming.editable() if naming else {}
+    allowed = set(columns) if allowed_fields is None else allowed_fields
+    if not isinstance(changes, dict) or not changes or not set(changes) <= allowed:
         raise ValueError("Invalid metadata fields")
     if any(
         not isinstance(value, str) or len(value) > 4096 for value in changes.values()
     ):
         raise ValueError("Invalid field value")
-    lighting = naming.lighting if naming else LIGHTING
-    if "lighting" in changes and changes["lighting"] not in lighting:
-        raise ValueError("Choose " + ", ".join(sorted(lighting)))
-    if "subject" in changes and not changes["subject"].strip():
-        raise ValueError("Identity cannot be empty")
-    if naming is None:
-        return
-    if naming.identities and changes.get("subject", "") not in {"", *naming.identities}:
-        raise ValueError("Identity is not in the naming file")
-    if changes.get("capture_device", "") not in {"", *naming.devices}:
-        raise ValueError("Device is not a standard device name")
+    for column, value in changes.items():
+        field = columns.get(column)
+        if field is None or field.accepted is None:
+            continue
+        if field.role == "identity" and not value.strip():
+            raise ValueError(f"{field.key} cannot be empty")
+        blank = not value and (field.role == "device" or not field.required)
+        if field.accepted and not blank and value not in field.accepted:
+            raise ValueError(f"Choose a standard {field.key}")
 
 
 def prepare_edit(path, folder, uuid, filename, changes, expected):
@@ -78,7 +75,7 @@ def edit_capture(
     changes,
     expected,
     *,
-    allowed_fields=FIELDS,
+    allowed_fields=None,
     naming=None,
 ):
     """Update both indexes, preserving optimistic checks and rolling back failed writes."""

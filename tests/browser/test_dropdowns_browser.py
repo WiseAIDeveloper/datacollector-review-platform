@@ -39,7 +39,7 @@ with sync_playwright() as p:
     page.goto(BASE + "/search.html")
     page.evaluate("(key)=>openCapture(key)", row["key"])
     page.locator("#edit-subject").wait_for()
-    for field in ["subject", "lighting", "capture_device"]:
+    for field in ["subject", "capture_env_lighting", "capture_device"]:
         assert page.locator("#edit-" + field).evaluate("(e)=>e.tagName") == "SELECT"
 
     def values(field):
@@ -48,8 +48,10 @@ with sync_playwright() as p:
             "(options)=>options.map(o=>o.value)"
         )
 
-    assert set(batch["expected_lighting"].split(";")) <= set(values("lighting"))
-    assert set(batch["expected_web_devices"].split(";")) <= set(
+    assert set(batch["expected_capture_env_lighting"].split(";")) <= set(
+        values("capture_env_lighting")
+    )
+    assert set(batch["expected_capture_device"].split(";")) <= set(
         values("capture_device")
     )
     assert "" in values("capture_device")
@@ -59,9 +61,9 @@ with sync_playwright() as p:
         (
             dict(
                 b,
-                expected_lighting="office-white",
-                expected_web_devices="fixture-web-device",
-                expected_identities="fixture-identity",
+                expected_capture_env_lighting="office-white",
+                expected_capture_device="fixture-web-device",
+                expected_subject="fixture-identity",
             )
             if b is batch
             else b
@@ -74,9 +76,9 @@ with sync_playwright() as p:
     assert "fixture-identity" in values("subject") and "fixture-web-device" in values(
         "capture_device"
     )
-    assert set(values("lighting")) == {
+    assert set(values("capture_env_lighting")) == {
         "office-white",
-        row["metadata"].get("lighting", ""),
+        row["metadata"].get("capture_env_lighting", ""),
     }
     assert page.locator("#edit-subject").input_value() == row["metadata"]["subject"]
     browser.close()

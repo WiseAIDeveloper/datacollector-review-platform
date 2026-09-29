@@ -19,8 +19,8 @@ current = {r["key"]: r for r in rows}
 for event in state["events"]:
     if event["available"]:
         row = current[event["key"]]
-        assert event["lighting"] == row["metadata"].get("lighting", "")
-        assert event["subject"] == row["metadata"].get("subject", "")
+        assert event["fields"] == row["fields"]
+        assert event["fields"]["subject"] == row["metadata"].get("subject", "")
 print("PASS live ingestion API matches current CSV metadata")
 event = next(e for e in state["events"] if e["available"])
 row = current[event["key"]]
@@ -38,24 +38,31 @@ with sync_playwright() as p:
         """Record a mocked metadata edit and update the synthetic response."""
         changes = route.request.post_data_json["changes"]
         row["metadata"].update(changes)
-        event.update(changes)
+        event["fields"].update(changes)
         route.fulfill(json={"updated": True})
 
     page.route("**/api/edit-capture", save)
     page.goto(BASE + "/ingestion.html")
     page.locator("#logs button").click()
-    page.locator("#edit-lighting").wait_for()
-    lighting = (
-        "office-white" if row["metadata"].get("lighting") != "office-white" else "dark"
+    page.locator("#edit-capture_env_lighting").wait_for()
+    capture_env_lighting = (
+        "office-white"
+        if row["metadata"].get("capture_env_lighting") != "office-white"
+        else "dark"
     )
-    page.locator("#edit-lighting").select_option(lighting)
+    page.locator("#edit-capture_env_lighting").select_option(capture_env_lighting)
     page.on(
         "dialog", lambda d: d.accept("test-pin") if d.type == "prompt" else d.accept()
     )
     page.locator("#save-metadata").click()
-    expect(page.locator("#logs tr").first.locator("td").nth(2)).to_have_text(lighting)
+    # Columns: picture, batch, SDK, then fields in naming-file order.
+    expect(page.locator("#logs tr").first.locator("td").nth(4)).to_have_text(
+        capture_env_lighting
+    )
     page.wait_for_function("!editing")
-    expect(page.locator("#edit-lighting")).to_have_value(lighting)
+    expect(page.locator("#edit-capture_env_lighting")).to_have_value(
+        capture_env_lighting
+    )
     browser.close()
 print(
     "PASS saving metadata refreshes visible ingestion row (mocked edit, no real changes)"

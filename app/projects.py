@@ -9,14 +9,9 @@ import uuid
 
 from .captures.catalog import MATRIX_NAME, batches, matrix
 
-MATRIX_FIELDS = {
-    "matrix_name",
-    "folder",
-    "lighting",
-    "sdk",
-    "device",
-    "expected_count_per_identity",
-}
+COUNT = "expected_count_per_identity"
+# Every other matrix column is a requirement; naming-file fields add their own.
+MATRIX_FIELDS = {"matrix_name", "folder", "sdk", COUNT}
 BATCH_FIELDS = {"batch_name", "test_plan_name"}
 
 
@@ -63,12 +58,9 @@ def validate_pair(plan, definitions):
             raise ValueError("Every test-plan folder must match a batch_name")
         if row["sdk"] not in {"web", "app"}:
             raise ValueError("Test-plan sdk must be web or app")
-        if (
-            not row["expected_count_per_identity"].isascii()
-            or not row["expected_count_per_identity"].isdigit()
-        ):
+        if not row[COUNT].isascii() or not row[COUNT].isdigit():
             raise ValueError("Expected counts must be non-negative integers")
-    keys = [(r["folder"], r["lighting"], r["sdk"], r["device"]) for r in plan]
+    keys = [tuple(v for k, v in sorted(r.items()) if k != COUNT) for r in plan]
     if len(keys) != len(set(keys)):
         raise ValueError("Test plan contains duplicate capture requirements")
     return next(iter(names))

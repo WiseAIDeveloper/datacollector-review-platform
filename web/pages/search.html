@@ -239,13 +239,10 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr>
+          <tr id="results-head">
             <th>Picture</th>
             <th>Batch</th>
-            <th>Lighting</th>
-            <th>Identity</th>
             <th>SDK</th>
-            <th>Device</th>
             <th></th>
           </tr>
         </thead>
@@ -281,6 +278,7 @@
     </div>
   </dialog>
   <script src="/project_context.js"></script>
+  <script src="/fields.js"></script>
   <script>
     const $ = /* Find an element by its page identifier. */ (id) =>
       document.getElementById(id);
@@ -296,17 +294,30 @@
         const res = await fetch("/api/search?q=" + encodeURIComponent(query));
         if (!res.ok) throw Error(await res.text());
         const data = await res.json();
+        const naming = await window.captureFields.load();
         if (ticket !== searchTicket) return;
+        const head = ["Picture", "Batch", "SDK"]
+          .concat(
+            naming.checked.map((f) => f.key),
+            [""],
+          )
+          .map((label) => {
+            const th = document.createElement("th");
+            th.textContent = label;
+            return th;
+          });
+        $("results-head").replaceChildren(...head);
         $("results").replaceChildren();
         for (const row of data.results) {
           const tr = document.createElement("tr");
           for (const [field, value] of [
             ["filename", row.metadata.filename],
             ["folder", row.folder],
-            ["lighting", row.lighting ?? row.metadata.lighting],
-            ["identity", row.identity ?? row.metadata.subject],
             ["sdk", row.sdk],
-            ["device", row.device],
+            ...naming.checked.map((f) => [
+              f.key,
+              window.captureFields.value(row, f.key),
+            ]),
           ]) {
             const td = document.createElement("td");
             td.textContent = value || "—";

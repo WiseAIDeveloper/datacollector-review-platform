@@ -10,6 +10,7 @@
 !app/captures/
 !app/captures/__init__.py
 !app/captures/catalog.py
+!app/captures/naming.py
 !app/captures/deletion.py
 !app/captures/editing.py
 !app/captures/quality.py
@@ -23,6 +24,7 @@
 !web/static/
 !web/static/js/
 !web/static/js/capture_review.js
+!web/static/js/fields.js
 !web/static/js/image_zoom.js
 !web/static/css/
 !web/static/css/terminal.css
