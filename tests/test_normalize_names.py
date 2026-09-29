@@ -13,12 +13,12 @@ if not (SOURCE / "scripts/normalize_names.py").is_file():
     raise unittest.SkipTest("Normalization script is not part of this source revision")
 
 NAMING = {
-    "lighting": {
-        "column": "lighting",
+    "capture_env_lighting": {
         "accepted": ["office_white", "office_dark", "office_yellow"],
     },
-    "identity": {"column": "subject", "accepted": []},
-    "device": {
+    "subject": {"role": "identity", "accepted": []},
+    "capture_device": {
+        "role": "device",
         "app": {"column": "capture_device", "fallback": "input_sensor.model"},
         "web": {"column": "capture_device"},
         "accepted": {
@@ -39,8 +39,8 @@ class NormalizeNamesTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.data = self.root / "data"
         self.rows = dataset(self.data, count=3)
-        self.rows[1]["lighting"] = "white"
-        self.rows[2]["lighting"] = "strange"
+        self.rows[1]["capture_env_lighting"] = "white"
+        self.rows[2]["capture_env_lighting"] = "strange"
         # A quoted cell proves unchanged rows keep their exact bytes.
         self.rows[2]["user"] = "a, b"
         write_csv(self.data / "genuine" / INDEXES[0], self.rows)
@@ -48,17 +48,24 @@ class NormalizeNamesTests(unittest.TestCase):
             self.data / "genuine/mykadfront/datacollector_annotation/capture-0.json"
         )
         self.annotation.write_text(
-            '{\n  "lighting": "dark",\n  "capture_device": "iphone-13",\n  "uuid": "capture-0"\n}'
+            '{\n  "capture_env_lighting": "dark",\n  "capture_device": "iphone-13",\n  "uuid": "capture-0"\n}'
         )
         project = self.root / "projects/p1"
         project.mkdir(parents=True)
         write_csv(
             project / "plan.csv",
-            [dict(folder="genuine", lighting="dark", sdk="app", device="SM-1")],
+            [
+                dict(
+                    folder="genuine",
+                    capture_env_lighting="dark",
+                    sdk="app",
+                    capture_device="SM-1",
+                )
+            ],
         )
         write_csv(
             project / "plan_batches.csv",
-            [dict(batch_name="genuine", expected_lighting="dark;white")],
+            [dict(batch_name="genuine", expected_capture_env_lighting="dark;white")],
         )
         (self.root / "naming.json").write_text(json.dumps(NAMING))
 
@@ -74,10 +81,10 @@ class NormalizeNamesTests(unittest.TestCase):
                 str(self.root / "projects"),
                 "--naming",
                 str(self.root / "naming.json"),
-                "--lighting",
-                "dark=office_dark",
-                "--lighting",
-                "white=office_white",
+                "--map",
+                "capture_env_lighting:dark=office_dark",
+                "--map",
+                "capture_env_lighting:white=office_white",
                 *extra,
             ],
             capture_output=True,
@@ -104,17 +111,18 @@ class NormalizeNamesTests(unittest.TestCase):
         changed = {
             (c["field"], c["old"], c["new"]): c["count"] for c in report["changes"]
         }
-        self.assertEqual(changed[("lighting", "dark", "office_dark")], 4)
-        self.assertEqual(changed[("lighting", "white", "office_white")], 2)
-        self.assertEqual(changed[("device", "iphone-13", "iphone_13")], 4)
-        self.assertEqual(changed[("device", "SM-1", "galaxy")], 1)
+        lighting, device = "capture_env_lighting", "capture_device"
+        self.assertEqual(changed[(lighting, "dark", "office_dark")], 4)
+        self.assertEqual(changed[(lighting, "white", "office_white")], 2)
+        self.assertEqual(changed[(device, "iphone-13", "iphone_13")], 4)
+        self.assertEqual(changed[(device, "SM-1", "galaxy")], 1)
         # Unlisted values are reported, never guessed: the fixture's other
         # annotations still say office-white.
         self.assertEqual(
             report["unmapped"],
             [
-                dict(field="lighting", value="office-white", count=2),
-                dict(field="lighting", value="strange", count=1),
+                dict(field="capture_env_lighting", value="office-white", count=2),
+                dict(field="capture_env_lighting", value="strange", count=1),
             ],
         )
 
@@ -141,7 +149,7 @@ class NormalizeNamesTests(unittest.TestCase):
         annotation = self.annotation.read_text()
         self.assertEqual(
             annotation,
-            '{\n  "lighting": "office_dark",\n  "capture_device": "iphone_13",\n  "uuid": "capture-0"\n}',
+            '{\n  "capture_env_lighting": "office_dark",\n  "capture_device": "iphone_13",\n  "uuid": "capture-0"\n}',
         )
         plan = (self.root / "projects/p1/plan.csv").read_text()
         self.assertIn("genuine,office_dark,app,galaxy", plan)

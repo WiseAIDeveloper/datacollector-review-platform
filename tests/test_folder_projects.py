@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app.ingestion import IngestionLog
-from tests.support import running_server
+from tests.support import fixture_naming, running_server
 from tests.test_projects import project_payload
 
 
@@ -162,7 +162,9 @@ class FolderProjectTests(unittest.TestCase):
             root = Path(temporary)
             log = root / "ingestion.jsonl"
             log.write_text('{"broken": true}\n')
-            ingestion = IngestionLog(root, root / "state.sqlite", log_path=log)
+            ingestion = IngestionLog(
+                root, root / "state.sqlite", fixture_naming(), log_path=log
+            )
             try:
                 with self.assertRaises(ValueError):
                     ingestion.restore_logs()

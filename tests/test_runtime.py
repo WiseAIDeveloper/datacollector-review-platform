@@ -1,5 +1,6 @@
 """Runtime configuration and lifecycle checks introduced by the refactor."""
 
+import json
 import os
 import secrets
 import subprocess
@@ -8,7 +9,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import PROJECT, application_module, dataset, load_application
+from tests.support import (
+    NAMING,
+    PROJECT,
+    application_module,
+    dataset,
+    fixture_naming,
+    load_application,
+)
 
 IngestionLog = load_application("ingestion").IngestionLog
 create_server = load_application("server").create_server
@@ -73,6 +81,7 @@ with patch('sqlite3.connect', side_effect=AssertionError('database opened')):
                 for index in range(2):
                     root = Path(temporary) / str(index)
                     dataset(root, count=index + 1)
+                    (root / "naming.json").write_text(json.dumps(NAMING))
                     settings = Settings(
                         root,
                         root / "history.sqlite",
@@ -80,6 +89,7 @@ with patch('sqlite3.connect', side_effect=AssertionError('database opened')):
                         secrets.token_hex(24),
                         "127.0.0.1",
                         0,
+                        naming_file=root / "naming.json",
                     )
                     servers.append(create_server(settings))
                 self.assertEqual(
@@ -105,7 +115,7 @@ with patch('sqlite3.connect', side_effect=AssertionError('database opened')):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             dataset(root, count=1)
-            log = IngestionLog(root, root / "history.sqlite")
+            log = IngestionLog(root, root / "history.sqlite", fixture_naming())
             try:
                 log.start()
                 first = log.thread

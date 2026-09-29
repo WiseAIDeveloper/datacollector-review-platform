@@ -10,7 +10,14 @@ src = Path(os.environ["REVIEW_SOURCE"])
 base = os.environ["VIEWER_URL"]
 data = {
     key: json.load(urllib.request.urlopen(base + "/api/" + key))
-    for key in ["captures", "matrix", "batches", "quality", "ingestion?limit=100"]
+    for key in [
+        "captures",
+        "matrix",
+        "batches",
+        "quality",
+        "fields",
+        "ingestion?limit=100",
+    ]
 }
 with sync_playwright() as p:
     b = p.chromium.launch(

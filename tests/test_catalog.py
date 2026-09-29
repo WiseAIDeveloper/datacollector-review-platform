@@ -1,8 +1,6 @@
 """Characterize dataset-reading functions from both the original and current app."""
 
-import ast
 import csv
-import json
 import tempfile
 import types
 import unittest
@@ -11,7 +9,7 @@ from pathlib import Path
 from tests.support import (
     INDEXES,
     MATRIX_NAME,
-    SOURCE,
+    NAMING,
     dataset,
     load_application,
     write_csv,
@@ -19,36 +17,15 @@ from tests.support import (
 
 
 def catalog_for(root):
-    """Load original reader functions without running the old server's startup code."""
-    if (SOURCE / "app").is_dir() or (SOURCE / "capture_data.py").exists():
-        capture_data = load_application("capture_data")
-
-        return types.SimpleNamespace(
-            records=lambda: capture_data.records(root),
-            matrix=lambda: capture_data.matrix(root),
-            batches=lambda: capture_data.batches(root),
-            collection_annotation=capture_data.collection_annotation,
-        )
-    tree = ast.parse((SOURCE / "server.py").read_text())
-    tree.body = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name in {"records", "matrix", "batches", "collection_annotation"}
-    ]
-    module = types.ModuleType("original_catalog")
-    module.__dict__.update(
-        ast=ast,
-        csv=csv,
-        json=json,
-        Path=Path,
-        ROOT=root,
-        MATRIX_NAME=MATRIX_NAME,
-        MATRIX_PATH=root / f"{MATRIX_NAME}.csv",
-        BATCHES_PATH=root / f"{MATRIX_NAME}_batches.csv",
+    """Bind the catalog readers to one fixture dataset and the fixture fields."""
+    capture_data = load_application("capture_data")
+    naming = load_application("naming").Naming(NAMING)
+    return types.SimpleNamespace(
+        records=lambda: capture_data.records(root, naming),
+        matrix=lambda: capture_data.matrix(root),
+        batches=lambda: capture_data.batches(root),
+        collection_annotation=capture_data.collection_annotation,
     )
-    exec(compile(tree, str(SOURCE / "server.py"), "exec"), module.__dict__)
-    return module
 
 
 class CatalogTests(unittest.TestCase):
@@ -69,7 +46,9 @@ class CatalogTests(unittest.TestCase):
         path = folder / "mykadfront/datacollector_annotation/capture-0.json"
         path.write_text("{")
         self.assertEqual(self.catalog.collection_annotation(folder, "capture-0"), {})
-        self.assertEqual(self.catalog.records()[0]["annotation_lighting"], "")
+        record = self.catalog.records()[0]
+        self.assertEqual(record["annotation"]["capture_env_lighting"], "")
+        self.assertEqual(self.catalog.records()[1]["annotation"]["subject"], "")
 
     def test_records_classify_known_sensors_and_keep_order(self):
         """Known app sensors are recognized; unsupported values remain explicitly unknown."""
@@ -96,12 +75,17 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual([row["metadata"] for row in records], self.rows)
 
     def test_sdk_detection_uses_sensor_before_device_label(self):
-        """Catalog and ingestion agree on web, native, legacy iOS, and unknown sensors."""
+        """Catalog and ingestion agree on web, native, legacy iOS, and unknown sensors.
+
+        The SDK comes from the sensor; the device is the label when there is one,
+        else the App SDK's detected model, as the naming file's device field says.
+        """
         catalog = load_application("capture_data")
         ingestion = load_application("ingestion")
+        naming = load_application("naming").Naming(NAMING)
         cases = [
-            ("websdk;chromemobile;android;mobile", "web", "friendly-phone"),
-            (" WEBSdk;browser ", "web", "friendly-phone"),
+            ("websdk;chromemobile;android;mobile", "web", "JNY-LX2"),
+            (" WEBSdk;browser ", "web", "unknown"),
             ("{'manufacturer': 'HUAWEI', 'model': 'JNY-LX2'}", "app", "JNY-LX2"),
             (
                 '{"manufacturer":"Apple","model":"iPhone14","flag":true}',
@@ -109,37 +93,31 @@ class CatalogTests(unittest.TestCase):
                 "iPhone14",
             ),
             ("model:iPhone14,ios:26.2", "app", "iPhone14"),
-            ("model:Unknown,ios:26.5", "app", "friendly-phone"),
-            ("model: UNKNOWN ,ios:26.5", "app", "friendly-phone"),
-            ('{"model":"Unknown"}', "app", "friendly-phone"),
-            ("", "unknown", "friendly-phone"),
-            ("unrecognized", "unknown", "friendly-phone"),
-            ("{broken", "unknown", "friendly-phone"),
-            ("{}", "unknown", "friendly-phone"),
-            ("{'model': 123}", "unknown", "friendly-phone"),
-            ("model:,ios:26.2", "unknown", "friendly-phone"),
+            ("model:Unknown,ios:26.5", "app", "unknown"),
+            ("model: UNKNOWN ,ios:26.5", "app", "unknown"),
+            ('{"model":"Unknown"}', "app", "unknown"),
+            ("", "unknown", "unknown"),
+            ("unrecognized", "unknown", "unknown"),
+            ("{broken", "unknown", "unknown"),
+            ("{}", "unknown", "unknown"),
+            ("{'model': 123}", "unknown", "unknown"),
+            ("model:,ios:26.2", "unknown", "unknown"),
         ]
         for sensor, sdk, device in cases:
             with self.subTest(sensor=sensor):
-                row = {"input_sensor": sensor, "capture_device": "friendly-phone"}
-                self.assertEqual(catalog.capture_device(row), (sdk, device))
-                self.assertEqual(ingestion.device_info(row), (sdk, device))
+                row = {"input_sensor": sensor}
+                if sdk == "web" and device != "unknown":
+                    row["capture_device"] = device
+                found, fields = catalog.capture_fields(naming, row, {})
+                self.assertEqual(
+                    (found, fields["capture_device"]["value"]), (sdk, device)
+                )
+                self.assertEqual(ingestion.logged_fields(naming, row)[0], sdk)
+        labelled = {"input_sensor": "model:iPhone14", "capture_device": "iphone-13"}
         self.assertEqual(
-            catalog.capture_device({"input_sensor": "websdk;browser"}),
-            ("web", "unknown"),
+            catalog.capture_fields(naming, labelled, {})[1]["capture_device"]["value"],
+            "iphone-13",
         )
-        self.assertEqual(
-            catalog.capture_device({"input_sensor": None, "capture_device": None}),
-            ("unknown", "unknown"),
-        )
-
-    def test_unknown_native_model_without_label_remains_unknown(self):
-        """A native SDK stays App even when neither source provides a device name."""
-        catalog = load_application("capture_data")
-        for sensor in ["model:Unknown,ios:26.5", '{"model":"unknown"}']:
-            self.assertEqual(
-                catalog.capture_device({"input_sensor": sensor}), ("app", "unknown")
-            )
 
     def test_excluded_folders_are_not_catalogued(self):
         """Ignore administrative and excluded batches even when they contain valid indexes."""
@@ -157,7 +135,7 @@ class CatalogTests(unittest.TestCase):
         write_csv(path, [rows[0], {**rows[0], "matrix_name": "other"}])
         self.assertEqual(self.catalog.matrix(), rows)
         self.assertEqual(
-            self.catalog.batches()[0]["expected_identities"], "fixture;another"
+            self.catalog.batches()[0]["expected_subject"], "fixture;another"
         )
 
 

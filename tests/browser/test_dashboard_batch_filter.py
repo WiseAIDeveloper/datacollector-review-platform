@@ -7,16 +7,16 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import expect, sync_playwright
 
-from tests.support import asset_path
+from tests.support import asset_path, fixture_fields, with_fields
 
 source = Path(os.environ["REVIEW_SOURCE"])
 batch_names = ["alpha", "beta", "empty"]
 matrix = [
     dict(
         folder=name,
-        lighting="dark",
+        capture_env_lighting="dark",
         sdk="web",
-        device="iphone-13",
+        capture_device="iphone-13",
         expected_count_per_identity="2",
     )
     for name in batch_names
@@ -32,7 +32,7 @@ rows = [
             uuid=f"{subject}-{index}",
             filename=f"{index}.jpg",
             subject=subject,
-            lighting="dark",
+            capture_env_lighting="dark",
             test_plan_name="colour_print_enhancement_2",
         ),
     )
@@ -41,7 +41,8 @@ rows = [
     for index in range(count)
 ]
 data = {
-    "captures": rows,
+    "fields": fixture_fields(),
+    "captures": with_fields(rows),
     "matrix": matrix,
     "batches": [
         dict(batch_name=name, batch_display_name=name.title(), sort_order=str(i))
@@ -121,7 +122,7 @@ with sync_playwright() as playwright:
                 else item
             )
             for item in matrix
-        ] + [dict(matrix[1], lighting="office")]
+        ] + [dict(matrix[1], capture_env_lighting="office")]
         page.locator("#refresh").click()
         expect(alpha).to_have_attribute("data-status", "completed")
         assert alpha.evaluate("e => getComputedStyle(e).color") == (
@@ -186,7 +187,9 @@ with sync_playwright() as playwright:
             == "rgb(82, 96, 107)"
         )
         page.locator('[data-view="batches"]').click()
-        page.get_by_text("Show batch grouped by lighting", exact=True).click()
+        page.get_by_text(
+            "Show batch grouped by capture_env_lighting", exact=True
+        ).click()
         expect(page.locator(".coverage-table .excess-case")).to_have_count(1)
         assert (
             page.locator(".coverage-table .excess-case td").first.evaluate(
@@ -280,17 +283,19 @@ with sync_playwright() as playwright:
         )
     # A second project's collector plan must drive identity choices and coverage.
     data["matrix"] = matrix
-    data["captures"] = [
-        dict(
-            rows[0],
-            metadata=dict(
-                rows[0]["metadata"],
-                subject="project-two-person",
-                test_plan_name="002_mykad26_initialcollection",
+    data["captures"] = with_fields(
+        [
+            dict(
+                rows[0],
+                metadata=dict(
+                    rows[0]["metadata"],
+                    subject="project-two-person",
+                    test_plan_name="002_mykad26_initialcollection",
+                ),
             ),
-        ),
-        rows[-1],
-    ]
+            rows[-1],
+        ]
+    )
     data["batches"] = [
         dict(batch, test_plan_name="002_mykad26_initialcollection")
         for batch in data["batches"]

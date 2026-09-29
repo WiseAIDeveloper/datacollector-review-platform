@@ -15,7 +15,7 @@ with sync_playwright() as p:
     page = b.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    for api in ["captures", "matrix", "batches", "quality"]:
+    for api in ["captures", "matrix", "batches", "quality", "fields"]:
         data = json.load(
             urllib.request.urlopen(os.environ["VIEWER_URL"] + "/api/" + api)
         )

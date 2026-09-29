@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from .captures.catalog import annotation_path, batches, matrix, records
 from .captures.deletion import delete_capture
 from .captures.editing import Conflict, edit_capture
-from .captures.naming import NamingFile
+from .captures.naming import NamingFile, required_naming
 from .ingestion import IngestionLog, with_current_metadata
 from .captures.quality import read_reviews, save_review
 from .settings import Settings
@@ -32,6 +32,7 @@ STATIC_FILES = {
     "/search.html": "pages/search.html",
     "/ingestion.html": "pages/ingestion.html",
     "/capture_review.js": "static/js/capture_review.js",
+    "/fields.js": "static/js/fields.js",
     "/image_zoom.js": "static/js/image_zoom.js",
     "/terminal.css": "static/css/terminal.css",
     "/frozen_panes.css": "static/css/frozen_panes.css",
@@ -52,16 +53,20 @@ class Application:
         """Create application state without starting background work."""
         self.settings = settings
         self.lock = threading.RLock()
+        self.naming = NamingFile(required_naming(settings))
         self.ingestion = IngestionLog(
-            settings.root, settings.database, self.lock, settings.log_path
+            settings.root,
+            settings.database,
+            self.current_naming,
+            self.lock,
+            settings.log_path,
         )
         self.projects = Projects(settings.database.parent / "projects", settings.root)
         self.quality_path = settings.log_path.with_name("quality_reviews.json")
-        self.naming = NamingFile(settings.naming_file) if settings.naming_file else None
 
     def current_naming(self):
-        """Return the current naming document, or None when none is configured."""
-        return self.naming.current() if self.naming else None
+        """Return the current naming document, which defines every capture field."""
+        return self.naming.current()
 
     def create_project(self, request):
         """Serialize project creation to prevent duplicate names in concurrent requests."""
@@ -90,8 +95,8 @@ class Application:
                 naming=self.current_naming(),
             )
             changes = {
-                key: {"from": request["expected"].get(key, ""), "to": value}
-                for key, value in request["changes"].items()
+                column: {"from": request["expected"].get(column, ""), "to": value}
+                for column, value in request["changes"].items()
             }
             self.ingestion.record_action(
                 "modified",
@@ -233,6 +238,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(self.app.projects.listing())
         if path == "/api/project":
             return self.send_json(self.app.projects.get(self.project_id() or "default"))
+        if path == "/api/fields":
+            return self.send_json(self.app.current_naming().describe())
         if path == "/api/captures":
             return self.send_json(self.records())
         if path == "/api/matrix":
@@ -307,7 +314,7 @@ class Handler(BaseHTTPRequestHandler):
             result = with_current_metadata(
                 self.app.ingestion.snapshot(limit, before), self.app.records()
             )
-        if self.app.naming and self.app.naming.error:
+        if self.app.naming.error:
             result["errors"] = [*result["errors"], self.app.naming.error]
         self.send_json(result)
 

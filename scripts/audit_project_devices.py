@@ -1,4 +1,4 @@
-"""Check project device definitions against current collector metadata without writes."""
+"""Check a project's plan against its captures and the naming file, without writes."""
 
 import argparse
 import json
@@ -12,23 +12,35 @@ from app.folder_projects import FolderProjects
 from app.captures.naming import load
 
 
+def planned_fields(project, naming):
+    """The naming-file fields this project's matrix plans, in naming-file order."""
+    columns = set().union(*(row.keys() for row in project["matrix"]))
+    return [field for field in naming.fields if field.key in columns]
+
+
+def requirement(capture_or_row, fields, values):
+    """Build the (batch, SDK, planned field values) key of a capture or matrix row."""
+    return (
+        capture_or_row["folder"],
+        capture_or_row["sdk"],
+        *(values(capture_or_row, field.key) for field in fields),
+    )
+
+
 def naming_report(project, captures, naming):
     """Group capture naming issues and list plan values that are not standard names."""
     issues = Counter(
         (field, capture["sdk"], value["raw"], value["issue"])
         for capture in captures
-        for field, value in capture.get("naming", {}).items()
+        for field, value in capture["naming"].items()
         if value["issue"]
     )
     plan = sorted(
         {
-            (row["folder"], field, row[field])
+            (row["folder"], field.key, row[field.key])
             for row in project["matrix"]
-            for field, allowed in (
-                ("lighting", naming.lighting),
-                ("device", naming.devices),
-            )
-            if row[field] not in allowed
+            for field in planned_fields(project, naming)
+            if field.accepted and row[field.key] not in field.accepted
         }
     )
     return dict(
@@ -43,60 +55,62 @@ def naming_report(project, captures, naming):
     )
 
 
-def audit(project, captures, naming=None):
-    """Report inconsistent planning lists and observed SDK/device pairs absent from the matrix.
+def audit(project, captures, naming):
+    """Report batch lists that disagree with the matrix and captures it does not plan.
 
-    With a naming document, also report capture naming issues and plan values
-    that are not standard names.
+    Every planned field is checked the same way: a batch's `expected_<field>`
+    list must hold exactly the values the matrix plans for that batch, and each
+    capture's batch, SDK, and planned field values must match a matrix row.
     """
-    matrix_pairs = {(r["folder"], r["sdk"], r["device"]) for r in project["matrix"]}
+    fields = planned_fields(project, naming)
     definition_errors = []
     for batch in project["batches"]:
-        for sdk in ("app", "web"):
-            configured = batch.get(f"expected_{sdk}_devices", "")
+        for field in fields:
+            configured = batch.get(f"expected_{field.key}", "")
             if not configured.strip():
                 continue
-            devices = {v.strip() for v in configured.split(";") if v.strip()}
+            listed = {v.strip() for v in configured.split(";") if v.strip()}
             planned = {
-                device
-                for folder, platform, device in matrix_pairs
-                if folder == batch["batch_name"] and platform == sdk
+                row[field.key]
+                for row in project["matrix"]
+                if row["folder"] == batch["batch_name"]
             }
-            if devices != planned:
+            if listed != planned:
                 definition_errors.append(
                     dict(
                         batch=batch["batch_name"],
-                        sdk=sdk,
-                        only_in_batches=sorted(devices - planned),
-                        only_in_matrix=sorted(planned - devices),
+                        field=field.key,
+                        only_in_batches=sorted(listed - planned),
+                        only_in_matrix=sorted(planned - listed),
                     )
                 )
+    plan = {requirement(r, fields, lambda r, k: r[k]) for r in project["matrix"]}
     unknown = Counter(
-        (r["folder"], r["sdk"], r["device"])
-        for r in captures
-        if (r["folder"], r["sdk"], r["device"]) not in matrix_pairs
+        key
+        for capture in captures
+        for key in [requirement(capture, fields, lambda c, k: c["fields"][k])]
+        if key not in plan
     )
-    report = dict(
+    names = ["batch", "sdk", *(field.key for field in fields)]
+    return dict(
         definition_errors=definition_errors,
-        unmatched_devices=[
-            dict(batch=folder, sdk=sdk, device=device, captures=count)
-            for (folder, sdk, device), count in sorted(unknown.items())
+        unplanned_captures=[
+            dict(zip(names, key), captures=count)
+            for key, count in sorted(unknown.items())
         ],
+        **naming_report(project, captures, naming),
     )
-    if naming is not None:
-        report.update(naming_report(project, captures, naming))
-    return report
 
 
 def main():
-    """Audit one folder project, exiting nonzero when device definitions do not align."""
+    """Audit one folder project, exiting nonzero when anything does not align."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--projects-root", required=True, type=Path)
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--project", required=True)
-    parser.add_argument("--naming", type=Path, help="Shared naming JSON file")
+    parser.add_argument("--naming", required=True, type=Path, help="Naming file")
     args = parser.parse_args()
-    naming = load(args.naming) if args.naming else None
+    naming = load(args.naming)
     projects = FolderProjects(args.projects_root, args.dataset)
     project = projects.get(args.project)
     captures = projects.filter_records(args.project, records(args.dataset, naming))

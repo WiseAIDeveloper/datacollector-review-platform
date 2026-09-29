@@ -299,6 +299,7 @@
     </style>
     <link rel="stylesheet" href="/terminal.css" />
     <script src="/project_context.js"></script>
+    <script src="/fields.js"></script>
   </head>
   <body class="terminal dashboard">
     <nav class="app-sidebar" aria-label="Main navigation">
@@ -358,7 +359,13 @@
         projectPlans = new Set(),
         decisions = {},
         qualityReviews = {},
-        selectedBatch = "";
+        selectedBatch = "",
+        naming = null,
+        planned = [];
+      const value = window.captureFields.value;
+      /* The field that groups a batch's requirements, and the ones shown per row. */
+      const groupField = () => planned[0];
+      const rowFields = () => planned.slice(1);
       try {
         decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
       } catch (e) {}
@@ -381,50 +388,18 @@
         }
       }
       /* Find allowed corrections from the capture’s matching batch definition. */
-      function correctionChoices(r, k) {
+      function correctionChoices(r, field) {
         const batch = batchDefs.find(
           /* Locate the item matching the selected capture or batch. */ (b) =>
             b.batch_name === r.folder &&
             b.test_plan_name === r.metadata.test_plan_name,
         );
-        const split =
-          /* Read nonempty choices from a semicolon-separated batch setting. */ (
-            v,
-          ) =>
-            (v || "")
-              .split(";")
-              .map(
-                /* Build the corresponding display or request value for each item. */ (
-                  x,
-                ) => x.trim(),
-              )
-              .filter(Boolean);
-        if (k === "subject") {
-          const configured = split(batch?.expected_identities);
-          return configured.length
-            ? configured
-            : [
-                ...new Set(
-                  rows
-                    .filter(
-                      /* Keep items that match the current selection criteria. */ (
-                        x,
-                      ) =>
-                        x.metadata.test_plan_name === r.metadata.test_plan_name,
-                    )
-                    .map(
-                      /* Build the corresponding display or request value for each item. */ (
-                        x,
-                      ) => x.identity ?? x.metadata.subject,
-                    )
-                    .filter(Boolean),
-                ),
-              ].sort();
-        }
-        if (k === "lighting") return split(batch?.expected_lighting);
-        if (k === "capture_device")
-          return ["", ...split(batch?.expected_web_devices)];
-        return null;
+        return window.captureFields.choices(
+          field,
+          batch,
+          rows,
+          r.metadata.test_plan_name,
+        );
       }
       /* Restore a capture’s saved draft or initialize an undecided review. */
       function decision(r) {
@@ -435,10 +410,9 @@
             filename: r.metadata.filename,
             uuid: r.metadata.uuid,
             csv_row_at_review: r.line,
-            subject: r.identity ?? r.metadata.subject,
-            lighting: r.lighting ?? r.metadata.lighting,
+            identity: r.identity,
             sdk: r.sdk,
-            device: r.device,
+            fields: { ...r.fields },
             decision: "undecided",
             notes: "",
             corrections: {},
@@ -450,12 +424,11 @@
         return decisions[r.key];
       }
       const key =
-        /* Build a stable coverage-group key from batch, lighting, SDK, and device. */ (
+        /* Build a stable coverage-group key from batch, SDK, and planned fields. */ (
           folder,
-          lighting,
           sdk,
-          device,
-        ) => [folder, lighting, sdk, device].join("\u001f");
+          values,
+        ) => [folder, sdk, ...values].join("\u001f");
       /* Respect selected project plans while supporting legacy definitions without a plan. */
       function matchesProject(capture) {
         return (
@@ -468,16 +441,14 @@
         const subject = $("subject").value,
           caps = rows.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
-              (r.identity ?? r.metadata.subject) === subject &&
-              matchesProject(r),
+              r.identity === subject && matchesProject(r),
           ),
           by = new Map();
         for (const r of caps) {
           const k = key(
             r.folder,
-            (r.lighting ?? r.metadata.lighting) || "",
             r.sdk,
-            r.device,
+            planned.map((f) => value(r, f.key)),
           );
           if (!by.has(k)) by.set(k, []);
           by.get(k).push(r);
@@ -487,7 +458,13 @@
             m,
           ) => {
             const captures =
-                by.get(key(m.folder, m.lighting, m.sdk, m.device)) || [],
+                by.get(
+                  key(
+                    m.folder,
+                    m.sdk,
+                    planned.map((f) => m[f.key]),
+                  ),
+                ) || [],
               expected = Number(m.expected_count_per_identity || 0);
             return {
               m,
@@ -528,7 +505,12 @@
         box.className = "group " + type;
         const head = el("div");
         head.className = "group-head";
-        const title = el("h3", [g.m.sdk.toUpperCase(), g.m.device].join(" · ")),
+        const title = el(
+            "h3",
+            [g.m.sdk.toUpperCase(), ...rowFields().map((f) => g.m[f.key])].join(
+              " · ",
+            ),
+          ),
           badge = el("span");
         badge.append(
           el("span", "Expected " + g.expected + " · "),
@@ -559,9 +541,8 @@
           const groupKey = [
             $("subject").value,
             g.m.folder,
-            g.m.lighting,
             g.m.sdk,
-            g.m.device,
+            ...planned.map((f) => g.m[f.key]),
           ].join("|");
           details.open = expandedExcess.has(groupKey);
           details.addEventListener(
@@ -617,13 +598,17 @@
           ),
           link,
         );
-        const original = el(
-          "p",
-          "Original annotation lighting: " +
-            (r.annotation_lighting || "(missing)"),
-        );
-        original.className = "facts";
-        card.append(original);
+        for (const f of planned.filter((f) => f.key in r.annotation)) {
+          const original = el(
+            "p",
+            "Original annotation " +
+              f.key +
+              ": " +
+              (r.annotation[f.key] || "(missing)"),
+          );
+          original.className = "facts";
+          card.append(original);
+        }
         const namingNote = window.namingIssueNote?.(r);
         if (namingNote) card.append(namingNote);
         const controls = el("div");
@@ -649,17 +634,12 @@
         if (current === "correct_metadata") {
           const changes = el("div");
           changes.className = "corrections";
-          for (const k of [
-            "subject",
-            "lighting",
-            "capture_device",
-            "input_sensor",
-            "user",
-          ]) {
-            const wrap = el("label", "Correct " + k),
-              options = correctionChoices(r, k),
+          for (const field of naming.editable) {
+            const k = field.column;
+            const wrap = el("label", "Correct " + field.key),
+              options = correctionChoices(r, field),
               input = el(options ? "select" : "input");
-            input.setAttribute("aria-label", "Correct " + k);
+            input.setAttribute("aria-label", "Correct " + field.key);
             if (options) {
               const current =
                 decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
@@ -674,16 +654,13 @@
               for (const value of [...new Set(options)]) {
                 const o = el(
                   "option",
-                  value ||
-                    (k === "capture_device"
-                      ? "App SDK — use input sensor"
-                      : "(missing)"),
+                  value || window.captureFields.blank(field),
                 );
                 o.value = value;
                 input.append(o);
               }
             }
-            input.placeholder = r.metadata[k] || r[k] || "(blank)";
+            input.placeholder = r.metadata[k] || "(blank)";
             input.value =
               decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
             input.oninput =
@@ -763,7 +740,7 @@
         }
         for (const r of rows) {
           if (
-            (r.identity ?? r.metadata.subject) === $("subject").value &&
+            r.identity === $("subject").value &&
             matchesProject(r) &&
             batches.has(r.folder)
           )
@@ -846,14 +823,20 @@
         main.append(nav, title, note, content);
         window.addEventListener("hashchange", render);
       }
-      /* Render matrix coverage counts for each lighting and device combination. */
+      /* Render matrix coverage counts for each planned combination. */
       function coverageTable(gs) {
         const table = el("table");
         table.className = "coverage-table";
         const head = el("tr");
+        const describe = /* Label a matrix row by SDK and its row fields. */ (
+          m,
+        ) =>
+          [m.sdk.toUpperCase(), ...rowFields().map((f) => m[f.key])].join(
+            " / ",
+          );
         for (const label of [
-          "Lighting",
-          "SDK / device",
+          groupField()?.key ?? "Group",
+          ["SDK", ...rowFields().map((f) => f.key)].join(" / "),
           "Expected",
           "Found",
           "Missing",
@@ -868,8 +851,8 @@
           if (needed) tr.className = "missing-case";
           else if (g.found > g.expected) tr.className = "excess-case";
           for (const [i, v] of [
-            g.m.lighting,
-            g.m.sdk.toUpperCase() + " / " + g.m.device,
+            groupField() ? g.m[groupField().key] : "All",
+            describe(g.m),
             g.expected,
             g.found,
             needed,
@@ -901,7 +884,8 @@
           check.disabled = true;
           check.setAttribute(
             "aria-label",
-            g.m.lighting + " / " + g.m.sdk + " / " + g.m.device + " reviewed",
+            [g.m.sdk, ...planned.map((f) => g.m[f.key])].join(" / ") +
+              " reviewed",
           );
           cell.title =
             reviewed +
@@ -914,16 +898,17 @@
         }
         return table;
       }
-      /* Render the selected batch groups organized by lighting. */
-      function lightingBlocks(gs, view) {
+      /* Render the selected batch groups organized by the grouping field. */
+      function groupBlocks(gs, view) {
         const wrap = el("div"),
           by = new Map();
         wrap.className = "lighting-groups";
         for (const g of gs) {
-          if (!by.has(g.m.lighting)) by.set(g.m.lighting, []);
-          by.get(g.m.lighting).push(g);
+          const name = groupField() ? g.m[groupField().key] : "All";
+          if (!by.has(name)) by.set(name, []);
+          by.get(name).push(g);
         }
-        for (const [lighting, list] of by) {
+        for (const [name, list] of by) {
           const block = el("section");
           block.className = "lighting-block";
           const expected = list.reduce(
@@ -954,7 +939,7 @@
               ) => n + Math.max(g.found - g.expected, 0),
               0,
             );
-          block.append(el("h3", lighting));
+          block.append(el("h3", name));
           const totals = el("div");
           totals.className = "batch-totals";
           block.classList.toggle("has-excess", excess > 0);
@@ -983,7 +968,7 @@
         const captures = rows.filter(
             /* Keep items that match the current selection criteria. */ (r) =>
               r.folder === b.name &&
-              (r.identity ?? r.metadata.subject) === $("subject").value &&
+              r.identity === $("subject").value &&
               matchesProject(r),
           ),
           reviewed = captures.filter(
@@ -1034,13 +1019,15 @@
           /* Display a capitalized label with a fallback for missing values. */ (
             v,
           ) => (v ? v[0].toUpperCase() + v.slice(1) : "Unknown");
+        const shown = new Set(planned.map((f) => "expected_" + f.key));
         for (const text of [
           "Capture class: " + title(d.capture_class),
-          "Expected lighting: " + (d.expected_lighting || ""),
-          "WEB SDK devices: " + (d.expected_web_devices || ""),
-          "APP SDK devices: " + (d.expected_app_devices || ""),
-          "Expected per SDK/device + lighting: " +
-            (d.expected_per_sdk_device_lighting || ""),
+          ...planned.map(
+            (f) => "Expected " + f.key + ": " + (d["expected_" + f.key] || ""),
+          ),
+          ...Object.entries(d)
+            .filter(([k]) => k.startsWith("expected_") && !shown.has(k))
+            .map(([k, v]) => k + ": " + v),
         ])
           definition.append(el("p", text));
         box.append(definition);
@@ -1075,8 +1062,11 @@
           box.append(el("p", label));
           const details = el("details");
           details.append(
-            el("summary", "Show batch grouped by lighting"),
-            lightingBlocks(b.groups, "requirements"),
+            el(
+              "summary",
+              "Show batch grouped by " + (groupField()?.key ?? "requirement"),
+            ),
+            groupBlocks(b.groups, "requirements"),
           );
           box.append(details);
           return box;
@@ -1089,7 +1079,7 @@
                 ? g.found > g.expected
                 : g.found === g.expected,
         );
-        box.append(lightingBlocks(selected, view));
+        box.append(groupBlocks(selected, view));
         return box;
       }
       /* Classify capture progress, prioritizing excess over missing combinations. */
@@ -1186,7 +1176,7 @@
                 r,
               ) =>
                 r.folder === b.name &&
-                (r.identity ?? r.metadata.subject) === $("subject").value &&
+                r.identity === $("subject").value &&
                 matchesProject(r) &&
                 !["pass", "error"].includes(qualityReviews[r.key]?.status),
             ),
@@ -1259,7 +1249,7 @@
       function pendingDecisions() {
         return rows.filter(
           /* Keep items that match the current selection criteria. */ (r) =>
-            (r.identity ?? r.metadata.subject) === $("subject").value &&
+            r.identity === $("subject").value &&
             matchesProject(r) &&
             ["remove", "correct_metadata"].includes(decisions[r.key]?.decision),
         );
@@ -1284,13 +1274,7 @@
           }),
         );
         if (executing || !pending.length) return;
-        const allowed = [
-          "subject",
-          "lighting",
-          "capture_device",
-          "input_sensor",
-          "user",
-        ];
+        const allowed = naming.editable.map((field) => field.column);
         for (const { r, d } of pending) {
           if (
             d.decision === "correct_metadata" &&
@@ -1340,7 +1324,7 @@
               pending.length +
               " decisions for " +
               ($("subject").value || "all identities") +
-              "?\nAcross all folders and lighting for this identity.\n\n" +
+              "?\nAcross all folders and field values for this identity.\n\n" +
               lines.join("\n") +
               "\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.",
           )
@@ -1421,6 +1405,8 @@
           rows = await a.json();
           matrix = await b.json();
           batchDefs = await c.json();
+          naming = await window.captureFields.load();
+          planned = naming.planned(matrix);
           projectPlans = new Set(
             batchDefs
               .map(
@@ -1442,7 +1428,7 @@
                   .map(
                     /* Build the corresponding display or request value for each item. */ (
                       r,
-                    ) => r.identity ?? r.metadata.subject,
+                    ) => r.identity,
                   )
                   .filter(Boolean),
               ),

@@ -7,12 +7,14 @@ services:
     restart: unless-stopped
     environment:
       DELETE_TOKEN: ${DELETE_TOKEN:?Set DELETE_TOKEN in .env}
+      NAMING_FILE: /naming/naming.json
     ports:
       - "${VIEWER_BIND_ADDRESS:-127.0.0.1}:${VIEWER_PORT:-8769}:8080"
     volumes:
       - ${DATASET_PATH:?Set DATASET_PATH in .env}:/data
       - ingestion_state:/state
       - ${LOGS_PATH:?Set LOGS_PATH in .env}:/logs
+      - ${NAMING_PATH:?Set NAMING_PATH to the shared naming folder}:/naming:ro
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

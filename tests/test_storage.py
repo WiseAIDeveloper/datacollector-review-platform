@@ -13,6 +13,7 @@ from tests.support import (
     SOURCE,
     application_command,
     dataset,
+    fixture_naming,
     load_application,
 )
 
@@ -43,6 +44,7 @@ class StorageTests(unittest.TestCase):
             self.row["filename"],
             changes,
             self.row if expected is None else expected,
+            naming=fixture_naming()(),
         )
 
     def test_remove_row_preserves_bom_multiline_and_other_bytes(self):
@@ -149,7 +151,7 @@ class StorageTests(unittest.TestCase):
             {},
             [],
             {"ori_path": "outside"},
-            {"lighting": "invalid"},
+            {"capture_env_lighting": "invalid"},
             {"subject": " "},
             {"user": 12},
             {"user": "x" * 4097},
@@ -158,21 +160,26 @@ class StorageTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.edit(changes)
         with self.assertRaises(edit_capture.Conflict):
-            self.edit({"lighting": "office-white"}, {**self.row, "subject": "stale"})
+            self.edit(
+                {"capture_env_lighting": "office-white"},
+                {**self.row, "subject": "stale"},
+            )
 
     def test_edit_updates_secondary_schema_and_preserves_unrelated_files(self):
         """Add edited columns to the secondary index while keeping images unchanged."""
         before = (self.folder / self.row["ori_path"]).read_bytes()
         self.assertEqual(
-            self.edit({"lighting": "office-white"}),
+            self.edit({"capture_env_lighting": "office-white"}),
             dict(
-                updated=True, changes={"lighting": "office-white"}, json_preserved=True
+                updated=True,
+                changes={"capture_env_lighting": "office-white"},
+                json_preserved=True,
             ),
         )
         for name in INDEXES:
             with (self.folder / name).open() as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(rows[0]["lighting"], "office-white")
+            self.assertEqual(rows[0]["capture_env_lighting"], "office-white")
         self.assertEqual((self.folder / self.row["ori_path"]).read_bytes(), before)
 
     def test_edit_rolls_back_when_second_write_fails(self):
@@ -190,7 +197,7 @@ class StorageTests(unittest.TestCase):
 
         with patch.object(edit_capture, "atomic_write", side_effect=fail_second):
             with self.assertRaises(OSError):
-                self.edit({"lighting": "office-white"})
+                self.edit({"capture_env_lighting": "office-white"})
         self.assertEqual(
             {name: (self.folder / name).read_bytes() for name in INDEXES}, original
         )
@@ -239,7 +246,9 @@ class IngestionEdgeTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         dataset(self.root, count=2)
-        self.log = ingestion.IngestionLog(self.root, self.root / "history.sqlite")
+        self.log = ingestion.IngestionLog(
+            self.root, self.root / "history.sqlite", fixture_naming()
+        )
         self.addCleanup(self.log.db.close)
 
     def test_device_info_fallbacks_and_timestamp(self):
@@ -251,7 +260,8 @@ class IngestionEdgeTests(unittest.TestCase):
             ({"capture_device": " device "}, ("unknown", "device")),
             ({"input_sensor": "{'model': 123}"}, ("unknown", "unknown")),
         ]:
-            self.assertEqual(ingestion.device_info(row), expected)
+            sdk, fields = ingestion.logged_fields(fixture_naming()(), row)
+            self.assertEqual((sdk, fields["capture_device"]), expected)
         self.assertTrue(ingestion.now().endswith("+00:00"))
 
     def test_export_actions_retry_after_write_failure(self):

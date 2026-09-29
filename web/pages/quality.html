@@ -133,6 +133,7 @@
       <button id="close">Close</button><img alt="Enlarged capture" />
     </dialog>
     <script src="/project_context.js"></script>
+    <script src="/fields.js"></script>
     <script>
       const $ = /* Find an element by its page identifier. */ (id) =>
           document.getElementById(id),
@@ -145,7 +146,8 @@
         reviews = {},
         drafts = {},
         pin = "",
-        saving = 0;
+        saving = 0,
+        naming = null;
       const query = new URLSearchParams(location.search);
       let first = true;
       /* Rebuild a filter’s options while preserving its selected value. */
@@ -163,8 +165,7 @@
       function scoped() {
         return rows.filter(
           /* Keep items that match the current selection criteria. */ (r) =>
-            (!$("identity").value ||
-              (r.identity ?? r.metadata.subject) === $("identity").value) &&
+            (!$("identity").value || r.identity === $("identity").value) &&
             (!$("batch").value || r.folder === $("batch").value),
         );
       }
@@ -214,14 +215,15 @@
         box.dataset.status = existing?.status || "unreviewed";
         box.append(
           el("h2", r.metadata.filename),
-          el("p", r.folder + " · " + (r.identity ?? r.metadata.subject)),
+          el("p", r.folder + " · " + r.identity),
           el(
             "p",
-            (r.lighting ?? r.metadata.lighting) +
-              " · " +
-              r.sdk.toUpperCase() +
-              " / " +
-              r.device,
+            [
+              r.sdk.toUpperCase(),
+              ...naming.checked
+                .filter((f) => f.role !== "identity")
+                .map((f) => window.captureFields.value(r, f.key)),
+            ].join(" · "),
           ),
         );
         const namingNote = window.namingIssueNote?.(r);
@@ -391,6 +393,7 @@
         )
           return;
         try {
+          naming = await window.captureFields.load();
           const responses = await Promise.all([
             fetch("/api/captures"),
             fetch("/api/quality"),
@@ -419,7 +422,7 @@
                   .map(
                     /* Build the corresponding display or request value for each item. */ (
                       r,
-                    ) => r.identity ?? r.metadata.subject,
+                    ) => r.identity,
                   )
                   .filter(Boolean),
               ),

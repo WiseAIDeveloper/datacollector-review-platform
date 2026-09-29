@@ -213,6 +213,7 @@
     </style>
     <link rel="stylesheet" href="/terminal.css" />
     <script src="/project_context.js"></script>
+    <script src="/fields.js"></script>
   </head>
   <body class="terminal">
     <nav class="app-sidebar" aria-label="Main navigation">
@@ -253,31 +254,35 @@
       try {
         decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
       } catch (e) {}
-      const fields = [
-        ["subject", "Filter by identity (view only)"],
-        ["folder", "Folder"],
-        ["lighting", "Lighting"],
-        ["sdk", "SDK"],
-        ["device", "Device"],
-      ];
-      const defaults = {
-        subject: "koh-jia-yi",
-        folder: "psastationery_colour_print_cutout",
-        lighting: "office-yellow",
-        sdk: "web",
-        device: "huawei-nova-7i",
-      };
+      let fields = [],
+        naming = null;
+      /* Filters: identity, batch, SDK, then every naming field with standard values. */
+      function filterFields() {
+        return [
+          [
+            "identity",
+            "Filter by " + naming.identity.key + " (view only)",
+            (r) => r.identity,
+          ],
+          ["folder", "Folder", (r) => r.folder],
+          ["sdk", "SDK", (r) => r.sdk],
+          ...naming.checked
+            .filter((f) => f.role !== "identity")
+            .map((f) => [
+              "field:" + f.key,
+              f.key,
+              (r) => window.captureFields.value(r, f.key),
+            ]),
+        ];
+      }
       const filters = {};
       const el = /* Create a text-only DOM element. */ (tag, text) => {
         const n = document.createElement(tag);
         if (text !== undefined) n.textContent = text;
         return n;
       };
-      const val =
-        /* Read a capture field from its summary or annotation metadata. */ (
-          r,
-          k,
-        ) => r[k] ?? r.metadata[k] ?? "";
+      const val = /* Read a filter's value for one capture. */ (r, k) =>
+        fields.find(([key]) => key === k)[2](r) || "";
       const url = /* Build an encoded URL for a capture resource. */ (
         type,
         r,
@@ -292,50 +297,18 @@
         }
       }
       /* Find allowed corrections from the capture’s matching batch definition. */
-      function correctionChoices(r, k) {
+      function correctionChoices(r, field) {
         const batch = batchDefs.find(
           /* Locate the item matching the selected capture or batch. */ (b) =>
             b.batch_name === r.folder &&
             b.test_plan_name === r.metadata.test_plan_name,
         );
-        const split =
-          /* Read nonempty choices from a semicolon-separated batch setting. */ (
-            v,
-          ) =>
-            (v || "")
-              .split(";")
-              .map(
-                /* Build the corresponding display or request value for each item. */ (
-                  x,
-                ) => x.trim(),
-              )
-              .filter(Boolean);
-        if (k === "subject") {
-          const configured = split(batch?.expected_identities);
-          return configured.length
-            ? configured
-            : [
-                ...new Set(
-                  rows
-                    .filter(
-                      /* Keep items that match the current selection criteria. */ (
-                        x,
-                      ) =>
-                        x.metadata.test_plan_name === r.metadata.test_plan_name,
-                    )
-                    .map(
-                      /* Build the corresponding display or request value for each item. */ (
-                        x,
-                      ) => x.identity ?? x.metadata.subject,
-                    )
-                    .filter(Boolean),
-                ),
-              ].sort();
-        }
-        if (k === "lighting") return split(batch?.expected_lighting);
-        if (k === "capture_device")
-          return ["", ...split(batch?.expected_web_devices)];
-        return null;
+        return window.captureFields.choices(
+          field,
+          batch,
+          rows,
+          r.metadata.test_plan_name,
+        );
       }
       /* Restore a capture’s saved draft or initialize an undecided review. */
       function decision(r) {
@@ -346,10 +319,9 @@
             filename: r.metadata.filename,
             uuid: r.metadata.uuid,
             csv_row_at_review: r.line,
-            subject: r.identity ?? r.metadata.subject,
-            lighting: r.lighting ?? r.metadata.lighting,
+            identity: r.identity,
             sdk: r.sdk,
-            device: r.device,
+            fields: { ...r.fields },
             decision: "undecided",
             notes: "",
             corrections: {},
@@ -402,7 +374,11 @@
             el("h2", r.metadata.filename),
             el(
               "p",
-              r.sdk.toUpperCase() + " · " + r.device + " · CSV row " + r.line,
+              r.sdk.toUpperCase() +
+                " · " +
+                window.captureFields.value(r, naming.device.key) +
+                " · CSV row " +
+                r.line,
             ),
           );
           const namingNote = window.namingIssueNote?.(r);
@@ -447,17 +423,12 @@
           if (current === "correct_metadata") {
             const changes = el("div");
             changes.className = "corrections";
-            for (const k of [
-              "subject",
-              "lighting",
-              "capture_device",
-              "input_sensor",
-              "user",
-            ]) {
-              const wrap = el("label", "Correct " + k),
-                options = correctionChoices(r, k),
+            for (const field of naming.editable) {
+              const k = field.column;
+              const wrap = el("label", "Correct " + field.key),
+                options = correctionChoices(r, field),
                 input = el(options ? "select" : "input");
-              input.setAttribute("aria-label", "Correct " + k);
+              input.setAttribute("aria-label", "Correct " + field.key);
               if (options) {
                 const current =
                   decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
@@ -472,16 +443,13 @@
                 for (const value of [...new Set(options)]) {
                   const o = el(
                     "option",
-                    value ||
-                      (k === "capture_device"
-                        ? "App SDK — use input sensor"
-                        : "(missing)"),
+                    value || window.captureFields.blank(field),
                   );
                   o.value = value;
                   input.append(o);
                 }
               }
-              input.placeholder = val(r, k) || "(blank)";
+              input.placeholder = r.metadata[k] || "(blank)";
               input.value =
                 decisions[r.key]?.corrections?.[k] ?? r.metadata[k] ?? "";
               input.oninput =
@@ -551,8 +519,10 @@
           if (!res.ok || !defs.ok) throw Error();
           rows = await res.json();
           batchDefs = await defs.json();
+          naming = await window.captureFields.load();
+          fields = filterFields();
           for (const [k, label] of fields) {
-            const prev = filters[k]?.value ?? defaults[k];
+            const prev = filters[k]?.value ?? "";
             if (!filters[k]) {
               const wrap = el("label", label),
                 s = el("select");
@@ -653,8 +623,9 @@
                     r.metadata.filename +
                     " · " +
                     decisions[r.key].decision +
-                    (decisions[r.key].corrections?.subject
-                      ? " → " + decisions[r.key].corrections.subject
+                    (decisions[r.key].corrections?.[naming.identity.column]
+                      ? " → " +
+                        decisions[r.key].corrections[naming.identity.column]
                       : ""),
                 )
                 .join(" | ")
@@ -671,13 +642,7 @@
           }),
         );
         if (executing || !pending.length) return;
-        const allowed = [
-          "subject",
-          "lighting",
-          "capture_device",
-          "input_sensor",
-          "user",
-        ];
+        const allowed = naming.editable.map((field) => field.column);
         for (const { r, d } of pending) {
           if (
             d.decision === "correct_metadata" &&
@@ -701,7 +666,7 @@
             r,
             d,
           }) =>
-            (r.identity ?? r.metadata.subject) +
+            r.identity +
             " / " +
             r.folder +
             " / " +
@@ -727,7 +692,7 @@
           !confirm(
             "Execute " +
               pending.length +
-              " pending decisions?\nIncludes all identities, folders and lighting, regardless of the current filters.\n\n" +
+              " pending decisions?\nIncludes every identity, folder, and field value, regardless of the current filters.\n\n" +
               lines.join("\n") +
               "\n\nRemovals permanently delete CSV rows and images. JSON metadata remains. Corrections update CSV metadata. Keep decisions leave files unchanged.",
           )

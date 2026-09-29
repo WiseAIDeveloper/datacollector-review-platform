@@ -9,7 +9,26 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .captures.catalog import EXCLUDED, INDEX_NAME, capture_device
+from .captures.catalog import EXCLUDED, INDEX_NAME, capture_fields
+
+# Event columns every capture has; naming-file fields are stored in `fields`.
+CORE = (
+    "id",
+    "key",
+    "status",
+    "detected_at",
+    "batch",
+    "filename",
+    "uuid",
+    "sdk",
+    "test_plan",
+    "creation_time",
+)
+EVENTS = (
+    "CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, key TEXT UNIQUE, "
+    "status TEXT, detected_at TEXT, batch TEXT, filename TEXT, uuid TEXT, sdk TEXT, "
+    "test_plan TEXT, creation_time TEXT, fields TEXT)"
+)
 
 
 def now():
@@ -17,9 +36,16 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def device_info(row):
-    """Use the same sensor-based SDK classification as the capture catalog."""
-    return capture_device(row)
+def logged_fields(naming, row):
+    """Read the SDK and every naming-file field of a capture as written."""
+    sdk, fields = capture_fields(naming, row, {})
+    return sdk, {key: v["raw"] or v["value"] for key, v in fields.items()}
+
+
+def flatten(row):
+    """Show an event with its field values as top-level keys, as the JSONL log does."""
+    entry = dict(row)
+    return {**json.loads(entry.pop("fields") or "{}"), **entry}
 
 
 def read_stable_rows(path):
@@ -44,8 +70,12 @@ def read_stable_rows(path):
 class IngestionLog:
     """Persist capture detections and actions without changing historical metadata."""
 
-    def __init__(self, root, database, dataset_lock=None, log_path=None):
-        """Open the history database and initialize scanner state without starting a worker."""
+    def __init__(self, root, database, naming, dataset_lock=None, log_path=None):
+        """Open the history database and initialize scanner state without starting a worker.
+
+        `naming` returns the current naming document, whose fields are logged.
+        """
+        self.naming = naming
         self.root = Path(root).resolve()
         self.log_path = (
             Path(log_path) if log_path else Path(database).with_suffix(".jsonl")
@@ -56,9 +86,8 @@ class IngestionLog:
         self.dataset_lock = dataset_lock or threading.RLock()
         self.db = sqlite3.connect(str(database), check_same_thread=False)
         self.db.row_factory = sqlite3.Row
-        self.db.execute(
-            "CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, key TEXT UNIQUE, status TEXT, detected_at TEXT, batch TEXT, filename TEXT, uuid TEXT, lighting TEXT, subject TEXT, sdk TEXT, device TEXT, test_plan TEXT, creation_time TEXT)"
-        )
+        self.db.execute(EVENTS)
+        self.move_columns_to_fields()
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS actions (id INTEGER PRIMARY KEY, action TEXT, occurred_at TEXT, batch TEXT, uuid TEXT, filename TEXT, changes TEXT)"
         )
@@ -77,6 +106,30 @@ class IngestionLog:
         self.stop = threading.Event()
         self.thread = None
         self.batch_filter = None
+
+    def move_columns_to_fields(self):
+        """Move each older per-field column into `fields`, keeping its column name."""
+        columns = [row[1] for row in self.db.execute("PRAGMA table_info(events)")]
+        if "fields" in columns:
+            return
+        extra = [column for column in columns if column not in CORE]
+        rows = [dict(row) for row in self.db.execute("SELECT * FROM events")]
+        self.db.execute("ALTER TABLE events RENAME TO events_before_fields")
+        self.db.execute(EVENTS)
+        for row in rows:
+            fields = {column: row.pop(column) or "" for column in extra}
+            self.insert_event(row, fields)
+        self.db.execute("DROP TABLE events_before_fields")
+
+    def insert_event(self, row, fields):
+        """Insert one event from its core values and field values."""
+        columns = [c for c in CORE if c in row] + ["fields"]
+        values = [row[c] for c in CORE if c in row] + [json.dumps(fields)]
+        return self.db.execute(
+            f"INSERT OR IGNORE INTO events ({','.join(columns)}) "
+            f"VALUES ({','.join('?' for _ in columns)})",
+            values,
+        )
 
     def restore_logs(self):
         """Import copied JSONL history once, transactionally, before the first scan."""
@@ -101,6 +154,8 @@ class IngestionLog:
                 fields = [
                     row[1] for row in self.db.execute(f"PRAGMA table_info({table})")
                 ]
+                if table == "events":
+                    fields = list(CORE)
                 with path.open(encoding="utf-8") as stream:
                     for line in stream:
                         if not line.strip():
@@ -110,8 +165,12 @@ class IngestionLog:
                             raise ValueError(
                                 f"Invalid copied {path.name}; history was not imported"
                             )
-                        if table == "actions":
-                            row["changes"] = json.dumps(row["changes"])
+                        if table == "events":
+                            core = {c: row.pop(c) for c in CORE}
+                            self.insert_event(core, row)
+                            restored += 1
+                            continue
+                        row["changes"] = json.dumps(row["changes"])
                         self.db.execute(
                             f"INSERT INTO {table} ({','.join(fields)}) VALUES ({','.join('?' for _ in fields)})",
                             [row[field] for field in fields],
@@ -140,6 +199,7 @@ class IngestionLog:
                 self.status.update(last_scan=detected, scanning=False, errors=[str(e)])
                 return
             allowed = self.batch_filter() if self.batch_filter else None
+            naming = self.naming()
             for folder in folders:
                 path = folder / INDEX_NAME
                 if (
@@ -166,24 +226,20 @@ class IngestionLog:
                         if not image.is_file() or image.stat().st_size == 0:
                             pending += 1
                             continue
-                        sdk, device = device_info(row)
-                        key = folder.name + "/" + uuid + "/" + filename
-                        result = self.db.execute(
-                            "INSERT OR IGNORE INTO events (key,status,detected_at,batch,filename,uuid,lighting,subject,sdk,device,test_plan,creation_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                            (
-                                key,
-                                "existing" if baseline else "ingested",
-                                detected,
-                                folder.name,
-                                filename,
-                                uuid,
-                                row.get("lighting", ""),
-                                row.get("subject", ""),
-                                sdk,
-                                device,
-                                row.get("test_plan_name", ""),
-                                row.get("creation_time", ""),
+                        sdk, fields = logged_fields(naming, row)
+                        result = self.insert_event(
+                            dict(
+                                key=folder.name + "/" + uuid + "/" + filename,
+                                status="existing" if baseline else "ingested",
+                                detected_at=detected,
+                                batch=folder.name,
+                                filename=filename,
+                                uuid=uuid,
+                                sdk=sdk,
+                                test_plan=row.get("test_plan_name", ""),
+                                creation_time=row.get("creation_time", ""),
                             ),
+                            fields,
                         )
                         added += result.rowcount
                 except (OSError, ValueError, csv.Error) as e:
@@ -217,7 +273,7 @@ class IngestionLog:
         temporary = self.log_path.with_suffix(".jsonl.tmp")
         with temporary.open("w", encoding="utf-8") as stream:
             for row in self.db.execute("SELECT * FROM events ORDER BY id"):
-                stream.write(json.dumps(dict(row), ensure_ascii=False) + "\n")
+                stream.write(json.dumps(flatten(row), ensure_ascii=False) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, self.log_path)
@@ -260,7 +316,7 @@ class IngestionLog:
         with self.lock:
             where, args = ("WHERE id < ?", [before]) if before else ("", [])
             records = [
-                dict(r)
+                dict(r, fields=json.loads(r["fields"] or "{}"))
                 for r in self.db.execute(
                     "SELECT * FROM events " + where + " ORDER BY id DESC LIMIT ?",
                     args + [limit],
@@ -332,10 +388,8 @@ def with_current_metadata(snapshot, records):
             event.update(
                 batch=row["folder"],
                 sdk=row["sdk"],
-                device=row["device"],
-                lighting=row.get("lighting", metadata.get("lighting", "")),
-                subject=row.get("identity", metadata.get("subject", "")),
-                naming=row.get("naming", {}),
+                fields=row["fields"],
+                naming=row["naming"],
             )
             for name in ("filename", "uuid", "creation_time"):
                 event[name] = metadata.get(name, "")

@@ -47,20 +47,27 @@ def sensor_model(row):
     return "unknown", ""
 
 
-def capture_device(row):
-    """Classify recognized sensor formats; a device label alone cannot identify an SDK."""
-    device = (row.get("capture_device") or "").strip()
+def capture_fields(naming, row, annotation):
+    """Classify the SDK and standardize every naming-file field of one capture row."""
     sdk, model = sensor_model(row)
-    if sdk == "app" and model.lower() != "unknown":
-        return sdk, model
-    return sdk, device or "unknown"
+    fields = naming.standardize(sdk, row, annotation, model)
+    device = fields[naming.device.key]
+    if sdk == "unknown":
+        # Without a recognized sensor, show the web label as the device, unchanged.
+        label = naming.device.standardize("web", row, annotation, model)["raw"]
+        device = dict(device, value=label or "unknown")
+    elif not device["value"]:
+        known = model if model.lower() != "unknown" else ""
+        device = dict(device, value=device["raw"] or known or "unknown")
+    return sdk, dict(fields, **{naming.device.key: device})
 
 
-def records(root, naming=None):
+def records(root, naming):
     """Return capture records in batch and CSV order with their original line numbers.
 
-    With a naming document, device is its standard name and lighting, identity, and
-    naming report each field's raw value, source column, and any issue.
+    Each record has every naming-file field by name (`fields`, standard values),
+    the same fields as written in the collection annotation (`annotation`), and
+    each field's raw value, source column, and any issue (`naming`).
     """
     root = Path(root).resolve()
     result = []
@@ -70,35 +77,29 @@ def records(root, naming=None):
             continue
         with path.open(newline="", encoding="utf-8-sig") as stream:
             for line, row in enumerate(csv.DictReader(stream), 2):
-                sdk, device = capture_device(row)
                 annotation = collection_annotation(folder, row.get("uuid", ""))
-                record = dict(
-                    key="/".join(
-                        (folder.name, row.get("uuid", ""), row.get("filename", ""))
-                    ),
-                    folder=folder.name,
-                    line=line,
-                    sdk=sdk,
-                    device=device,
-                    lighting=row.get("lighting", ""),
-                    identity=row.get("subject", ""),
-                    annotation_lighting=annotation.get("lighting", ""),
-                    metadata=row,
-                )
-                if naming is not None:
-                    standard = naming.standardize(
-                        sdk, row, annotation, sensor_model(row)[1]
-                    )
-                    record.update(
-                        lighting=standard["lighting"]["value"],
-                        identity=standard["identity"]["value"],
+                sdk, standard = capture_fields(naming, row, annotation)
+                values = {key: value["value"] for key, value in standard.items()}
+                result.append(
+                    dict(
+                        key="/".join(
+                            (folder.name, row.get("uuid", ""), row.get("filename", ""))
+                        ),
+                        folder=folder.name,
+                        line=line,
+                        sdk=sdk,
+                        device=values[naming.device.key],
+                        identity=values[naming.identity.key],
+                        fields=values,
+                        annotation={
+                            field.key: str(annotation.get(field.edit_column, ""))
+                            for field in naming.fields
+                            if field.edit_column
+                        },
                         naming=standard,
+                        metadata=row,
                     )
-                    if sdk != "unknown":
-                        record["device"] = standard["device"]["value"] or device
-                    if "replay_device" in standard:
-                        record["replay_device"] = standard["replay_device"]["value"]
-                result.append(record)
+                )
     return result
 
 

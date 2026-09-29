@@ -12,7 +12,15 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add an optional `replay_device` block to the naming file, for test plans that record the screen a card image is replayed on. Standard names and listed spellings are accepted, an empty value is allowed, and other values are highlighted. Existing naming files without the block keep working.
 
-- Add `scripts/normalize_names.py` to convert old lighting values and device spellings in capture indexes, annotations, and project plans to standard names, with a dry run and per-file backups.
+- Add `scripts/normalize_names.py` to convert old field values and spellings in capture indexes, annotations, and project plans to standard names (`--map field:old=new`), with a dry run and per-file backups.
+
+- Add `scripts/rename_fields.py` to rename a stored field everywhere (capture index headers, annotation keys, plan headers, ingestion history and logs) and merge plan list columns, with a dry run and per-file backups.
+
+### Changed
+
+- **Breaking:** the naming file now defines every capture field, and is required (`NAMING_FILE`, mounted from `NAMING_PATH` by both compose files). Each top-level key is a field whose name is its index column, matrix column, `expected_<field>` batch list, page label, and ingestion log key; one field has `role: identity` and one `role: device`. Pages, filters, edit forms, coverage, and audits follow the file instead of fixed lighting, identity, and device columns. Coverage matches each capture's batch, SDK, and every field the matrix has a column for, so unused fields such as a replay device do not affect it. Migrate with `scripts/rename_fields.py` and convert the naming file to the new format; see `docs/naming.md`.
+
+- **Breaking:** the ingestion history stores field values by field name. An older database is converted on first start, keeping each old column's name; `scripts/rename_fields.py` renames them.
 
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 

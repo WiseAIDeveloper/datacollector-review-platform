@@ -59,14 +59,15 @@ class ApiTests(unittest.TestCase):
             line=2,
             sdk="web",
             device="iphone-13",
-            annotation_lighting="office-white",
+            identity="fixture",
             metadata=self.row,
         )
         self.assertEqual({key: rows[0][key] for key in expected}, expected)
-        # Standardized fields are additive; without a naming file they echo the CSV.
-        self.assertLessEqual(set(rows[0]) - set(expected), {"lighting", "identity"})
-        self.assertEqual(rows[0].get("lighting", "dark"), "dark")
-        self.assertEqual(rows[0].get("identity", "fixture"), "fixture")
+        self.assertEqual(
+            set(rows[0]) - set(expected), {"fields", "annotation", "naming"}
+        )
+        self.assertEqual(rows[0]["fields"]["capture_env_lighting"], "dark")
+        self.assertEqual(rows[0]["annotation"]["capture_env_lighting"], "office-white")
         self.assertEqual(
             self.client.request("/api/capture?key=" + quote(self.key))[1], rows[0]
         )
@@ -75,7 +76,7 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(
             self.client.request("/api/annotation?key=" + quote(self.key))[1],
-            {"lighting": "office-white", "uuid": self.row["uuid"]},
+            {"capture_env_lighting": "office-white", "uuid": self.row["uuid"]},
         )
         self.assertEqual(
             self.client.request("/api/matrix")[1][0]["matrix_name"], MATRIX_NAME
@@ -143,7 +144,7 @@ class ApiTests(unittest.TestCase):
             folder="genuine",
             uuid=self.row["uuid"],
             filename=self.row["filename"],
-            changes={"lighting": "office-yellow"},
+            changes={"capture_env_lighting": "office-yellow"},
             expected=self.row,
         )
         self.assertEqual(
@@ -153,11 +154,11 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.request("/api/edit-capture", payload)[0], 409)
         snapshot = self.client.request("/api/ingestion")[1]
         event = next(e for e in snapshot["events"] if e["key"] == self.key)
-        self.assertEqual(event["lighting"], "office-yellow")
+        self.assertEqual(event["fields"]["capture_env_lighting"], "office-yellow")
         self.assertEqual(snapshot["action_total"], 1)
         self.assertEqual(
             snapshot["actions"][0]["changes"],
-            {"lighting": {"from": "dark", "to": "office-yellow"}},
+            {"capture_env_lighting": {"from": "dark", "to": "office-yellow"}},
         )
         self.assertEqual(
             len((self.client.root / "actions.jsonl").read_text().splitlines()), 1
