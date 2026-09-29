@@ -50,9 +50,9 @@ def ingestion(request):
             last_scan=detected,
             errors=[],
             pending_images=0,
-            total=4,
+            total=5,
             existing=0,
-            ingested=4,
+            ingested=5,
             events=[
                 event,
                 dict(
@@ -84,6 +84,7 @@ def ingestion(request):
                     )
                     for number, marker in [(3, "na"), (4, "none")]
                 ],
+                dict(event, id=5, filename="deleted.jpg", available=False),
             ],
             next_before=None,
             actions=[],
@@ -133,6 +134,8 @@ with sync_playwright() as p:
         replay = page.locator("#logs tr").filter(has_text=marker + ".jpg").locator("td").nth(6)
         expect(replay).to_have_text("—")
         assert "ingestion-rainbow" not in (replay.get_attribute("class") or "")
+    deleted = page.locator("#logs tr").filter(has_text="deleted.jpg")
+    assert deleted.locator("td.ingestion-rainbow, td.ingestion-matrix-mismatch").count() == 0
     note = page.evaluate(
         "namingIssueNote({naming: %s})?.textContent" % __import__("json").dumps(NAMING)
     )

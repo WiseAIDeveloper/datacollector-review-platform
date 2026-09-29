@@ -348,6 +348,7 @@
     }
     /* Mark an invalid name before checking whether a standard value is planned. */
     function highlightValue(td, event, field, matrixRows) {
+      if (event.available === false) return;
       const value = displayedValue(event, field);
       const issue =
         (value && event.naming?.[field.key]?.issue) ||
