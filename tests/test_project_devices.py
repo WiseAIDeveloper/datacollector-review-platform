@@ -152,6 +152,7 @@ class CollectorOptionsTests(unittest.TestCase):
                             {"display": "Dark", "value": "office_dark"},
                             {"display": "Other", "value": "other"},
                         ],
+                        "lighting": [{"value": "office_dark"}],
                         "batch": [{"display": "B", "value": "not-a-field"}],
                     }
                 )
@@ -180,12 +181,21 @@ class CollectorOptionsTests(unittest.TestCase):
             )
             self.assertEqual(
                 options_report([options, form], NAMING),
-                [
-                    dict(
-                        file="plan_options.json",
-                        field="capture_env_lighting",
-                        value="other",
-                    ),
-                    dict(file="plan_web.json", field="capture_device", value="SM-1"),
-                ],
+                {
+                    "unknown_option_fields": [
+                        dict(file="plan_options.json", field="lighting")
+                    ],
+                    "nonstandard_options": [
+                        dict(
+                            file="plan_options.json",
+                            field="capture_env_lighting",
+                            value="other",
+                        ),
+                        dict(file="plan_web.json", field="capture_device", value="SM-1"),
+                    ],
+                },
             )
+
+            (folder / "devices.json").write_text("{}")
+            with self.assertRaisesRegex(ValueError, "reference.*missing"):
+                options_report([form], NAMING)

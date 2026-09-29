@@ -133,5 +133,7 @@ with their capture counts, and matrix values that are not standard names.
 Add `--options <file>` (repeatable) with the collector's option files for the
 project to check what the collector offers. A plan may offer any subset of the
 naming-file fields and values, but each value it offers for a field must be one
-of that field's standard names; options for other fields (batch, test plan) are
-not checked. Form files that point to option lists with `$ref` are followed.
+of that field's standard names. Unknown capture option fields are reported;
+collector metadata (`batch`, `test_plan_name`, and `idType`) is excluded. Form
+files that point to option lists with `$ref` are followed, and broken references
+fail the audit.

@@ -12,6 +12,9 @@ from app.folder_projects import FolderProjects
 from app.captures.naming import load
 
 
+COLLECTOR_METADATA_FIELDS = {"display_order", "test_plan_name", "batch", "idType"}
+
+
 def planned_fields(project, naming):
     """The naming-file fields this project's matrix plans, in naming-file order."""
     columns = set().union(*(row.keys() for row in project["matrix"]))
@@ -108,30 +111,39 @@ def option_values(entry, folder):
     if isinstance(options, dict) and "$ref" in options:
         name, _, pointer = options["$ref"].partition("#/")
         document = json.loads((folder / name).read_text(encoding="utf-8"))
-        options = document.get(pointer, [])
+        if pointer not in document:
+            raise ValueError(f"Collector options reference {options['$ref']} is missing")
+        options = document[pointer]
     if not isinstance(options, list):
-        return []
+        raise ValueError("Collector options must be a list")
     return [o["value"] for o in options if isinstance(o, dict) and "value" in o]
 
 
 def options_report(paths, naming):
-    """List collector options that are not standard names of their naming field.
+    """List collector fields and values that are absent from the naming file.
 
     A collector plan may offer any subset of the fields and values; every value
     it offers for a naming-file field must be one of that field's standard names.
-    Options for fields the naming file does not define are not checked.
+    Collector metadata fields are excluded from capture naming checks.
     """
-    report = []
+    report = {"unknown_option_fields": [], "nonstandard_options": []}
     for path in paths:
         document = json.loads(path.read_text(encoding="utf-8"))
         for key, entry in document.items():
             name = entry.get("field_name", key) if isinstance(entry, dict) else key
+            if name in COLLECTOR_METADATA_FIELDS:
+                continue
             field = naming.field(name)
-            if field is None or not field.accepted:
+            if field is None:
+                report["unknown_option_fields"].append(dict(file=path.name, field=name))
+                continue
+            if not field.accepted:
                 continue
             for value in option_values(entry, path.parent):
                 if value not in field.accepted:
-                    report.append(dict(file=path.name, field=name, value=value))
+                    report["nonstandard_options"].append(
+                        dict(file=path.name, field=name, value=value)
+                    )
     return report
 
 
@@ -155,7 +167,7 @@ def main():
     project = projects.get(args.project)
     captures = projects.filter_records(args.project, records(args.dataset, naming))
     report = audit(project, captures, naming)
-    report["nonstandard_options"] = options_report(args.options, naming)
+    report.update(options_report(args.options, naming))
     print(json.dumps(report, indent=2))
     return int(any(report.values()))
 

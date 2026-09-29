@@ -28,6 +28,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Flag collector capture option fields absent from the naming file, and fail on broken option references, so stale field names cannot pass the project audit.
+
 - Use the capture_device label when a recognized native sensor reports an Unknown model, without changing its App classification.
 
 - Detect App/Web from recognized input sensor formats consistently across captures and ingestion. Native captures with a device label no longer become Web; unfamiliar sensors are explicitly unknown. Capture metadata is unchanged.
