@@ -963,6 +963,10 @@
         const state = b.excess ? "excess" : b.missing ? "missing" : "complete";
         const box = el("article");
         box.className = "batch " + state;
+        box.classList.toggle(
+          "fully-complete",
+          b.expected > 0 && b.missing === 0 && b.excess === 0,
+        );
         const heading = el("div");
         heading.className = "batch-heading";
         const captures = rows.filter(

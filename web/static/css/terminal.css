@@ -486,6 +486,37 @@ body.terminal.dashboard .group {
   background: #101316;
   border-color: #52606b;
 }
+body.terminal.dashboard .batch.fully-complete {
+  border: 3px solid transparent;
+  background:
+    linear-gradient(#101316, #101316) padding-box,
+    linear-gradient(
+        100deg,
+        #f87171,
+        #fde047,
+        #86efac,
+        #93c5fd,
+        #c4b5fd,
+        #f87171
+      )
+      border-box;
+  background-size:
+    100% 100%,
+    300% 100%;
+  animation: complete-card-gradient 5s linear infinite;
+}
+@keyframes complete-card-gradient {
+  to {
+    background-position:
+      0 0,
+      300% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.terminal.dashboard .batch.fully-complete {
+    animation: none;
+  }
+}
 body.terminal.dashboard .lighting-block {
   background: #101316;
   border-color: #35414b;

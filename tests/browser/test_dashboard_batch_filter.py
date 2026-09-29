@@ -125,6 +125,14 @@ with sync_playwright() as playwright:
         ] + [dict(matrix[1], capture_env_lighting="office")]
         page.locator("#refresh").click()
         expect(alpha).to_have_attribute("data-status", "completed")
+        complete_card = page.locator(".batch.fully-complete")
+        expect(complete_card).to_have_count(1)
+        assert "linear-gradient" in complete_card.evaluate(
+            "e => getComputedStyle(e).backgroundImage"
+        )
+        assert complete_card.evaluate(
+            "e => getComputedStyle(e).animationName"
+        ) == "complete-card-gradient"
         assert alpha.evaluate("e => getComputedStyle(e).color") == (
             "rgb(150, 230, 179)"
         )
