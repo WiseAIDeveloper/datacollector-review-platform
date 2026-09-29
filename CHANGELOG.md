@@ -28,6 +28,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Include the naming module and shared field script in the Docker build context so the new viewer image starts correctly.
+
 - Flag collector capture option fields absent from the naming file, and fail on broken option references, so stale field names cannot pass the project audit.
 
 - Use the capture_device label when a recognized native sensor reports an Unknown model, without changing its App classification.
