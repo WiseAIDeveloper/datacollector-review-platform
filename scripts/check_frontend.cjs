@@ -5,17 +5,19 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const parser = require("@babel/parser");
 
-// Naming highlights and standardized fields are covered by browser scenarios.
+// Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
-  "index.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
-  "quality.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
-  "search.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
-  "ingestion.html": "d6914ad31494898033af8423ca24f3d624bde3f9",
-  "capture_review.js": "745e5f4ea6ddc40e2cc16c5d59b7c84d0c79ef79",
+  "coverage.html": "0b6d6dc",
+  "index.html": "0b6d6dc",
+  "quality.html": "0b6d6dc",
+  "search.html": "0b6d6dc",
+  "ingestion.html": "0b6d6dc",
+  "capture_review.js": "0b6d6dc",
+  "fields.js": "0b6d6dc",
 };
 const files = [
   "capture_review.js",
+  "fields.js",
   "image_zoom.js",
   "index.html",
   "coverage.html",
