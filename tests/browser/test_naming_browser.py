@@ -65,6 +65,7 @@ def ingestion(request):
                         capture_device="galaxy_z_fold_5",
                     ),
                     naming={},
+                    possible_excess=True,
                 ),
                 *[
                     dict(
@@ -84,7 +85,7 @@ def ingestion(request):
                     )
                     for number, marker in [(3, "na"), (4, "none")]
                 ],
-                dict(event, id=5, filename="deleted.jpg", available=False),
+                dict(event, id=5, filename="deleted.jpg", available=False, possible_excess=True),
             ],
             next_before=None,
             actions=[],
@@ -125,6 +126,11 @@ with sync_playwright() as p:
     assert "not an accepted capture_device" in flagged.nth(1).get_attribute("title")
     expect(page.locator("#logs td.ingestion-naming-issue")).to_have_count(2)
     expect(page.locator("#logs td.ingestion-matrix-mismatch")).to_have_count(1)
+    excess = page.locator("#logs tr.ingestion-possible-excess")
+    expect(excess).to_have_count(1)
+    assert "rgb(109, 40, 217)" in excess.locator("td").first.evaluate(
+        "e => getComputedStyle(e).backgroundImage"
+    )
     gradient = flagged.first.evaluate(
         "e => getComputedStyle(e).backgroundImage"
     )
@@ -136,6 +142,7 @@ with sync_playwright() as p:
         expect(replay).to_have_text("—")
         assert "ingestion-naming-issue" not in (replay.get_attribute("class") or "")
     deleted = page.locator("#logs tr").filter(has_text="deleted.jpg")
+    assert "ingestion-possible-excess" not in (deleted.get_attribute("class") or "")
     assert deleted.locator("td.ingestion-naming-issue, td.ingestion-matrix-mismatch").count() == 0
     note = page.evaluate(
         "namingIssueNote({naming: %s})?.textContent" % __import__("json").dumps(NAMING)

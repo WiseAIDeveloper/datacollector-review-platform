@@ -345,6 +345,11 @@ class IngestionLog:
                 next_before=records[-1]["id"] if len(records) == limit else None,
             )
 
+    def newest_event_keys(self):
+        """Return all logged capture keys in ingestion order, newest first."""
+        with self.lock:
+            return [row[0] for row in self.db.execute("SELECT key FROM events ORDER BY id DESC")]
+
     def run(self):
         """Scan every five seconds until stopped, retaining database errors for the API."""
         while not self.stop.is_set():
@@ -396,3 +401,42 @@ def with_current_metadata(snapshot, records):
             event["test_plan"] = metadata.get("test_plan_name", "")
         events.append(event)
     return dict(snapshot, events=events)
+
+
+def possible_excess_keys(records, plan, naming, newest_keys):
+    """Identify the newest available captures beyond each matrix row's count."""
+    if not plan:
+        return set()
+    fields = [
+        field.key
+        for field in naming.fields
+        if field.role != "identity" and field.key in plan[0]
+    ]
+    requirements = {
+        (
+            row["folder"],
+            row["sdk"],
+            row.get("test_plan_name", ""),
+            *(row[field] for field in fields),
+        ): int(row["expected_count_per_identity"])
+        for row in plan
+    }
+    current = {row["key"]: row for row in records}
+    groups = {}
+    for key in newest_keys:
+        record = current.get(key)
+        if record is None:
+            continue
+        requirement = (
+            record["folder"],
+            record["sdk"],
+            record["metadata"].get("test_plan_name", ""),
+            *(record["fields"].get(field, "") for field in fields),
+        )
+        identity = record["fields"].get(naming.identity.key, "")
+        if identity and requirement in requirements:
+            groups.setdefault((identity, requirement), []).append(key)
+    excess = set()
+    for (_, requirement), keys in groups.items():
+        excess.update(keys[: max(0, len(keys) - requirements[requirement])])
+    return excess

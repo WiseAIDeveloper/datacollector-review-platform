@@ -276,6 +276,11 @@
       <span class="ingestion-matrix-mismatch"
         >Red: not in this batch's matrix</span
       >
+      <span class="ingestion-possible-excess"
+        ><span class="excess-legend"
+          >Purple: newest beyond matrix count</span
+        ></span
+      >
     </p>
     <div class="table-wrap">
       <table>
@@ -454,13 +459,18 @@
         $("logs").replaceChildren();
         for (const event of data.events) {
           const row = document.createElement("tr");
+          if (event.available !== false && event.possible_excess)
+            row.classList.add("ingestion-possible-excess");
           const matrixRows = matrix.filter(
             (planned) =>
               planned.folder === event.batch &&
               planned.sdk === event.sdk &&
               (!event.test_plan || planned.test_plan_name === event.test_plan),
           );
-          cell(row, event.filename);
+          const picture = cell(row, event.filename);
+          if (row.classList.contains("ingestion-possible-excess"))
+            picture.title =
+              "Possible excess: newest capture beyond the matrix count";
           cell(row, event.batch);
           cell(row, event.sdk);
           for (const f of naming.checked) {
