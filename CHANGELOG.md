@@ -28,6 +28,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Show SDK, capture device, and replay device in separate coverage table columns when the matrix plans those fields.
+
 - Include the naming module and shared field script in the Docker build context so the new viewer image starts correctly.
 
 - Flag collector capture option fields absent from the naming file, and fail on broken option references, so stale field names cannot pass the project audit.

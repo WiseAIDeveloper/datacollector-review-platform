@@ -828,15 +828,11 @@
         const table = el("table");
         table.className = "coverage-table";
         const head = el("tr");
-        const describe = /* Label a matrix row by SDK and its row fields. */ (
-          m,
-        ) =>
-          [m.sdk.toUpperCase(), ...rowFields().map((f) => m[f.key])].join(
-            " / ",
-          );
+        const dimensions = rowFields();
         for (const label of [
           groupField()?.key ?? "Group",
-          ["SDK", ...rowFields().map((f) => f.key)].join(" / "),
+          "SDK",
+          ...dimensions.map((field) => field.key),
           "Expected",
           "Found",
           "Missing",
@@ -847,12 +843,15 @@
         table.append(head);
         for (const g of gs) {
           const tr = el("tr"),
-            needed = Math.max(g.expected - g.found, 0);
+            needed = Math.max(g.expected - g.found, 0),
+            foundIndex = dimensions.length + 3,
+            missingIndex = foundIndex + 1;
           if (needed) tr.className = "missing-case";
           else if (g.found > g.expected) tr.className = "excess-case";
           for (const [i, v] of [
             groupField() ? g.m[groupField().key] : "All",
-            describe(g.m),
+            g.m.sdk.toUpperCase(),
+            ...dimensions.map((field) => g.m[field.key] || "—"),
             g.expected,
             g.found,
             needed,
@@ -862,11 +861,11 @@
           ].entries()) {
             const td = el("td", v);
             td.className =
-              i === 3
+              i === foundIndex
                 ? g.found > g.expected
                   ? "excess-count"
                   : "found-count"
-                : i === 4
+                : i === missingIndex
                   ? "missing-count"
                   : "";
             tr.append(td);
