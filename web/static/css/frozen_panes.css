@@ -331,3 +331,41 @@ body.terminal .workspace-header p {
 p.naming-issue {
   padding: 4px 8px;
 }
+
+/* Ingestion distinguishes unknown names from values outside the selected plan. */
+.ingestion-rainbow,
+.ingestion-matrix-mismatch {
+  border-radius: 3px;
+  background-size: 300% 100%;
+  animation: ingestion-gradient 4s linear infinite;
+}
+.ingestion-rainbow {
+  background-image: linear-gradient(
+    100deg,
+    #fca5a5,
+    #fde68a,
+    #86efac,
+    #93c5fd,
+    #c4b5fd,
+    #fca5a5
+  );
+  color: #111827;
+}
+.ingestion-matrix-mismatch {
+  background-image: linear-gradient(100deg, #7f1d1d, #ef4444, #f87171, #7f1d1d);
+  color: #fff;
+}
+.ingestion-legend span {
+  padding: 2px 6px;
+}
+@keyframes ingestion-gradient {
+  to {
+    background-position: 300% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ingestion-rainbow,
+  .ingestion-matrix-mismatch {
+    animation: none;
+  }
+}

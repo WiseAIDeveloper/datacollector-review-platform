@@ -27,7 +27,7 @@ NAMING = dict(
 
 
 def ingestion(request):
-    """Serve one ingestion event with capture_env_lighting and device issues."""
+    """Serve an unknown name and a named value absent from the matrix."""
     detected = datetime.now(timezone.utc).isoformat()
     event = dict(
         id=1,
@@ -50,10 +50,41 @@ def ingestion(request):
             last_scan=detected,
             errors=[],
             pending_images=0,
-            total=1,
+            total=4,
             existing=0,
-            ingested=1,
-            events=[event],
+            ingested=4,
+            events=[
+                event,
+                dict(
+                    event,
+                    id=2,
+                    filename="unplanned.jpg",
+                    fields=dict(
+                        capture_env_lighting="office_dark",
+                        subject="fixture",
+                        capture_device="galaxy_z_fold_5",
+                    ),
+                    naming={},
+                ),
+                *[
+                    dict(
+                        event,
+                        id=number,
+                        filename=marker + ".jpg",
+                        available=False,
+                        fields=dict(
+                            capture_env_lighting="office_white",
+                            subject="fixture",
+                            capture_device="galaxy_z_fold_5",
+                            replay_device=marker,
+                        ),
+                        naming={
+                            "replay_device": dict(OK, issue="legacy issue")
+                        } if marker == "none" else {},
+                    )
+                    for number, marker in [(3, "na"), (4, "none")]
+                ],
+            ],
             next_before=None,
             actions=[],
             action_total=0,
@@ -68,16 +99,40 @@ with sync_playwright() as p:
     )
     page = browser.new_page()
     page.route("**/api/ingestion?*", ingestion)
+    page.route(
+        "**/api/fields*",
+        lambda route: route.fulfill(
+            json=[
+                dict(key="capture_env_lighting", accepted=["office_white", "office_dark"], required=True),
+                dict(key="subject", accepted=["fixture"], required=True),
+                dict(key="capture_device", accepted=["galaxy_z_fold_5"], required=True),
+                dict(key="replay_device", accepted=["galaxy_z_fold_5"], required=False),
+            ]
+        ),
+    )
+    page.route(
+        "**/api/matrix*",
+        lambda route: route.fulfill(
+            json=[dict(folder="batch", sdk="app", test_plan_name="plan", capture_env_lighting="office_white", capture_device="galaxy_z_fold_5")]
+        ),
+    )
     page.goto(BASE + "/ingestion.html")
     expect(page.locator("#logs")).to_contain_text("flagged.jpg")
     flagged = page.locator("#logs td.naming-issue")
     expect(flagged).to_have_count(2)
     assert flagged.all_text_contents() == ["white", "SM-A556E"]
     assert "not an accepted capture_device" in flagged.nth(1).get_attribute("title")
-    assert (
-        flagged.first.evaluate("e => getComputedStyle(e).backgroundColor")
-        == "rgb(253, 224, 71)"
+    expect(page.locator("#logs td.ingestion-rainbow")).to_have_count(2)
+    expect(page.locator("#logs td.ingestion-matrix-mismatch")).to_have_count(1)
+    assert "linear-gradient" in flagged.first.evaluate(
+        "e => getComputedStyle(e).backgroundImage"
     )
+    assert flagged.first.evaluate("e => getComputedStyle(e).animationName") == "ingestion-gradient"
+    assert "not planned" in page.locator("#logs td.ingestion-matrix-mismatch").get_attribute("title")
+    for marker in ("na", "none"):
+        replay = page.locator("#logs tr").filter(has_text=marker + ".jpg").locator("td").nth(6)
+        expect(replay).to_have_text("—")
+        assert "ingestion-rainbow" not in (replay.get_attribute("class") or "")
     note = page.evaluate(
         "namingIssueNote({naming: %s})?.textContent" % __import__("json").dumps(NAMING)
     )
