@@ -123,19 +123,20 @@ with sync_playwright() as p:
     expect(flagged).to_have_count(2)
     assert flagged.all_text_contents() == ["white", "SM-A556E"]
     assert "not an accepted capture_device" in flagged.nth(1).get_attribute("title")
-    expect(page.locator("#logs td.ingestion-rainbow")).to_have_count(2)
+    expect(page.locator("#logs td.ingestion-naming-issue")).to_have_count(2)
     expect(page.locator("#logs td.ingestion-matrix-mismatch")).to_have_count(1)
-    assert "linear-gradient" in flagged.first.evaluate(
+    gradient = flagged.first.evaluate(
         "e => getComputedStyle(e).backgroundImage"
     )
+    assert "linear-gradient" in gradient and "rgb(250, 204, 21)" in gradient
     assert flagged.first.evaluate("e => getComputedStyle(e).animationName") == "ingestion-gradient"
     assert "not planned" in page.locator("#logs td.ingestion-matrix-mismatch").get_attribute("title")
     for marker in ("na", "none"):
         replay = page.locator("#logs tr").filter(has_text=marker + ".jpg").locator("td").nth(6)
         expect(replay).to_have_text("—")
-        assert "ingestion-rainbow" not in (replay.get_attribute("class") or "")
+        assert "ingestion-naming-issue" not in (replay.get_attribute("class") or "")
     deleted = page.locator("#logs tr").filter(has_text="deleted.jpg")
-    assert deleted.locator("td.ingestion-rainbow, td.ingestion-matrix-mismatch").count() == 0
+    assert deleted.locator("td.ingestion-naming-issue, td.ingestion-matrix-mismatch").count() == 0
     note = page.evaluate(
         "namingIssueNote({naming: %s})?.textContent" % __import__("json").dumps(NAMING)
     )

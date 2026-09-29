@@ -272,7 +272,7 @@
       <div id="action-lines">No actions recorded yet.</div>
     </details>
     <p class="ingestion-legend">
-      <span class="ingestion-rainbow">Rainbow: not in naming JSON</span>
+      <span class="ingestion-naming-issue">Yellow: not in naming JSON</span>
       <span class="ingestion-matrix-mismatch"
         >Red: not in this batch's matrix</span
       >
@@ -356,7 +356,7 @@
           ? value + " is not in the naming JSON"
           : "");
       if (issue) {
-        td.classList.add("naming-issue", "ingestion-rainbow");
+        td.classList.add("naming-issue", "ingestion-naming-issue");
         td.title = issue;
       } else if (
         value &&

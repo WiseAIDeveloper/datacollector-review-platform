@@ -333,21 +333,20 @@ p.naming-issue {
 }
 
 /* Ingestion distinguishes unknown names from values outside the selected plan. */
-.ingestion-rainbow,
+.ingestion-naming-issue,
 .ingestion-matrix-mismatch {
   border-radius: 3px;
   background-size: 300% 100%;
   animation: ingestion-gradient 4s linear infinite;
 }
-.ingestion-rainbow {
+.ingestion-naming-issue {
   background-image: linear-gradient(
     100deg,
-    #fca5a5,
-    #fde68a,
-    #86efac,
-    #93c5fd,
-    #c4b5fd,
-    #fca5a5
+    #facc15,
+    #fef08a,
+    #fde047,
+    #fef9c3,
+    #facc15
   );
   color: #111827;
 }
@@ -364,7 +363,7 @@ p.naming-issue {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ingestion-rainbow,
+  .ingestion-naming-issue,
   .ingestion-matrix-mismatch {
     animation: none;
   }
