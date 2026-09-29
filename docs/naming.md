@@ -35,14 +35,22 @@ the old version.
       },
       "iphone_13": { "capture_device": ["iphone-13"] }
     }
+  },
+  "replay_device": {
+    "description": "Screen the card image is replayed on",
+    "column": "replay_device",
+    "accepted": {
+      "galaxy_z_fold_5": ["samsung-galaxy-z-fold-5"],
+      "iphone_13": ["iphone-13"]
+    }
   }
 }
 ```
 
 ## Blocks
 
-`lighting`, `identity`, and `device` are all required. `description` is optional
-free text.
+`lighting`, `identity`, and `device` are all required; `replay_device` is
+optional. `description` is optional free text.
 
 | Key        | Meaning                                                                                 |
 | ---------- | --------------------------------------------------------------------------------------- |
@@ -50,7 +58,7 @@ free text.
 | `fallback` | Optional column read only when `column` is empty.                                       |
 | `accepted` | Lighting and identity: the exact accepted values. Device: standard names and spellings. |
 
-`device` has an `app` and a `web` block, each with its own `column` and optional
+`replay_device` has a `column` (no `fallback`) and no SDK blocks. `device` has an `app` and a `web` block, each with its own `column` and optional
 `fallback`. The SDK itself is still detected from `input_sensor`.
 
 A column is an index CSV column name, `input_sensor.model` (the model the App
@@ -69,6 +77,11 @@ capture's collection annotation JSON).
   `capture_device`, and a detected model only under `input_sensor.model`. Only
   columns that `device.app` or `device.web` read may be listed. A spelling may
   appear once per column and may not itself be a standard name.
+- **Replay device**: each key of `replay_device.accepted` is a standard name,
+  and its list holds other spellings of it (usually the same ones as its
+  `capture_device` spellings). An empty value is not an issue, because genuine
+  captures have no replay device; any other unlisted value is flagged. Without
+  the block, replay devices are not checked.
 
 Values are compared exactly after trimming spaces.
 

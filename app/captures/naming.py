@@ -2,7 +2,8 @@
 
 The naming file has one block per field. Each block names the column it is read
 from and its accepted values. Device spellings are keyed by the column they are
-found in, so a label and a detected model code are never confused.
+found in, so a label and a detected model code are never confused. An optional
+replay device block lists the screens a card image may be replayed on.
 """
 
 import json
@@ -93,7 +94,9 @@ class Naming:
 
     def __init__(self, document):
         """Reject unknown keys, duplicates, and spellings that could mean two devices."""
-        keys(document, {"lighting", "identity", "device"}, set(), "the file")
+        keys(
+            document, {"lighting", "identity", "device"}, {"replay_device"}, "the file"
+        )
         optional = {"description", "fallback"}
         self.columns, self.descriptions = {}, {}
         for field, allow_empty in (("lighting", False), ("identity", True)):
@@ -134,6 +137,34 @@ class Naming:
                             f"Naming file: {column} value {raw} maps to two devices"
                         )
                     self.aliases[column][raw] = device
+        self.replay(document.get("replay_device"))
+
+    def replay(self, block):
+        """Load the optional replay device block: standard names and their spellings."""
+        self.replay_devices, self.replay_aliases = set(), {}
+        if block is None:
+            return
+        keys(block, {"column", "accepted"}, {"description"}, "replay_device")
+        self.columns["replay_device"] = columns(block, "replay_device")
+        self.descriptions["replay_device"] = description(block, "replay_device")
+        accepted = block["accepted"]
+        if not isinstance(accepted, dict) or not accepted:
+            raise ValueError(
+                "Naming file: replay_device.accepted must be a nonempty object"
+            )
+        self.replay_devices = set(names(list(accepted), "replay device names"))
+        for device, spellings in accepted.items():
+            label = f"replay_device.accepted.{device}"
+            for raw in names(spellings, label, allow_empty=True):
+                if raw in self.replay_devices:
+                    raise ValueError(
+                        f"Naming file: {raw} is already a standard replay device name"
+                    )
+                if raw in self.replay_aliases:
+                    raise ValueError(
+                        f"Naming file: replay device spelling {raw} maps to two devices"
+                    )
+                self.replay_aliases[raw] = device
 
     def device(self, column, raw):
         """Return the standard device for a value read from a column, or None."""
@@ -156,7 +187,24 @@ class Naming:
                 issue = f"{raw} is not an accepted {field}"
             result[field] = dict(value=raw, raw=raw, source=column, issue=issue)
         result["device"] = self.standardize_device(sdk, row, annotation, sensor_model)
+        if self.replay_devices:
+            result["replay_device"] = self.standardize_replay(
+                row, annotation, sensor_model
+            )
         return result
+
+    def standardize_replay(self, row, annotation, sensor_model):
+        """Map a replay device to its standard name; genuine captures may leave it empty."""
+        column, raw = read_first(
+            self.columns["replay_device"], row, annotation, sensor_model
+        )
+        if not raw or raw in self.replay_devices:
+            return dict(value=raw, raw=raw, source=column, issue="")
+        standard = self.replay_aliases.get(raw)
+        if standard is None:
+            issue = f"{raw} is not an accepted replay device"
+            return dict(value=raw, raw=raw, source=column, issue=issue)
+        return dict(value=standard, raw=raw, source=column, issue="")
 
     def standardize_device(self, sdk, row, annotation, sensor_model):
         """Map the SDK's device column (or its fallback) to a standard device name."""

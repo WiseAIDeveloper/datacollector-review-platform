@@ -96,6 +96,8 @@ def records(root, naming=None):
                     )
                     if sdk != "unknown":
                         record["device"] = standard["device"]["value"] or device
+                    if "replay_device" in standard:
+                        record["replay_device"] = standard["replay_device"]["value"]
                 result.append(record)
     return result
 

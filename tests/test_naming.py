@@ -138,6 +138,66 @@ class NamingDocumentTests(unittest.TestCase):
         )
 
 
+REPLAY = {
+    "description": "Screen the card image is replayed on",
+    "column": "replay_device",
+    "accepted": {
+        "galaxy_z_fold_5": ["samsung-galaxy-z-fold-5"],
+        "iphone_14": ["iphone-14"],
+    },
+}
+
+
+class ReplayDeviceTests(unittest.TestCase):
+    """Accept replay devices by standard name or listed spelling when configured."""
+
+    def setUp(self):
+        """Use the sample document with a replay device block."""
+        self.names = naming.Naming(document(replay_device=REPLAY))
+
+    def replay(self, row):
+        """Standardize one row and return its replay device result."""
+        return self.names.standardize("web", row, {}, "")["replay_device"]
+
+    def test_block_is_optional(self):
+        """Without the block, no replay device is reported."""
+        result = naming.Naming(document()).standardize("web", {}, {}, "")
+        self.assertNotIn("replay_device", result)
+
+    def test_names_and_spellings(self):
+        """Standard names pass, spellings map, and empty values are not issues."""
+        cases = [
+            ("iphone_14", "iphone_14", ""),
+            ("samsung-galaxy-z-fold-5", "galaxy_z_fold_5", ""),
+            ("", "", ""),
+            ("ipad", "ipad", "ipad is not an accepted replay device"),
+        ]
+        for raw, value, issue in cases:
+            with self.subTest(raw=raw):
+                result = self.replay({"replay_device": raw})
+                self.assertEqual(
+                    result,
+                    dict(value=value, raw=raw, source="replay_device", issue=issue),
+                )
+        self.assertEqual(
+            self.names.descriptions["replay_device"], REPLAY["description"]
+        )
+
+    def test_invalid_blocks(self):
+        """Bad columns, empty lists, fallbacks, and ambiguous spellings fail."""
+        cases = {
+            "no devices": dict(REPLAY, accepted={}),
+            "list not object": dict(REPLAY, accepted=["iphone_14"]),
+            "fallback": dict(REPLAY, fallback="capture_device"),
+            "bad column": dict(REPLAY, column="../replay"),
+            "spelling is a name": dict(REPLAY, accepted={"a": ["b"], "b": []}),
+            "spelling twice": dict(REPLAY, accepted={"a": ["x"], "b": ["x"]}),
+        }
+        for label, block in cases.items():
+            with self.subTest(label), self.assertRaises(ValueError):
+                naming.Naming(document(replay_device=block))
+
+
 class StandardizeTests(unittest.TestCase):
     """Report standard values, raw values, columns, and issues per field."""
 
