@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-MATRIX_NAME = "internal_colour_print_enhancement_2"
+MATRIX_NAME = "001_MyKad_ColourPrintEnhancement2"
 INDEX_NAME = "index_annotation_.csv"
 EXCLUDED = {"test", "webcam_genuine", "webcam_replay", "capture_viewer"}
 

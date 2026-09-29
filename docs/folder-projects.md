@@ -15,8 +15,8 @@ The first project uses this layout:
 ```text
 /mnt5/auto-ekyc/datacollection_review/idrecapture/projects/
 └── 001_MyKad_ColourPrintEnhancement2/
-    ├── internal_colour_print_enhancement_2.csv
-    ├── internal_colour_print_enhancement_2_batches.csv
+    ├── 001_MyKad_ColourPrintEnhancement2.csv
+    ├── 001_MyKad_ColourPrintEnhancement2_batches.csv
     ├── project.json
     ├── ingestion.jsonl
     ├── actions.jsonl
