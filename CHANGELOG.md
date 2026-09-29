@@ -14,6 +14,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add `scripts/normalize_names.py` to convert old field values and spellings in capture indexes, annotations, and project plans to standard names (`--map field:old=new`), with a dry run and per-file backups.
 
+- Add `--options` to the project audit to check that a collector plan only offers standard names for naming-file fields; plans may use any subset of fields and values.
+
 - Add `scripts/rename_fields.py` to rename a stored field everywhere (capture index headers, annotation keys, plan headers, ingestion history and logs) and merge plan list columns, with a dry run and per-file backups.
 
 ### Changed

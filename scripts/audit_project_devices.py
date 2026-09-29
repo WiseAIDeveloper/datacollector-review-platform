@@ -102,6 +102,39 @@ def audit(project, captures, naming):
     )
 
 
+def option_values(entry, folder):
+    """Read one collector field's option values, following a `$ref` to another file."""
+    options = entry.get("options") if isinstance(entry, dict) else entry
+    if isinstance(options, dict) and "$ref" in options:
+        name, _, pointer = options["$ref"].partition("#/")
+        document = json.loads((folder / name).read_text(encoding="utf-8"))
+        options = document.get(pointer, [])
+    if not isinstance(options, list):
+        return []
+    return [o["value"] for o in options if isinstance(o, dict) and "value" in o]
+
+
+def options_report(paths, naming):
+    """List collector options that are not standard names of their naming field.
+
+    A collector plan may offer any subset of the fields and values; every value
+    it offers for a naming-file field must be one of that field's standard names.
+    Options for fields the naming file does not define are not checked.
+    """
+    report = []
+    for path in paths:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for key, entry in document.items():
+            name = entry.get("field_name", key) if isinstance(entry, dict) else key
+            field = naming.field(name)
+            if field is None or not field.accepted:
+                continue
+            for value in option_values(entry, path.parent):
+                if value not in field.accepted:
+                    report.append(dict(file=path.name, field=name, value=value))
+    return report
+
+
 def main():
     """Audit one folder project, exiting nonzero when anything does not align."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -109,12 +142,20 @@ def main():
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--project", required=True)
     parser.add_argument("--naming", required=True, type=Path, help="Naming file")
+    parser.add_argument(
+        "--options",
+        action="append",
+        default=[],
+        type=Path,
+        help="Collector options file for this project, repeatable",
+    )
     args = parser.parse_args()
     naming = load(args.naming)
     projects = FolderProjects(args.projects_root, args.dataset)
     project = projects.get(args.project)
     captures = projects.filter_records(args.project, records(args.dataset, naming))
     report = audit(project, captures, naming)
+    report["nonstandard_options"] = options_report(args.options, naming)
     print(json.dumps(report, indent=2))
     return int(any(report.values()))
 

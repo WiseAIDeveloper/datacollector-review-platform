@@ -128,3 +128,64 @@ class ProjectAuditTests(unittest.TestCase):
             result["nonstandard_plan_values"],
             [dict(batch="b", field="capture_env_lighting", value="dark")],
         )
+
+
+class CollectorOptionsTests(unittest.TestCase):
+    """Collector plans may offer any subset of fields, but only standard values."""
+
+    def test_options_must_be_standard_names(self):
+        """Direct lists and $ref form files are both checked; other fields are not."""
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from scripts.audit_project_devices import options_report
+
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            options = folder / "plan_options.json"
+            options.write_text(
+                json.dumps(
+                    {
+                        "subject": [{"display": "A", "value": "anyone"}],
+                        "capture_env_lighting": [
+                            {"display": "Dark", "value": "office_dark"},
+                            {"display": "Other", "value": "other"},
+                        ],
+                        "batch": [{"display": "B", "value": "not-a-field"}],
+                    }
+                )
+            )
+            form = folder / "plan_web.json"
+            form.write_text(
+                json.dumps(
+                    {
+                        "display_order": {"1": "capture_device"},
+                        "capture_device": {
+                            "field_name": "capture_device",
+                            "options": {"$ref": "devices.json#/capture_device"},
+                        },
+                    }
+                )
+            )
+            (folder / "devices.json").write_text(
+                json.dumps(
+                    {
+                        "capture_device": [
+                            {"value": "phone"},
+                            {"value": "SM-1"},
+                        ]
+                    }
+                )
+            )
+            self.assertEqual(
+                options_report([options, form], NAMING),
+                [
+                    dict(
+                        file="plan_options.json",
+                        field="capture_env_lighting",
+                        value="other",
+                    ),
+                    dict(file="plan_web.json", field="capture_device", value="SM-1"),
+                ],
+            )

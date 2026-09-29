@@ -129,3 +129,9 @@ which source is correct when a phone label contradicts its native sensor model.
 
 It also lists capture values that are not standard [names](naming.md), grouped
 with their capture counts, and matrix values that are not standard names.
+
+Add `--options <file>` (repeatable) with the collector's option files for the
+project to check what the collector offers. A plan may offer any subset of the
+naming-file fields and values, but each value it offers for a field must be one
+of that field's standard names; options for other fields (batch, test plan) are
+not checked. Form files that point to option lists with `$ref` are followed.
