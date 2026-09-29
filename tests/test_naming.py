@@ -214,6 +214,8 @@ class StandardizeTests(unittest.TestCase):
         )
         self.assertEqual(result["replay_device"]["issue"], "")
         self.assertEqual(result["user"]["issue"], "")
+        absent = self.standardize("web", {"replay_device": "na"})["replay_device"]
+        self.assertEqual((absent["raw"], absent["value"], absent["issue"]), ("na", "", ""))
         self.assertEqual(
             self.standardize("unknown", {})["capture_device"]["issue"],
             "SDK not recognized",

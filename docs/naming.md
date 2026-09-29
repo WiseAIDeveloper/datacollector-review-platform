@@ -87,6 +87,8 @@ annotation are shown and checked but cannot be edited.
   device edit means the App SDK's detected model is used.
 - **Other fields** with an `accepted` list must match exactly. With an object,
   each key is a standard name and its list holds other spellings.
+- Optional fields may use `na` to mean not applicable. The collector can offer
+  it as a choice, but it is treated as empty and is not a standard name.
 - **Free-text fields** have no `accepted`: they are editable and shown in
   capture metadata, never flagged except when `required` and missing.
 
