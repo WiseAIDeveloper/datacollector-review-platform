@@ -7,7 +7,8 @@ const parser = require("@babel/parser");
 
 // Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "0b6d6dc",
+  // State-preserving three-second refresh is covered by test_dashboard_refresh.py.
+  "coverage.html": "0e2bff0",
   "index.html": "0b6d6dc",
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",

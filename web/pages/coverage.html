@@ -316,6 +316,9 @@
           <div class="toolbar">
             <label>Identity<select id="subject"></select></label>
             <button id="refresh">Refresh data</button>
+            <span id="refresh-status" role="status"
+              >Auto-refresh every 3 seconds</span
+            >
           </div>
           <button id="execute" disabled>Execute decisions (0)</button>
         </div>
@@ -538,6 +541,12 @@
         if (type === "over") {
           const details = el("details");
           details.className = "excess-review";
+          details.dataset.refreshKey = JSON.stringify([
+            "excess",
+            g.m.folder,
+            g.m.sdk,
+            ...planned.map((f) => g.m[f.key]),
+          ]);
           const groupKey = [
             $("subject").value,
             g.m.folder,
@@ -693,9 +702,11 @@
           tr.append(el("th", k), el("td", v));
           table.append(tr);
         }
+        details.dataset.refreshKey = JSON.stringify(["csv", r.key]);
         details.append(el("summary", "Current CSV metadata"), table);
         const raw = el("details"),
           pre = el("pre", "Loading…");
+        raw.dataset.refreshKey = JSON.stringify(["annotation", r.key]);
         raw.append(el("summary", "Full original collection metadata"), pre);
         raw.addEventListener(
           "toggle",
@@ -1017,6 +1028,7 @@
         const d = b.definition || {},
           definition = el("details");
         definition.className = "batch-definition";
+        definition.dataset.refreshKey = JSON.stringify(["definition", b.name]);
         definition.append(el("summary", "Expected batch requirements"));
         const title =
           /* Display a capitalized label with a fallback for missing values. */ (
@@ -1064,6 +1076,7 @@
                   : "Complete";
           box.append(el("p", label));
           const details = el("details");
+          details.dataset.refreshKey = JSON.stringify(["groups", b.name]);
           details.append(
             el(
               "summary",
@@ -1395,8 +1408,46 @@
               : ""),
         );
       }
-      /* Load current capture data and refresh page controls and results. */
-      async function load() {
+      let loading = false;
+      let lastSnapshot = "";
+      /* Avoid interrupting edits, open images, or hidden tabs with background updates. */
+      function refreshPaused() {
+        return (
+          document.hidden ||
+          executing ||
+          $("zoom").open ||
+          document.activeElement?.matches("input, textarea, select")
+        );
+      }
+      /* Redraw fresh data while retaining expanded details, keyboard focus, and scroll. */
+      function refreshView() {
+        const details = new Map(
+            [...document.querySelectorAll("details[data-refresh-key]")].map(
+              /* Key expansion state by batch/group/capture, independent of row order. */
+              (node) => [node.dataset.refreshKey, node.open],
+            ),
+          ),
+          active = document.activeElement,
+          focusedKey = active?.closest("details[data-refresh-key]")?.dataset
+            .refreshKey,
+          focusedSummary = active?.tagName === "SUMMARY",
+          x = window.scrollX,
+          y = window.scrollY;
+        render();
+        for (const node of document.querySelectorAll(
+          "details[data-refresh-key]",
+        )) {
+          if (details.has(node.dataset.refreshKey))
+            node.open = details.get(node.dataset.refreshKey);
+          if (focusedSummary && node.dataset.refreshKey === focusedKey)
+            node.querySelector("summary").focus({ preventScroll: true });
+        }
+        window.scrollTo(x, y);
+      }
+      /* Fetch one snapshot at a time and preserve the last good view on failure. */
+      async function load(background = false) {
+        if (loading || executing || (background && refreshPaused())) return;
+        loading = true;
         try {
           const [a, b, c, d] = await Promise.all([
             fetch("/api/captures"),
@@ -1405,10 +1456,20 @@
             fetch("/api/quality"),
           ]);
           if (!a.ok || !b.ok || !c.ok || !d.ok) throw Error();
-          rows = await a.json();
-          matrix = await b.json();
-          batchDefs = await c.json();
-          naming = await window.captureFields.load();
+          const data = await Promise.all([
+            a.json(),
+            b.json(),
+            c.json(),
+            d.json(),
+          ]);
+          const fields = await window.captureFields.load();
+          // The user may have started editing while the requests were in flight.
+          if (executing || (background && refreshPaused())) return;
+          const snapshot = JSON.stringify([data, decisions]);
+          $("refresh-status").textContent = "Auto-refresh every 3 seconds";
+          if (snapshot === lastSnapshot) return;
+          [rows, matrix, batchDefs, qualityReviews] = data;
+          naming = fields;
           planned = naming.planned(matrix);
           projectPlans = new Set(
             batchDefs
@@ -1418,7 +1479,6 @@
               )
               .filter(Boolean),
           );
-          qualityReviews = await d.json();
           const previous = $("subject").value,
             subjects = [
               ...new Set(
@@ -1450,17 +1510,28 @@
           $("subject").value = subjects.includes(previous)
             ? previous
             : subjects[0] || "";
-          render();
+          refreshView();
+          lastSnapshot = snapshot;
         } catch (e) {
-          $("summary").replaceChildren(stat("Load error", "Please refresh"));
+          $("refresh-status").textContent =
+            "Refresh failed. Retrying automatically…";
+        } finally {
+          loading = false;
         }
       }
       $("execute").onclick = executeDecisions;
       $("subject").onchange = render;
-      $("refresh").onclick = load;
+      $("refresh").onclick =
+        /* Refresh immediately without treating the click as background work. */ () =>
+          load();
       $("close").onclick = /* Close the image preview dialog. */ () =>
         $("zoom").close();
       load();
+      setInterval(
+        /* Poll visible, idle dashboards every three seconds. */ () =>
+          load(true),
+        3000,
+      );
       window.addEventListener(
         "focus",
         /* Handle the focus event for this control. */ () => {
@@ -1468,7 +1539,7 @@
             try {
               decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
             } catch (e) {}
-            load();
+            load(true);
           }
         },
       );
