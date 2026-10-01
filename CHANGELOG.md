@@ -23,7 +23,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Highlight dashboard batch `002_Genuine_Internal_None_None_002` with an animated rainbow gradient, retaining selected-state contrast and respecting reduced-motion preferences.
+- Highlight dashboard batch `002_Genuine_Internal_None_None_002` with a bright animated rainbow gradient and dark readable text, retaining selected-state contrast and respecting reduced-motion preferences.
 
 - Speed up dashboard and capture reads by sharing unchanged metadata across project readers while checking CSV, annotation, and naming changes on every request. Coalesce concurrent validation, reuse serialized responses, compress large JSON responses for supporting browsers, and avoid rescanning captures for empty quality reviews. No data migration or configuration change is needed.
 
