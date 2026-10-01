@@ -9,6 +9,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Refresh dashboard data automatically every three seconds while the page is visible and no review is being edited. Manual and automatic refresh preserve selected filters, expanded details, review drafts, and scroll position; failed refreshes retain the last successful view.
+- Keep the dashboard batch selector visible below the header while scrolling. Long batch lists scroll within the pane, and the pane can still be collapsed to make room for coverage results.
 
 - Add an optional shared naming file (`NAMING_FILE`) with one block each for lighting, identity, and device: the column it is read from (App devices use `capture_device`, falling back to the auto-detected model), the accepted values, and device spellings keyed by column. Devices are shown by standard name; missing or unaccepted values are highlighted and edits must use accepted values. The project compose file mounts the shared `naming/` folder read-only. See `docs/naming.md`.
 

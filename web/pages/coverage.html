@@ -72,12 +72,26 @@
         gap: 12px;
       }
       .batch-filter-panel {
+        position: sticky;
+        top: var(--dashboard-header-height, 0px);
+        z-index: 20;
         margin: 0 0 16px;
+        padding: 10px 12px;
+        background: #10171b;
+        border-bottom: 1px solid #34434c;
+        box-shadow: 0 4px 12px #0003;
       }
       .batch-filter-panel > summary {
         font-weight: 600;
       }
       .batch-filter {
+        max-height: min(
+          30dvh,
+          max(80px, calc(100dvh - var(--dashboard-header-height, 0px) - 100px))
+        );
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        padding: 3px;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -1519,6 +1533,17 @@
           loading = false;
         }
       }
+      new ResizeObserver(
+        /* Keep batch choices directly below the header as project text and viewport size change. */
+        ([entry]) => {
+          document.documentElement.style.setProperty(
+            "--dashboard-header-height",
+            entry.target.getBoundingClientRect().height + "px",
+          );
+        },
+      ).observe(document.querySelector(".dashboard-header"), {
+        box: "border-box",
+      });
       $("execute").onclick = executeDecisions;
       $("subject").onchange = render;
       $("refresh").onclick =
