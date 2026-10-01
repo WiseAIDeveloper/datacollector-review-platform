@@ -73,6 +73,9 @@ class Application:
         self.lock = threading.RLock()
         self.naming = NamingFile(required_naming(settings))
         self.catalog = CatalogCache(settings.root)
+        self.response_lock = threading.Lock()
+        self.response_rows = None
+        self.response_bytes = None
         self.ingestion = IngestionLog(
             settings.root,
             settings.database,
@@ -100,6 +103,24 @@ class Application:
             if hasattr(self, "project_id")
             else rows
         )
+
+    def encode_captures(self, rows):
+        """Serialize and compress one unchanged capture snapshot once across readers."""
+        with self.response_lock:
+            if (
+                self.response_rows is None
+                or len(rows) != len(self.response_rows)
+                or any(
+                    left is not right for left, right in zip(rows, self.response_rows)
+                )
+            ):
+                data = json.dumps(rows).encode()
+                compressed = gzip.compress(data, compresslevel=1, mtime=0)
+                self.response_rows = tuple(rows)
+                self.response_bytes = data, (
+                    compressed if len(compressed) < len(data) else None
+                )
+            return self.response_bytes
 
     def edit(self, request):
         """Apply a metadata edit and persist its action history while holding the lock."""
@@ -186,6 +207,8 @@ class Handler(BaseHTTPRequestHandler):
     @property
     def app(self):
         """Access the application attached to this server instance."""
+        if getattr(self, "_request_application", None) is not None:
+            return self._request_application
         application = self.server.application
         path = urlparse(self.path).path
         if (
@@ -196,7 +219,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             and path not in {"/api/projects", "/api/project", "/api/project-mode"}
         ):
-            return application.select(self.project_id())
+            application = application.select(self.project_id())
+        self._request_application = application
         return application
 
     def log_message(self, format, *args):
@@ -229,6 +253,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Dispatch a read request and return a generic error for unexpected failures."""
+        self._request_application = None
         try:
             url = urlparse(self.path)
             self.get_route(url.path, parse_qs(url.query))
@@ -269,7 +294,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/fields":
             return self.send_json(self.app.current_naming().describe())
         if path == "/api/captures":
-            return self.send_json(self.records())
+            data, compressed = self.app.encode_captures(self.records())
+            if compressed is not None and accepts_gzip(
+                self.headers.get("Accept-Encoding", "")
+            ):
+                return self.send(compressed, encoding="gzip")
+            return self.send(data)
         if path == "/api/matrix":
             return self.send_json(
                 self.app.projects.get(self.project_id())["matrix"]
@@ -391,6 +421,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Authenticate writes before reading their bounded JSON bodies."""
+        self._request_application = None
         try:
             path = urlparse(self.path).path
             if path not in WRITE_ROUTES:
@@ -450,9 +481,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send(b"Write failed; refresh before retrying", "text/plain", 500)
 
 
+class ReviewHTTPServer(ThreadingHTTPServer):
+    """Accept bursts of dashboard requests without the default five-connection backlog."""
+
+    request_queue_size = 128
+
+
 def create_server(settings):
     """Construct an HTTP server without starting its serving loop or ingestion worker."""
-    server = ThreadingHTTPServer((settings.host, settings.port), Handler)
+    server = ReviewHTTPServer((settings.host, settings.port), Handler)
     try:
         server.application = (
             ProjectApplications(settings, Application)

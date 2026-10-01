@@ -167,3 +167,41 @@ read-only to consumers. Regression tests compare cached results with fresh
 reads after edits, replacements, deletions, naming changes, and concurrent reads.
 Large JSON responses use gzip only when the client accepts it; decoded API data
 and existing `no-store` behavior remain unchanged.
+
+The deeper backend path coalesces overlapping file-validation passes, caches
+serialized and compressed capture responses by ordered record identity, and
+accepts connection bursts with a 128-connection listen backlog. Sequential
+refreshes still validate files, and a changed record rebuilds the encoded result.
+No timer-based snapshot delay is added. The background ingestion scanner also
+avoids repeated normalization/database inserts for keys already recorded, while
+still checking image availability.
+
+Run `PYTHONPATH=. python scripts/benchmark_dashboard_http.py --captures 5200 --users 20`
+for a real HTTP comparison on a temporary localhost server. Use `--captures 50000`
+for a larger dataset. By default the ingestion worker is disabled to isolate
+HTTP/catalog costs. These figures exclude browser rendering, production network
+latency, and concurrent writes. The server uses only synthetic data.
+
+| Workload | Deployed baseline (`7f6f41e`) | Optimized branch |
+| --- | ---: | ---: |
+| 5,200 captures, 20 users, warm HTTP p50 | 13.122 s | 0.100 s |
+| 5,200 captures, 20 users, warm HTTP p95 | 13.813 s | 0.129 s |
+| 5,200 captures, response size | 7,220,236 B | 154,897 B |
+| 5,200 captures, cold request | 0.268 s | 0.371 s |
+| 50,000 captures, 20 users, warm HTTP p95 | Not run | 0.568 s |
+| 50,000 captures, cold request | Not run | 3.583 s |
+
+The requested workload is **10 concurrent users and 100,000 captures**. Run it
+with project selection and background ingestion enabled:
+
+```sh
+PYTHONPATH=. python scripts/benchmark_dashboard_http.py --captures 100000 --users 10 --folder-project
+```
+
+A single synchronized burst on this host measured warm p50 **2.102 s**, p95
+**2.144 s**, and **2,978,818 B** per compressed response. Cold initialization
+measured **20.841 s**. No comparable baseline at 100,000 captures was measured.
+This larger run does not meet a subsecond target; first-page loads and browser
+processing still need improvement. The smaller isolated HTTP comparison above
+must not be interpreted as end-to-end dashboard latency. Repeat sustained tests
+on the intended storage and network before setting a production latency objective.

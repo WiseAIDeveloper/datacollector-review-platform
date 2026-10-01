@@ -129,6 +129,9 @@ class CatalogCache:
         self.lock = threading.RLock()
         self.indexes = {}
         self.entries = {}
+        self.generation = 0
+        self.snapshot = []
+        self.naming = None
 
     def records(self, naming):
         """Return current records in CSV order, rebuilding only changed metadata.
@@ -137,7 +140,11 @@ class CatalogCache:
         ones so concurrent serializers retain a consistent snapshot. Deleted files
         and rows are discarded; no time-based staleness is introduced.
         """
+        generation = self.generation
         with self.lock:
+            # A simultaneous caller already checked files after this read began.
+            if self.generation != generation and self.naming is naming:
+                return self.snapshot
             indexes, entries, result = {}, {}, []
             for folder in sorted(self.root.iterdir()):
                 path = folder / INDEX_NAME
@@ -172,6 +179,8 @@ class CatalogCache:
                             entries[identity] = naming, annotation_stamp, record
                     result.append(record)
             self.indexes, self.entries = indexes, entries
+            self.snapshot, self.naming = result, naming
+            self.generation += 1
             return result
 
 

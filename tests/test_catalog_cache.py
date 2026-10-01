@@ -5,6 +5,7 @@ import gzip
 import json
 import os
 import tempfile
+import threading
 import unittest
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +14,7 @@ from unittest.mock import patch
 
 from app.captures import catalog
 from app.captures.naming import Naming
-from app.server import accepts_gzip
+from app.server import Application, accepts_gzip
 from tests.support import NAMING, dataset, running_server, write_csv
 
 
@@ -100,6 +101,53 @@ class CatalogCacheTests(unittest.TestCase):
             dataset(Path(other), count=1)
             self.assertEqual(len(catalog.CatalogCache(other).records(self.naming)), 1)
         self.assert_current()
+
+    def test_overlapping_requests_share_validation(self):
+        """A burst checks files once, while a subsequent request still revalidates them."""
+        barrier = threading.Barrier(4)
+        lock = threading.Lock()
+
+        class SimultaneousLock:
+            """Arrange four overlapping reads without timing-dependent sleeps."""
+
+            def __enter__(self):
+                """Let all reads begin before the first can build its snapshot."""
+                barrier.wait(timeout=5)
+                lock.acquire()
+
+            def __exit__(self, *args):
+                """Allow the next waiter to reuse the newly validated snapshot."""
+                lock.release()
+
+        self.cache.lock = SimultaneousLock()
+        with patch.object(catalog, "file_stamp", wraps=catalog.file_stamp) as stat:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(
+                    pool.map(lambda _: self.cache.records(self.naming), range(4))
+                )
+            self.assertEqual(stat.call_count, 12)
+        self.assertTrue(all(result == results[0] for result in results))
+        self.cache.lock = threading.RLock()
+        self.rows[0]["subject"] = "changed-after-burst"
+        write_csv(self.index, self.rows)
+        self.assert_current()
+
+    def test_encoded_snapshot_reuse_and_scope(self):
+        """Response bytes are shared only while every ordered record is unchanged."""
+        application = Application.__new__(Application)
+        application.response_lock = threading.Lock()
+        application.response_rows = None
+        application.response_bytes = None
+        rows = self.cache.records(self.naming)
+        first = application.encode_captures(rows)
+        self.assertIs(application.encode_captures(list(rows)), first)
+        subset = application.encode_captures(rows[:1])
+        self.assertEqual(len(json.loads(subset[0])), 1)
+        self.rows[0]["subject"] = "new-subject"
+        write_csv(self.index, self.rows)
+        updated = application.encode_captures(self.cache.records(self.naming))
+        self.assertEqual(json.loads(updated[0])[0]["identity"], "new-subject")
+        self.assertEqual(json.loads(first[0])[0]["identity"], "fixture")
 
 
 class CompressedJsonTests(unittest.TestCase):
