@@ -23,6 +23,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Reconcile dashboard refresh and frozen batch selection with the deployed matrix naming, optional-field handling, ingestion highlights, and separate coverage columns so deployment preserves existing behavior.
+
 - **Breaking:** the naming file now defines every capture field, and is required (`NAMING_FILE`, mounted from `NAMING_PATH` by both compose files). Each top-level key is a field whose name is its index column, matrix column, `expected_<field>` batch list, page label, and ingestion log key; one field has `role: identity` and one `role: device`. Pages, filters, edit forms, coverage, and audits follow the file instead of fixed lighting, identity, and device columns. Coverage matches each capture's batch, SDK, and every field the matrix has a column for, so unused fields such as a replay device do not affect it. Migrate with `scripts/rename_fields.py` and convert the naming file to the new format; see `docs/naming.md`.
 
 - **Breaking:** the ingestion history stores field values by field name. An older database is converted on first start, keeping each old column's name; `scripts/rename_fields.py` renames them.
