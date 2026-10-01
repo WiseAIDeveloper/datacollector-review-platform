@@ -330,9 +330,7 @@
           <div class="toolbar">
             <label>Identity<select id="subject"></select></label>
             <button id="refresh">Refresh data</button>
-            <span id="refresh-status" role="status"
-              >Auto-refresh every 3 seconds</span
-            >
+            <span id="refresh-status" role="status">Not refreshed yet</span>
           </div>
           <button id="execute" disabled>Execute decisions (0)</button>
         </div>
@@ -1424,14 +1422,15 @@
       }
       let loading = false;
       let lastSnapshot = "";
-      /* Avoid interrupting edits, open images, or hidden tabs with background updates. */
-      function refreshPaused() {
-        return (
-          document.hidden ||
-          executing ||
-          $("zoom").open ||
-          document.activeElement?.matches("input, textarea, select")
-        );
+      let lastRefreshed = null;
+      /* Show the last successful fetch in local time, retaining it after failures. */
+      function updateRefreshStatus(failed = false) {
+        $("refresh-status").textContent =
+          (lastRefreshed
+            ? "Last refreshed at " + lastRefreshed.toLocaleTimeString()
+            : "Not refreshed yet") +
+          (failed ? " · Refresh failed. Try again." : "");
+        $("refresh-status").title = lastRefreshed?.toLocaleString() || "";
       }
       /* Redraw fresh data while retaining expanded details, keyboard focus, and scroll. */
       function refreshView() {
@@ -1459,8 +1458,8 @@
         window.scrollTo(x, y);
       }
       /* Fetch one snapshot at a time and preserve the last good view on failure. */
-      async function load(background = false) {
-        if (loading || executing || (background && refreshPaused())) return;
+      async function load() {
+        if (loading || executing) return;
         loading = true;
         try {
           const [a, b, c, d] = await Promise.all([
@@ -1477,11 +1476,17 @@
             d.json(),
           ]);
           const fields = await window.captureFields.load();
-          // The user may have started editing while the requests were in flight.
-          if (executing || (background && refreshPaused())) return;
+          // Do not replace a view while review decisions are being submitted.
+          if (executing) return;
+          try {
+            decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
+          } catch (e) {}
           const snapshot = JSON.stringify([data, decisions]);
-          $("refresh-status").textContent = "Auto-refresh every 3 seconds";
-          if (snapshot === lastSnapshot) return;
+          if (snapshot === lastSnapshot) {
+            lastRefreshed = new Date();
+            updateRefreshStatus();
+            return;
+          }
           [rows, matrix, batchDefs, qualityReviews] = data;
           naming = fields;
           planned = naming.planned(matrix);
@@ -1526,9 +1531,10 @@
             : subjects[0] || "";
           refreshView();
           lastSnapshot = snapshot;
+          lastRefreshed = new Date();
+          updateRefreshStatus();
         } catch (e) {
-          $("refresh-status").textContent =
-            "Refresh failed. Retrying automatically…";
+          updateRefreshStatus(true);
         } finally {
           loading = false;
         }
@@ -1547,27 +1553,10 @@
       $("execute").onclick = executeDecisions;
       $("subject").onchange = render;
       $("refresh").onclick =
-        /* Refresh immediately without treating the click as background work. */ () =>
-          load();
+        /* Fetch current data when the user requests a refresh. */ () => load();
       $("close").onclick = /* Close the image preview dialog. */ () =>
         $("zoom").close();
       load();
-      setInterval(
-        /* Poll visible, idle dashboards every three seconds. */ () =>
-          load(true),
-        3000,
-      );
-      window.addEventListener(
-        "focus",
-        /* Handle the focus event for this control. */ () => {
-          if (!executing) {
-            try {
-              decisions = JSON.parse(localStorage.getItem(STORAGE) || "{}");
-            } catch (e) {}
-            load(true);
-          }
-        },
-      );
     </script>
     <script src="/image_zoom.js"></script>
     <link rel="stylesheet" href="/frozen_panes.css" />
