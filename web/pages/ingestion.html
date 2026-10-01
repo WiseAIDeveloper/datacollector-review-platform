@@ -271,6 +271,17 @@
       </summary>
       <div id="action-lines">No actions recorded yet.</div>
     </details>
+    <p class="ingestion-legend">
+      <span class="ingestion-naming-issue">Yellow: not in naming JSON</span>
+      <span class="ingestion-matrix-mismatch"
+        >Red: not in this batch's matrix</span
+      >
+      <span class="ingestion-possible-excess"
+        ><span class="excess-legend"
+          >Purple: newest beyond matrix count</span
+        ></span
+      >
+    </p>
     <div class="table-wrap">
       <table>
         <thead>
@@ -333,6 +344,35 @@
       row.append(td);
       return td;
     }
+    /* Display optional absence markers as the original empty log value. */
+    function displayedValue(event, field) {
+      const value = event.fields?.[field.key] || "";
+      return !field.required && ["na", "none"].includes(value.toLowerCase())
+        ? ""
+        : value;
+    }
+    /* Mark an invalid name before checking whether a standard value is planned. */
+    function highlightValue(td, event, field, matrixRows) {
+      if (event.available === false) return;
+      const value = displayedValue(event, field);
+      const issue =
+        (value && event.naming?.[field.key]?.issue) ||
+        (value && field.accepted && !field.accepted.includes(value)
+          ? value + " is not in the naming JSON"
+          : "");
+      if (issue) {
+        td.classList.add("naming-issue", "ingestion-naming-issue");
+        td.title = issue;
+      } else if (
+        value &&
+        matrixRows.length &&
+        field.key in matrixRows[0] &&
+        !matrixRows.some((row) => row[field.key] === value)
+      ) {
+        td.classList.add("ingestion-matrix-mismatch");
+        td.title = value + " is not planned for this batch and SDK";
+      }
+    }
     /* Render recent metadata edits and deletions from the action history. */
     function renderActions(data) {
       const actions = data.actions || [];
@@ -374,14 +414,19 @@
       if (busy) return;
       busy = true;
       try {
-        const response = await fetch(
-          "/api/ingestion?limit=100" + (before ? "&before=" + before : ""),
-          {
-            signal: AbortSignal.timeout(15000),
-          },
-        );
-        if (!response.ok) throw Error("HTTP " + response.status);
+        const [response, matrixResponse] = await Promise.all([
+          fetch(
+            "/api/ingestion?limit=100" + (before ? "&before=" + before : ""),
+            { signal: AbortSignal.timeout(15000) },
+          ),
+          fetch("/api/matrix", { signal: AbortSignal.timeout(15000) }),
+        ]);
+        if (!response.ok || !matrixResponse.ok)
+          throw Error(
+            "HTTP " + (!response.ok ? response.status : matrixResponse.status),
+          );
         const data = await response.json();
+        const matrix = await matrixResponse.json();
         const naming = await window.captureFields.load();
         $("logs-head").replaceChildren(
           ...["Picture", "Batch", "SDK"]
@@ -414,15 +459,24 @@
         $("logs").replaceChildren();
         for (const event of data.events) {
           const row = document.createElement("tr");
-          cell(row, event.filename);
+          if (event.available !== false && event.possible_excess)
+            row.classList.add("ingestion-possible-excess");
+          const matrixRows = matrix.filter(
+            (planned) =>
+              planned.folder === event.batch &&
+              planned.sdk === event.sdk &&
+              (!event.test_plan || planned.test_plan_name === event.test_plan),
+          );
+          const picture = cell(row, event.filename);
+          if (row.classList.contains("ingestion-possible-excess"))
+            picture.title =
+              "Possible excess: newest capture beyond the matrix count";
           cell(row, event.batch);
           cell(row, event.sdk);
-          for (const f of naming.checked)
-            window.markNamingIssue?.(
-              cell(row, event.fields?.[f.key]),
-              event,
-              f.key,
-            );
+          for (const f of naming.checked) {
+            const td = cell(row, displayedValue(event, f));
+            highlightValue(td, event, f, matrixRows);
+          }
           cell(row, event.creation_time);
           const action = cell(row, "");
           const edit = document.createElement("button");

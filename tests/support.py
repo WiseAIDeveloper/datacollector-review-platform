@@ -29,7 +29,7 @@ MODULES = {
     "ingestion": "app.ingestion",
     "naming": "app.captures.naming",
 }
-MATRIX_NAME = "internal_colour_print_enhancement_2"
+MATRIX_NAME = "001_MyKad_ColourPrintEnhancement2"
 INDEXES = ("index_annotation_.csv", "index_annotation_mykadfront.csv")
 # Fixture fields, as a naming file defines them. Field names are also the index
 # columns, the matrix columns, and the expected_<field> batch lists.

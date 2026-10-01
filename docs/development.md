@@ -89,6 +89,9 @@ verified optional-PIN feature commit as their baseline. Browser scenarios cover
 both PIN-free project workflows and the original PIN-protected behavior. Other
 pages retain the original baseline. An optional revision argument overrides all
 per-file defaults.
+The dashboard refresh baseline includes three-second polling and preservation of
+filters, expanded panels, drafts, and scroll, verified by
+`tests/browser/test_dashboard_refresh.py`.
 An intentional frontend feature change needs behavior-focused tests and a reviewed
 update to the applicable baseline; do not treat a syntax difference alone as a bug
 or disable the check without explanation.

@@ -13,7 +13,7 @@ from .captures.catalog import annotation_path, batches, matrix, records
 from .captures.deletion import delete_capture
 from .captures.editing import Conflict, edit_capture
 from .captures.naming import NamingFile, required_naming
-from .ingestion import IngestionLog, with_current_metadata
+from .ingestion import IngestionLog, possible_excess_keys, with_current_metadata
 from .captures.quality import read_reviews, save_review
 from .settings import Settings
 from .projects import Projects
@@ -311,9 +311,23 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self.send(b"Invalid pagination", "text/plain", 400)
         with self.app.lock:
-            result = with_current_metadata(
-                self.app.ingestion.snapshot(limit, before), self.app.records()
+            captures = self.app.records()
+            result = with_current_metadata(self.app.ingestion.snapshot(limit, before), captures)
+            if self.project_id():
+                plan = self.app.projects.get(self.project_id())["matrix"]
+            else:
+                try:
+                    plan = matrix(self.app.settings.root)
+                except FileNotFoundError:
+                    plan = []
+            excess = possible_excess_keys(
+                captures,
+                plan,
+                self.app.current_naming(),
+                self.app.ingestion.newest_event_keys(),
             )
+            for event in result["events"]:
+                event["possible_excess"] = event["available"] and event["key"] in excess
         if self.app.naming.error:
             result["errors"] = [*result["errors"], self.app.naming.error]
         self.send_json(result)

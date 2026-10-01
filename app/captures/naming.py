@@ -205,9 +205,11 @@ class Field:
         else:
             order = self.columns
         column, raw = read_first(order, row, annotation, sensor_model)
-        if not raw:
+        # A collector's "na" or older "none" means this optional field is absent.
+        # Neither spelling is a standard device name.
+        if not raw or (not self.required and raw.casefold() in {"na", "none"}):
             issue = f"Missing {self.key} ({column})" if self.required else ""
-            return dict(value="", raw="", source=column, issue=issue)
+            return dict(value="", raw=raw, source=column, issue=issue)
         standard = self.standard(column, raw)
         if standard is None:
             place = f" ({column})" if self.role == "device" else ""

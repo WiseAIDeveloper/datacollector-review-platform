@@ -152,6 +152,10 @@ class CollectorOptionsTests(unittest.TestCase):
                             {"display": "Dark", "value": "office_dark"},
                             {"display": "Other", "value": "other"},
                         ],
+                        "replay_device": [
+                            {"display": "None", "value": "na"},
+                            {"display": "Invalid", "value": "none"},
+                        ],
                         "lighting": [{"value": "office_dark"}],
                         "batch": [{"display": "B", "value": "not-a-field"}],
                     }
@@ -191,6 +195,7 @@ class CollectorOptionsTests(unittest.TestCase):
                             field="capture_env_lighting",
                             value="other",
                         ),
+                        dict(file="plan_options.json", field="replay_device", value="none"),
                         dict(file="plan_web.json", field="capture_device", value="SM-1"),
                     ],
                 },

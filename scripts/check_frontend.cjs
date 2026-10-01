@@ -7,11 +7,12 @@ const parser = require("@babel/parser");
 
 // Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "0b6d6dc",
+  // Dashboard refresh and frozen panes are covered by browser scenarios.
+  "coverage.html": "297ed15",
   "index.html": "0b6d6dc",
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
-  "ingestion.html": "0b6d6dc",
+  "ingestion.html": "6380c2d",
   "capture_review.js": "0b6d6dc",
   "fields.js": "0b6d6dc",
 };

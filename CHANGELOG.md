@@ -8,6 +8,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Refresh dashboard data automatically every three seconds while the page is visible and no review is being edited. Manual and automatic refresh preserve selected filters, expanded details, review drafts, and scroll position; failed refreshes retain the last successful view.
+- Keep the dashboard batch selector visible below the header while scrolling. Long batch lists scroll within the pane, and the pane can still be collapsed to make room for coverage results.
+
 - Add an optional shared naming file (`NAMING_FILE`) with one block each for lighting, identity, and device: the column it is read from (App devices use `capture_device`, falling back to the auto-detected model), the accepted values, and device spellings keyed by column. Devices are shown by standard name; missing or unaccepted values are highlighted and edits must use accepted values. The project compose file mounts the shared `naming/` folder read-only. See `docs/naming.md`.
 
 - Add an optional `replay_device` block to the naming file, for test plans that record the screen a card image is replayed on. Standard names and listed spellings are accepted, an empty value is allowed, and other values are highlighted. Existing naming files without the block keep working.
@@ -20,6 +23,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Reconcile dashboard refresh and frozen batch selection with the deployed matrix naming, optional-field handling, ingestion highlights, and separate coverage columns so deployment preserves existing behavior.
+
 - **Breaking:** the naming file now defines every capture field, and is required (`NAMING_FILE`, mounted from `NAMING_PATH` by both compose files). Each top-level key is a field whose name is its index column, matrix column, `expected_<field>` batch list, page label, and ingestion log key; one field has `role: identity` and one `role: device`. Pages, filters, edit forms, coverage, and audits follow the file instead of fixed lighting, identity, and device columns. Coverage matches each capture's batch, SDK, and every field the matrix has a column for, so unused fields such as a replay device do not affect it. Migrate with `scripts/rename_fields.py` and convert the naming file to the new format; see `docs/naming.md`.
 
 - **Breaking:** the ingestion history stores field values by field name. An older database is converted on first start, keeping each old column's name; `scripts/rename_fields.py` renames them.
@@ -27,6 +32,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 
 ### Fixed
+
+- Show SDK, capture device, and replay device in separate coverage table columns when the matrix plans those fields.
 
 - Include the naming module and shared field script in the Docker build context so the new viewer image starts correctly.
 

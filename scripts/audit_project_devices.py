@@ -140,6 +140,8 @@ def options_report(paths, naming):
             if not field.accepted:
                 continue
             for value in option_values(entry, path.parent):
+                if value == "na" and not field.required:
+                    continue
                 if value not in field.accepted:
                     report["nonstandard_options"].append(
                         dict(file=path.name, field=name, value=value)
