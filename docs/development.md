@@ -143,3 +143,27 @@ expand phone filters without scrolling sideways to reach Save or Execute.
 `tests/browser/test_frozen_panes.py` checks sticky positioning, compact height,
 horizontal overflow, mobile filter toggling, and reopening filters on desktop.
 Run it through `python -m tests.run_browser` with disposable fixture data.
+
+## Catalog performance checks
+
+Run `PYTHONPATH=. python scripts/benchmark_catalog.py --captures 5200` to
+compare uncached reads, warmed cache reads, four concurrent readers, and JSON
+transfer size using a disposable synthetic dataset. Fixture creation is excluded
+from timings. Results are workload-dependent and are not production load-test
+numbers.
+
+On the development host, 5,200 synthetic captures took 0.210 seconds per uncached
+read versus 0.053 seconds with a warm cache. Four concurrent reads including
+JSON serialization took 2.179 seconds versus 0.368 seconds. The 7,220,236-byte
+JSON response compressed to 154,897 bytes with gzip level 1. A cold cache still
+reads all annotations (0.355 seconds in this run); the improvement is primarily
+for repeat requests and concurrent reviewers.
+
+The cache is shared by projects using the same dataset. Each read checks file
+identity, size, modification and change timestamps, and the naming model. It
+reuses unchanged CSV rows and normalized metadata; removed rows are discarded.
+It does not cache image bytes or introduce a refresh delay. Cached records are
+read-only to consumers. Regression tests compare cached results with fresh
+reads after edits, replacements, deletions, naming changes, and concurrent reads.
+Large JSON responses use gzip only when the client accepts it; decoded API data
+and existing `no-store` behavior remain unchanged.

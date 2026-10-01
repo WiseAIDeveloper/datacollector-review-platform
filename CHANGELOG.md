@@ -23,6 +23,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Speed up dashboard and capture reads by sharing unchanged metadata across project readers while checking CSV, annotation, and naming changes on every request. Compress large JSON responses for supporting browsers and avoid rescanning captures for empty quality reviews. No data migration or configuration change is needed.
+
 - Replace dashboard automatic polling and focus refresh with a local-time “Last refreshed at” indicator. Refresh data manually without losing view state; failed requests retain the last successful timestamp.
 
 - Reconcile dashboard refresh and frozen batch selection with the deployed matrix naming, optional-field handling, ingestion highlights, and separate coverage columns so deployment preserves existing behavior.

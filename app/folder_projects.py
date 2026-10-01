@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .projects import Projects, parse_csv, validate_pair, MATRIX_FIELDS, BATCH_FIELDS
-from .captures.catalog import records
+from .captures.catalog import CatalogCache
 from .captures.naming import NamingFile, required_naming
 
 
@@ -144,10 +144,11 @@ class ProjectApplications:
         self.applications = {}
         self.ingestion = self
         self.naming = NamingFile(required_naming(settings))
+        self.catalog = CatalogCache(settings.root)
 
     def records(self):
         """Resolve globally keyed image links in the shared source capture dataset."""
-        return records(self.settings.root, self.naming.current())
+        return self.catalog.records(self.naming.current())
 
     def start(self):
         """Project workers start only after a valid selection."""
@@ -174,6 +175,7 @@ class ProjectApplications:
                 application.ingestion.dataset_lock = self.lock
                 application.projects = self.projects
                 application.naming = self.naming
+                application.catalog = self.catalog
                 application.project_id = identifier
                 try:
                     application.ingestion.restore_logs()
