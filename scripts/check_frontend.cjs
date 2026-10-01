@@ -7,7 +7,8 @@ const parser = require("@babel/parser");
 
 // Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  "coverage.html": "0b6d6dc",
+  // Frozen batch pane is covered by the desktop/mobile browser checks.
+  "coverage.html": "8153e05",
   "index.html": "0b6d6dc",
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
