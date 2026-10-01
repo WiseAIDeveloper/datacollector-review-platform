@@ -1,4 +1,4 @@
-"""Verify timed dashboard refresh and preserved state using disposable API fixtures."""
+"""Verify manual dashboard refresh timestamps and preserved state using disposable API fixtures."""
 
 import os
 import shutil
@@ -80,6 +80,13 @@ with sync_playwright() as playwright:
     page.clock.pause_at("2030-01-01T00:00:00")
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
+    requests = []
+    page.on(
+        "request",
+        lambda request: (
+            requests.append(request.url) if "/api/captures" in request.url else None
+        ),
+    )
     page.route("**/*", route)
     page.goto("http://fixture/coverage.html")
     expect(page.locator(".batch")).to_have_count(3)
@@ -91,9 +98,21 @@ with sync_playwright() as playwright:
         item.locator("summary").click()
     original = page.locator(".batch").element_handle()
 
-    # An unchanged manual refresh leaves the actual DOM and open panels intact.
+    # Idle time and window focus never fetch data; manual refresh advances the time.
+    status = page.locator("#refresh-status")
+    expect(status).to_contain_text("Last refreshed at")
+    previous_time = status.inner_text()
+    request_count = len(requests)
+    page.clock.run_for(30000)
+    page.evaluate("window.dispatchEvent(new Event('focus'))")
+    assert len(requests) == request_count
+    expect(status).to_have_text(previous_time)
+
+    # An unchanged manual refresh leaves the DOM intact but records its success.
     page.locator("#refresh").click()
     page.wait_for_function("!loading")
+    assert status.inner_text() != previous_time
+    assert len(requests) == request_count + 1
     assert original.evaluate("node => node.isConnected")
     assert all(item.evaluate("node => node.open") for item in details.all())
 
@@ -110,31 +129,43 @@ with sync_playwright() as playwright:
     page.evaluate("window.scrollTo(0, 250)")
     scroll = page.evaluate("window.scrollY")
     data["captures"].append(dict(data["captures"][-1], key="auto-capture"))
-    page.clock.run_for(2999)
+    page.clock.run_for(30000)
     expect(page.locator("#summary b")).to_have_text(["2", "4", "0", "2"])
-    page.clock.run_for(1)
+    page.locator("#refresh").click()
     expect(page.locator("#summary b")).to_have_text(["2", "5", "0", "3"])
     assert abs(page.evaluate("window.scrollY") - scroll) <= 1
     assert all(item.evaluate("node => node.open") for item in details.all())
 
-    # Failed requests retain the view; the next scheduled attempt recovers.
+    # A failed manual request preserves the last good view and timestamp.
+    successful_time = status.inner_text()
+    successful_title = status.get_attribute("title")
     page.route("**/api/captures", lambda request: request.fulfill(status=503, json={}))
     page.clock.run_for(3000)
-    expect(page.locator("#refresh-status")).to_contain_text("Refresh failed")
+    page.locator("#refresh").click()
+    expect(status).to_contain_text("Refresh failed")
+    expect(status).to_contain_text(successful_time)
+    assert status.get_attribute("title") == successful_title
     expect(page.locator("#summary b")).to_have_text(["2", "5", "0", "3"])
+    request_count = len(requests)
+    page.clock.run_for(30000)
+    assert len(requests) == request_count
     page.unroute("**/api/captures")
-    page.clock.run_for(3000)
-    expect(page.locator("#refresh-status")).to_have_text("Auto-refresh every 3 seconds")
+    page.locator("#refresh").click()
+    page.wait_for_function("!loading")
+    assert "Refresh failed" not in status.inner_text()
+    assert status.inner_text() != successful_time
 
-    # A pending request prevents both timer and manual duplicate requests.
+    # Repeated manual clicks cannot create overlapping requests.
     pending = []
     page.route("**/api/captures", lambda request: pending.append(request))
-    page.clock.run_for(3000)
+    page.locator("#refresh").click()
     page.wait_for_timeout(50)
     assert len(pending) == 1
+    pending_time = status.inner_text()
     page.clock.run_for(6000)
     page.locator("#refresh").click()
     assert len(pending) == 1
+    expect(status).to_have_text(pending_time)
     pending.pop().fulfill(json=data["captures"])
     page.wait_for_function("!loading")
     page.unroute("**/api/captures")
@@ -168,5 +199,5 @@ with sync_playwright() as playwright:
     assert not errors, errors
     browser.close()
 print(
-    "Dashboard refresh preserves state, polls every 3 seconds, and recovers from failures."
+    "Manual refresh preserves state, records successful refresh times, and never polls."
 )
