@@ -1,6 +1,7 @@
 """HTTP interface for capture review, with explicit startup and shutdown."""
 
 import hmac
+import gzip
 import json
 import logging
 import mimetypes
@@ -9,7 +10,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .captures.catalog import annotation_path, batches, matrix, records
+from .captures.catalog import CatalogCache, annotation_path, batches, matrix
 from .captures.deletion import delete_capture
 from .captures.editing import Conflict, edit_capture
 from .captures.naming import NamingFile, required_naming
@@ -46,6 +47,23 @@ WRITE_ROUTES = {
 CONTENT_TYPES = {"html": "text/html", "js": "text/javascript", "css": "text/css"}
 
 
+def accepts_gzip(header):
+    """Compress only when the client explicitly accepts gzip with a positive quality."""
+    for item in header.lower().split(","):
+        parts = [part.strip() for part in item.split(";")]
+        if parts[0] != "gzip":
+            continue
+        quality = "1"
+        for parameter in parts[1:]:
+            if parameter.startswith("q="):
+                quality = parameter[2:]
+        try:
+            return 0 < float(quality) <= 1
+        except ValueError:
+            return False
+    return False
+
+
 class Application:
     """Coordinate dataset access and persistent review state under a shared lock."""
 
@@ -54,6 +72,10 @@ class Application:
         self.settings = settings
         self.lock = threading.RLock()
         self.naming = NamingFile(required_naming(settings))
+        self.catalog = CatalogCache(settings.root)
+        self.response_lock = threading.Lock()
+        self.response_rows = None
+        self.response_bytes = None
         self.ingestion = IngestionLog(
             settings.root,
             settings.database,
@@ -75,12 +97,30 @@ class Application:
 
     def records(self):
         """Read the current annotation rows for this application's dataset."""
-        rows = records(self.settings.root, self.current_naming())
+        rows = self.catalog.records(self.current_naming())
         return (
             self.projects.filter_records(self.project_id, rows)
             if hasattr(self, "project_id")
             else rows
         )
+
+    def encode_captures(self, rows):
+        """Serialize and compress one unchanged capture snapshot once across readers."""
+        with self.response_lock:
+            if (
+                self.response_rows is None
+                or len(rows) != len(self.response_rows)
+                or any(
+                    left is not right for left, right in zip(rows, self.response_rows)
+                )
+            ):
+                data = json.dumps(rows).encode()
+                compressed = gzip.compress(data, compresslevel=1, mtime=0)
+                self.response_rows = tuple(rows)
+                self.response_bytes = data, (
+                    compressed if len(compressed) < len(data) else None
+                )
+            return self.response_bytes
 
     def edit(self, request):
         """Apply a metadata edit and persist its action history while holding the lock."""
@@ -167,6 +207,8 @@ class Handler(BaseHTTPRequestHandler):
     @property
     def app(self):
         """Access the application attached to this server instance."""
+        if getattr(self, "_request_application", None) is not None:
+            return self._request_application
         application = self.server.application
         path = urlparse(self.path).path
         if (
@@ -177,18 +219,23 @@ class Handler(BaseHTTPRequestHandler):
             )
             and path not in {"/api/projects", "/api/project", "/api/project-mode"}
         ):
-            return application.select(self.project_id())
+            application = application.select(self.project_id())
+        self._request_application = application
         return application
 
     def log_message(self, format, *args):
         """Keep request paths, bodies, credentials, and personal data out of access logs."""
         LOGGER.info("Handled %s request", self.command)
 
-    def send(self, data, kind="application/json", status=200):
+    def send(self, data, kind="application/json", status=200, *, encoding=None):
         """Send response bytes with the platform's cache and browser-security headers."""
         self.send_response(status)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(data)))
+        if kind == "application/json":
+            self.send_header("Vary", "Accept-Encoding")
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
@@ -197,10 +244,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_json(self, value):
         """Serialize API data using the existing JSON encoding defaults."""
-        self.send(json.dumps(value).encode())
+        data = json.dumps(value).encode()
+        if len(data) >= 1024 and accepts_gzip(self.headers.get("Accept-Encoding", "")):
+            compressed = gzip.compress(data, compresslevel=1, mtime=0)
+            if len(compressed) < len(data):
+                return self.send(compressed, encoding="gzip")
+        self.send(data)
 
     def do_GET(self):
         """Dispatch a read request and return a generic error for unexpected failures."""
+        self._request_application = None
         try:
             url = urlparse(self.path)
             self.get_route(url.path, parse_qs(url.query))
@@ -241,7 +294,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/fields":
             return self.send_json(self.app.current_naming().describe())
         if path == "/api/captures":
-            return self.send_json(self.records())
+            data, compressed = self.app.encode_captures(self.records())
+            if compressed is not None and accepts_gzip(
+                self.headers.get("Accept-Encoding", "")
+            ):
+                return self.send(compressed, encoding="gzip")
+            return self.send(data)
         if path == "/api/matrix":
             return self.send_json(
                 self.app.projects.get(self.project_id())["matrix"]
@@ -258,10 +316,13 @@ class Handler(BaseHTTPRequestHandler):
             with self.app.lock:
                 reviews = read_reviews(self.app.quality_path)
                 if self.project_id():
-                    keys = {row["key"] for row in self.records()}
-                    reviews = {
-                        key: value for key, value in reviews.items() if key in keys
-                    }
+                    # Even an empty review file must validate the requested project.
+                    self.app.projects.get(self.project_id())
+                    if reviews:
+                        keys = {row["key"] for row in self.records()}
+                        reviews = {
+                            key: value for key, value in reviews.items() if key in keys
+                        }
                 return self.send_json(reviews)
         if path == "/api/search":
             return self.search(query)
@@ -312,7 +373,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(b"Invalid pagination", "text/plain", 400)
         with self.app.lock:
             captures = self.app.records()
-            result = with_current_metadata(self.app.ingestion.snapshot(limit, before), captures)
+            result = with_current_metadata(
+                self.app.ingestion.snapshot(limit, before), captures
+            )
             if self.project_id():
                 plan = self.app.projects.get(self.project_id())["matrix"]
             else:
@@ -358,6 +421,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Authenticate writes before reading their bounded JSON bodies."""
+        self._request_application = None
         try:
             path = urlparse(self.path).path
             if path not in WRITE_ROUTES:
@@ -417,9 +481,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send(b"Write failed; refresh before retrying", "text/plain", 500)
 
 
+class ReviewHTTPServer(ThreadingHTTPServer):
+    """Accept bursts of dashboard requests without the default five-connection backlog."""
+
+    request_queue_size = 128
+
+
 def create_server(settings):
     """Construct an HTTP server without starting its serving loop or ingestion worker."""
-    server = ThreadingHTTPServer((settings.host, settings.port), Handler)
+    server = ReviewHTTPServer((settings.host, settings.port), Handler)
     try:
         server.application = (
             ProjectApplications(settings, Application)

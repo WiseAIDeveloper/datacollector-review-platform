@@ -200,13 +200,13 @@ class IngestionLog:
                 return
             allowed = self.batch_filter() if self.batch_filter else None
             naming = self.naming()
+            known = {row[0] for row in self.db.execute("SELECT key FROM events")}
             for folder in folders:
                 path = folder / INDEX_NAME
-                if (
-                    folder.name in EXCLUDED
-                    or not path.is_file()
-                    or folder.resolve().parent != self.root
-                ):
+                if folder.name in EXCLUDED or not path.is_file():
+                    continue
+                resolved_folder = folder.resolve()
+                if resolved_folder.parent != self.root:
                     continue
                 try:
                     rows = read_stable_rows(path)
@@ -221,15 +221,18 @@ class IngestionLog:
                         if not uuid or not filename or not row["ori_path"]:
                             continue
                         image = (folder / row["ori_path"]).resolve()
-                        if not image.is_relative_to(folder.resolve()):
+                        if not image.is_relative_to(resolved_folder):
                             raise ValueError("Image path outside batch")
                         if not image.is_file() or image.stat().st_size == 0:
                             pending += 1
                             continue
+                        key = folder.name + "/" + uuid + "/" + filename
+                        if key in known:
+                            continue
                         sdk, fields = logged_fields(naming, row)
                         result = self.insert_event(
                             dict(
-                                key=folder.name + "/" + uuid + "/" + filename,
+                                key=key,
                                 status="existing" if baseline else "ingested",
                                 detected_at=detected,
                                 batch=folder.name,
@@ -242,6 +245,7 @@ class IngestionLog:
                             fields,
                         )
                         added += result.rowcount
+                        known.add(key)
                 except (OSError, ValueError, csv.Error) as e:
                     errors.append(folder.name + ": " + str(e))
             if not errors:
@@ -348,7 +352,10 @@ class IngestionLog:
     def newest_event_keys(self):
         """Return all logged capture keys in ingestion order, newest first."""
         with self.lock:
-            return [row[0] for row in self.db.execute("SELECT key FROM events ORDER BY id DESC")]
+            return [
+                row[0]
+                for row in self.db.execute("SELECT key FROM events ORDER BY id DESC")
+            ]
 
     def run(self):
         """Scan every five seconds until stopped, retaining database errors for the API."""

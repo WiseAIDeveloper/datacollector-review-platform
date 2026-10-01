@@ -1,6 +1,7 @@
 from tests import support  # Select the requested original or current source.
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 IngestionLog = support.load_application("ingestion").IngestionLog
@@ -64,6 +65,24 @@ class IngestionTests(unittest.TestCase):
             ),
             ("new.jpg", "dark", "web", "iphone-13"),
         )
+
+    def test_known_captures_skip_normalization_but_check_images(self):
+        """Repeated scans preserve immutable history and still count missing images."""
+        folder = self.write_batch(["old"])
+        self.log.scan()
+        with patch.object(
+            support.load_application("ingestion"),
+            "logged_fields",
+            side_effect=AssertionError("reprocessed known capture"),
+        ):
+            self.log.scan()
+            (folder / "orig/old.jpg").unlink()
+            self.log.scan()
+        self.assertEqual(self.log.snapshot()["total"], 1)
+        self.assertEqual(self.log.status["pending_images"], 1)
+        self.write_batch(["old", "new"])
+        self.log.scan()
+        self.assertEqual(self.log.snapshot()["ingested"], 1)
 
     def test_restart_and_deleted_history(self):
         """Verify restart and deleted history."""

@@ -23,6 +23,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Speed up dashboard and capture reads by sharing unchanged metadata across project readers while checking CSV, annotation, and naming changes on every request. Coalesce concurrent validation, reuse serialized responses, compress large JSON responses for supporting browsers, and avoid rescanning captures for empty quality reviews. No data migration or configuration change is needed.
+
 - Replace dashboard automatic polling and focus refresh with a local-time “Last refreshed at” indicator. Refresh data manually without losing view state; failed requests retain the last successful timestamp.
 
 - Reconcile dashboard refresh and frozen batch selection with the deployed matrix naming, optional-field handling, ingestion highlights, and separate coverage columns so deployment preserves existing behavior.
@@ -34,6 +36,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add a read-only project device audit to detect mismatched batch/matrix device lists and collector SDK/device pairs missing from project requirements.
 
 ### Fixed
+
+- Reduce background ingestion work by skipping normalization and duplicate inserts for previously logged captures while continuing to check missing images and detect new captures.
 
 - Show SDK, capture device, and replay device in separate coverage table columns when the matrix plans those fields.
 
