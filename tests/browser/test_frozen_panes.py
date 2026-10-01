@@ -100,6 +100,54 @@ with sync_playwright() as p:
                 width,
             )
             if name == "coverage.html":
+                panel = page.locator(".batch-filter-panel")
+                page.wait_for_function(
+                    "Math.abs(document.querySelector('.batch-filter-panel').getBoundingClientRect().top "
+                    "- document.querySelector('.dashboard-header').getBoundingClientRect().bottom) < 1"
+                )
+                assert panel.bounding_box()["y"] > 0
+                page.locator("#batch-filter button").first.click()
+                page.locator("#refresh").click()
+                page.wait_for_timeout(100)
+                assert (
+                    abs(panel.bounding_box()["y"] - header.bounding_box()["height"]) < 1
+                )
+
+                # Long batch lists scroll within the pane, leaving results visible.
+                page.evaluate(
+                    """() => {
+                    const host = document.querySelector('#batch-filter');
+                    for (let i = 0; i < 80; i++) {
+                        const button = document.createElement('button');
+                        button.textContent = 'fixture-long-batch-name-' + i;
+                        host.append(button);
+                    }
+                }"""
+                )
+                batch_list = page.locator("#batch-filter")
+                assert batch_list.evaluate(
+                    "node => node.scrollHeight > node.clientHeight"
+                )
+                assert panel.bounding_box()["y"] + panel.bounding_box()["height"] < 800
+                assert page.evaluate(
+                    "document.documentElement.scrollWidth <= innerWidth"
+                )
+                batch_list.locator("button").last.focus()
+                assert batch_list.evaluate("node => node.scrollTop > 0")
+                panel.locator(":scope > summary").click()
+                assert not panel.evaluate("node => node.open")
+                assert panel.bounding_box()["height"] < 70
+                panel.locator(":scope > summary").click()
+                assert panel.evaluate("node => node.open")
+
+                # A resized header must move the pane down instead of covering it.
+                header.evaluate("node => node.style.paddingBottom = '54px'")
+                page.evaluate("window.scrollTo(0, 700)")
+                page.wait_for_timeout(100)
+                page.wait_for_function(
+                    "Math.abs(document.querySelector('.batch-filter-panel').getBoundingClientRect().top "
+                    "- document.querySelector('.dashboard-header').getBoundingClientRect().bottom) < 1"
+                )
                 page.screenshot(path="/tmp/frozen-" + str(width) + ".png")
     assert not errors, errors
     b.close()
