@@ -14,9 +14,11 @@ const featureBaselines = {
   "search.html": "0b6d6dc",
   "ingestion.html": "6380c2d",
   "fields.js": "0b6d6dc",
+  // Batch editing is covered by real dummy-move browser scenarios.
+  "capture_review.js": "154101b",
 };
 const files = [
-  "fields.js",
+  "capture_review.js",  "fields.js",
   "image_zoom.js",
   "index.html",
   "coverage.html",
@@ -98,8 +100,7 @@ for (const filename of files) {
 }
 
 // Project behavior is exercised by the real upload and navigation browser scenario.
-// Capture editing and batch moves are exercised by browser scenarios.
-for (const filename of ["project_context.js", "projects.js", "capture_review.js"]) {
+for (const filename of ["project_context.js", "projects.js"]) {
   parser.parse(fs.readFileSync(path.join("web/static/js", filename), "utf8"));
   console.log(`PASS ${filename}: JavaScript parses`);
 }
