@@ -13,6 +13,7 @@
 !app/captures/naming.py
 !app/captures/deletion.py
 !app/captures/editing.py
+!app/captures/moving.py
 !app/captures/quality.py
 !web/
 !web/pages/

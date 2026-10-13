@@ -13,12 +13,12 @@ const featureBaselines = {
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
   "ingestion.html": "6380c2d",
-  "capture_review.js": "0b6d6dc",
   "fields.js": "0b6d6dc",
+  // Batch editing is covered by real dummy-move browser scenarios.
+  "capture_review.js": "154101b",
 };
 const files = [
-  "capture_review.js",
-  "fields.js",
+  "capture_review.js",  "fields.js",
   "image_zoom.js",
   "index.html",
   "coverage.html",

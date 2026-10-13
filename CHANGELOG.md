@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Change a capture’s batch in the review editor within its project and test plan. Moves preserve image and annotation bytes, quality reviews, and audit history; conflicts are rejected and failed writes roll back.
+
 - Refresh dashboard data automatically every three seconds while the page is visible and no review is being edited. Manual and automatic refresh preserve selected filters, expanded details, review drafts, and scroll position; failed refreshes retain the last successful view.
 - Keep the dashboard batch selector visible below the header while scrolling. Long batch lists scroll within the pane, and the pane can still be collapsed to make room for coverage results.
 

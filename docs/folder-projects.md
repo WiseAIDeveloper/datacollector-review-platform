@@ -137,3 +137,25 @@ of that field's standard names. Unknown capture option fields are reported;
 collector metadata (`batch`, `test_plan_name`, and `idType`) is excluded. Form
 files that point to option lists with `$ref` are followed, and broken references
 fail the audit.
+
+## Change a capture's batch
+
+Open a capture in the review editor and choose **Batch**, then save. Destination
+choices are limited to batches in the selected project with the same collection
+test-plan identifier. Lighting and other metadata choices follow the selected
+destination; existing draft values are retained so you can correct them explicitly.
+
+Saving moves the original/cropped images and collection annotation JSON without
+changing their contents, removes the capture from both source CSV indexes, and
+adds it to both destination indexes. An uncollected batch gets its directories
+and indexes on first use. UUID, filename, relative image paths and test-plan
+identifier stay unchanged. Batch columns are updated and quality-review status,
+notes and timestamps follow the new capture key. The original ingestion events
+remain in history; a modification event records the old and new batch. Coverage
+uses the destination batch and the current CSV metadata after refresh. Annotation
+JSON remains the original collection evidence, as with ordinary metadata edits.
+
+Stale metadata, duplicate UUIDs/files/reviews, missing referenced images and
+symlink paths are rejected. A handled write or removal failure restores the
+original CSVs, review file and assets. This spans several filesystem operations;
+it is not a crash-recovery journal for a machine interruption.

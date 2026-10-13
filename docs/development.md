@@ -84,8 +84,10 @@ Tests never modify the live dataset or use its credential.
 
 `test:frontend` checks executable JavaScript against the original refactor baseline,
 except for explicit per-file feature baselines in `scripts/check_frontend.cjs`.
-The dashboard, capture and quality pages, and shared capture editor use the
-verified optional-PIN feature commit as their baseline. Browser scenarios cover
+The dashboard, capture and quality pages use the verified optional-PIN feature
+commit as their baseline. The shared capture editor uses the tested batch-editing
+commit `154101b`, covered by browser scenarios including real dummy batch moves.
+Browser scenarios cover
 both PIN-free project workflows and the original PIN-protected behavior. Other
 pages retain the original baseline. An optional revision argument overrides all
 per-file defaults.
