@@ -13,11 +13,9 @@ const featureBaselines = {
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
   "ingestion.html": "6380c2d",
-  "capture_review.js": "0b6d6dc",
   "fields.js": "0b6d6dc",
 };
 const files = [
-  "capture_review.js",
   "fields.js",
   "image_zoom.js",
   "index.html",
@@ -100,7 +98,8 @@ for (const filename of files) {
 }
 
 // Project behavior is exercised by the real upload and navigation browser scenario.
-for (const filename of ["project_context.js", "projects.js"]) {
+// Capture editing and batch moves are exercised by browser scenarios.
+for (const filename of ["project_context.js", "projects.js", "capture_review.js"]) {
   parser.parse(fs.readFileSync(path.join("web/static/js", filename), "utf8"));
   console.log(`PASS ${filename}: JavaScript parses`);
 }

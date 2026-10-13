@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from .captures.catalog import CatalogCache, annotation_path, batches, matrix
 from .captures.deletion import delete_capture
 from .captures.editing import Conflict, edit_capture
+from .captures.moving import move_capture
 from .captures.naming import NamingFile, required_naming
 from .ingestion import IngestionLog, possible_excess_keys, with_current_metadata
 from .captures.quality import read_reviews, save_review
@@ -122,22 +123,49 @@ class Application:
                 )
             return self.response_bytes
 
-    def edit(self, request):
+    def edit(self, request, *, batch_definitions=None):
         """Apply a metadata edit and persist its action history while holding the lock."""
         with self.lock:
-            result = edit_capture(
-                self.settings.root,
-                request.get("folder", ""),
-                request.get("uuid", ""),
-                request.get("filename", ""),
-                request.get("changes"),
-                request.get("expected"),
-                naming=self.current_naming(),
-            )
+            destination = request.get("destination_batch", request.get("folder"))
+            moving = destination != request.get("folder")
+            if moving:
+                configured = (
+                    batch_definitions
+                    if batch_definitions is not None
+                    else (
+                        self.projects.get(self.project_id)["batches"]
+                        if hasattr(self, "project_id")
+                        else batches(self.settings.root)
+                    )
+                )
+                result = move_capture(
+                    self.settings.root,
+                    request.get("folder", ""),
+                    request.get("uuid", ""),
+                    request.get("filename", ""),
+                    destination,
+                    request.get("changes"),
+                    request.get("expected"),
+                    batches=configured,
+                    naming=self.current_naming(),
+                    quality_path=self.quality_path,
+                )
+            else:
+                result = edit_capture(
+                    self.settings.root,
+                    request.get("folder", ""),
+                    request.get("uuid", ""),
+                    request.get("filename", ""),
+                    request.get("changes"),
+                    request.get("expected"),
+                    naming=self.current_naming(),
+                )
             changes = {
                 column: {"from": request["expected"].get(column, ""), "to": value}
                 for column, value in request["changes"].items()
             }
+            if moving:
+                changes["batch"] = {"from": request["folder"], "to": destination}
             self.ingestion.record_action(
                 "modified",
                 request["folder"],
@@ -466,9 +494,19 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Capture does not belong to the selected project")
             if path == "/api/projects":
                 return self.send_json(self.server.application.create_project(request))
+            if path == "/api/edit-capture":
+                configured = (
+                    self.app.projects.get(self.project_id())["batches"]
+                    if self.project_id()
+                    and request.get("destination_batch", request.get("folder"))
+                    != request.get("folder")
+                    else None
+                )
+                return self.send_json(
+                    self.app.edit(request, batch_definitions=configured)
+                )
             action = {
                 "/api/quality": self.app.review,
-                "/api/edit-capture": self.app.edit,
                 "/api/apply-decisions": self.app.remove,
             }[path]
             self.send_json(action(request))

@@ -50,52 +50,96 @@ async function openCapture(key) {
     if (!batch)
       throw Error("This batch has no matching definition in the batches CSV.");
     editable = fields.editable;
-    const choices = Object.fromEntries(
-      editable.map((field) => [
-        field.column,
-        window.captureFields.choices(
-          field,
-          batch,
-          rows,
-          row.metadata.test_plan_name,
-        ),
-      ]),
-    );
     $("review-title").textContent = row.folder + " / " + row.metadata.filename;
     $("review-image").src = "/api/image?key=" + encodeURIComponent(row.key);
     $("all-metadata").textContent = JSON.stringify(row.metadata, null, 2);
-    for (const field of editable) {
-      const k = field.column;
-      const label = document.createElement("label");
-      label.textContent = field.key;
-      label.title = field.description;
-      const input = document.createElement(choices[k] ? "select" : "input");
-      input.id = "edit-" + k;
-      const current = row.metadata[k] || "";
-      if (choices[k]) {
-        if (!choices[k].includes(current)) {
-          const option = document.createElement("option");
-          option.value = current;
-          option.textContent =
-            (current || "(missing)") +
-            " — current value outside configured choices";
-          input.append(option);
-        }
-        for (const value of [...new Set(choices[k])]) {
-          const option = document.createElement("option");
-          option.value = value;
-          option.textContent = value || window.captureFields.blank(field);
-          input.append(option);
-        }
-      }
-      input.value = current;
-      label.append(input);
-      $("review-fields").append(label);
+    const batchLabel = document.createElement("label");
+    batchLabel.textContent = "Batch";
+    const batchSelect = document.createElement("select");
+    batchSelect.id = "edit-batch";
+    for (const item of batches.filter(
+      /* Keep moves within the capture's collection test plan. */
+      (item) => item.test_plan_name === row.metadata.test_plan_name,
+    )) {
+      const option = document.createElement("option");
+      option.value = item.batch_name;
+      option.textContent = item.batch_name;
+      batchSelect.append(option);
     }
-    const hint = document.createElement("p");
-    hint.textContent =
-      "Choices: the batch's expected_<field> list, else the naming file.";
-    $("review-fields").append(hint);
+    batchSelect.value = row.folder;
+    batchLabel.append(batchSelect);
+    $("review-fields").append(batchLabel);
+    /* Rebuild metadata choices for the selected batch, retaining pending edits. */
+    function renderMetadata(selectedBatch) {
+      const drafts = Object.fromEntries(
+        editable.map(
+          /* Preserve the value entered before changing the destination. */
+          (field) => [
+            field.column,
+            $("edit-" + field.column)?.value ??
+              row.metadata[field.column] ??
+              "",
+          ],
+        ),
+      );
+      $("review-fields").replaceChildren(batchLabel);
+      const choices = Object.fromEntries(
+        editable.map(
+          /* Resolve choices against the destination batch's expected values. */
+          (field) => [
+            field.column,
+            window.captureFields.choices(
+              field,
+              selectedBatch,
+              rows,
+              row.metadata.test_plan_name,
+            ),
+          ],
+        ),
+      );
+      for (const field of editable) {
+        const k = field.column;
+        const label = document.createElement("label");
+        label.textContent = field.key;
+        label.title = field.description;
+        const input = document.createElement(choices[k] ? "select" : "input");
+        input.id = "edit-" + k;
+        const current = drafts[k];
+        if (choices[k]) {
+          if (!choices[k].includes(current)) {
+            const option = document.createElement("option");
+            option.value = current;
+            option.textContent =
+              (current || "(missing)") +
+              " — current value outside configured choices";
+            input.append(option);
+          }
+          for (const value of [...new Set(choices[k])]) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value || window.captureFields.blank(field);
+            input.append(option);
+          }
+        }
+        input.value = current;
+        label.append(input);
+        $("review-fields").append(label);
+      }
+      const hint = document.createElement("p");
+      hint.textContent =
+        "Choices: the batch's expected_<field> list, else the naming file.";
+      $("review-fields").append(hint);
+    }
+    batchSelect.onchange =
+      /* Update metadata choices without discarding the user's draft values. */ () =>
+        renderMetadata(
+          batches.find(
+            (item) =>
+              item.batch_name === batchSelect.value &&
+              item.test_plan_name === row.metadata.test_plan_name,
+          ),
+        );
+    renderMetadata(batch);
     capture = row;
     controls(false);
   } catch (e) {
@@ -119,7 +163,9 @@ async function executeEdit(remove) {
         ) => [k, $("edit-" + k).value],
       ),
   );
-  if (!remove && !Object.keys(changes).length) {
+  const destination = $("edit-batch").value;
+  const moving = destination !== row.folder;
+  if (!remove && !moving && !Object.keys(changes).length) {
     $("review-error").textContent = "No metadata changes.";
     return;
   }
@@ -127,7 +173,11 @@ async function executeEdit(remove) {
     ? "Delete " +
       row.metadata.filename +
       " from both CSV indexes and delete its images? JSON metadata and ingestion history remain."
-    : "Save these metadata changes in both CSV indexes?\n" +
+    : (moving
+        ? "Move this capture's images and annotation to " +
+          destination +
+          " and update both CSV indexes?\n"
+        : "Save these metadata changes in both CSV indexes?\n") +
       Object.entries(changes)
         .map(
           /* Build the corresponding display or request value for each item. */ ([
@@ -162,6 +212,7 @@ async function executeEdit(remove) {
           uuid: row.metadata.uuid,
           filename: row.metadata.filename,
           changes,
+          ...(moving ? { destination_batch: destination } : {}),
           expected: row.metadata,
         };
     const res = await fetch(
@@ -176,6 +227,7 @@ async function executeEdit(remove) {
       },
     );
     if (!res.ok) throw Error(await res.text());
+    const result = await res.json();
     if (remove) {
       try {
         const d = JSON.parse(
@@ -188,9 +240,42 @@ async function executeEdit(remove) {
       $("review").close();
       await refresh();
     } else {
+      if (result.moved) {
+        try {
+          const stored = JSON.parse(
+            localStorage.getItem("idrecapture-review-v1") || "{}",
+          );
+          if (stored[row.key]) {
+            const response = await fetch(
+              "/api/capture?key=" + encodeURIComponent(result.key),
+            );
+            if (!response.ok)
+              throw Error("Moved capture could not be reopened");
+            const movedRow = await response.json();
+            stored[result.key] = {
+              ...stored[row.key],
+              key: result.key,
+              folder: result.folder,
+              csv_row_at_review: movedRow.line,
+              identity: movedRow.identity,
+              sdk: movedRow.sdk,
+              fields: { ...movedRow.fields },
+              metadata_at_review: { ...movedRow.metadata },
+            };
+            delete stored[row.key];
+            localStorage.setItem(
+              "idrecapture-review-v1",
+              JSON.stringify(stored),
+            );
+            if (typeof decisions !== "undefined") decisions = stored;
+          }
+        } catch {
+          // A browser storage failure must not report a completed move as unsaved.
+        }
+      }
       await refresh();
       editing = false;
-      await openCapture(row.key);
+      await openCapture(result.key || row.key);
     }
   } catch (e) {
     $("review-error").textContent = "Not saved: " + e.message;
