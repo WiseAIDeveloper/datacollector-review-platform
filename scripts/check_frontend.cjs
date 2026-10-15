@@ -7,13 +7,13 @@ const parser = require("@babel/parser");
 
 // Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  // Dashboard refresh and frozen panes are covered by browser scenarios.
-  "coverage.html": "6d9c6a7",
+  // Dashboard refresh, frozen panes, and additive targets have browser coverage.
+  "coverage.html": "2e0f991",
   "index.html": "0b6d6dc",
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
   "ingestion.html": "6380c2d",
-  "fields.js": "0b6d6dc",
+  "fields.js": "2e0f991",
   // Batch editing is covered by real dummy-move browser scenarios.
   "capture_review.js": "154101b",
 };

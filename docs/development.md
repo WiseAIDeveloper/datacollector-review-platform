@@ -207,3 +207,8 @@ This larger run does not meet a subsecond target; first-page loads and browser
 processing still need improvement. The smaller isolated HTTP comparison above
 must not be interpreted as end-to-end dashboard latency. Repeat sustained tests
 on the intended storage and network before setting a production latency objective.
+
+Per-identity collection targets in `coverage.html` and `fields.js` use tested
+frontend baseline `2e0f991`. `tests/test_identity_targets.py` checks CSV validation
+and target selection; `tests/browser/test_coverage_columns.py` verifies both shared
+and per-identity targets in Chromium.
