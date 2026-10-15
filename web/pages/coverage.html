@@ -480,7 +480,7 @@
                     planned.map((f) => m[f.key]),
                   ),
                 ) || [],
-              expected = Number(m.expected_count_per_identity || 0);
+              expected = naming.expected(m, subject);
             return {
               m,
               captures,

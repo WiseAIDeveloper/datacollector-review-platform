@@ -60,6 +60,24 @@ def validate_pair(plan, definitions):
             raise ValueError("Test-plan sdk must be web or app")
         if not row[COUNT].isascii() or not row[COUNT].isdigit():
             raise ValueError("Expected counts must be non-negative integers")
+        if row.get("expected_count_by_subject"):
+            try:
+                counts = json.loads(row["expected_count_by_subject"])
+            except (TypeError, ValueError) as error:
+                raise ValueError("Identity targets must be a JSON object") from error
+            if (
+                not isinstance(counts, dict)
+                or not counts
+                or any(
+                    not isinstance(identity, str)
+                    or not identity.strip()
+                    or identity != identity.strip()
+                    or type(count) is not int
+                    or count < 0
+                    for identity, count in counts.items()
+                )
+            ):
+                raise ValueError("Identity targets must map identities to non-negative integers")
     keys = [tuple(v for k, v in sorted(r.items()) if k != COUNT) for r in plan]
     if len(keys) != len(set(keys)):
         raise ValueError("Test plan contains duplicate capture requirements")

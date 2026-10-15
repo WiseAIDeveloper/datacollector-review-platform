@@ -23,6 +23,13 @@ window.captureFields = (() => {
       /* Fields an edit may change, keyed by the index column they write. */
       editable: all.filter((f) => f.column),
       field: (key) => byKey.get(key),
+      /* An additive collection round can give each identity a different target. */
+      expected: (row, identity) => {
+        const counts = row.expected_count_by_subject;
+        return counts
+          ? Number(JSON.parse(counts)[identity] || 0)
+          : Number(row.expected_count_per_identity || 0);
+      },
       /* Fields other than identity that the matrix plans, in naming-file order. */
       planned: (matrix) =>
         all.filter(

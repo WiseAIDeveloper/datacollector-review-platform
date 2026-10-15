@@ -98,6 +98,12 @@ exactly after trimming spaces.
 
 ## Plans follow the matrix
 
+A matrix may optionally include `expected_count_by_subject`, a JSON object such
+as `{"ang-kuan-liang":4,"loh-yong-han":2}`. It overrides the per-identity target
+for that row, with zero for identities absent from the object. Leave it blank
+to retain `expected_count_per_identity`. This supports adding another collection
+round for some identities without increasing everyone else's requirements.
+
 A matrix column named after a field makes that field part of coverage: a capture
 counts toward a matrix row when its batch, SDK, and every planned field match.
 Fields the matrix does not have, such as a replay device the plan does not use,
