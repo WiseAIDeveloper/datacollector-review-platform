@@ -13,12 +13,48 @@ def record(key, batch="printed", subject="person"):
         folder=batch,
         sdk="web",
         metadata={"test_plan_name": "plan"},
-        fields=dict(subject=subject, capture_env_lighting="office_dark", capture_device="phone"),
+        fields=dict(
+            subject=subject, capture_env_lighting="office_dark", capture_device="phone"
+        ),
     )
 
 
 class PossibleExcessTests(unittest.TestCase):
     """Only the newest available captures beyond the plan count are excess."""
+
+    def test_additive_targets_match_dashboard(self):
+        """Honor returning/new subjects, zero targets, and unlisted subjects."""
+        plan = [
+            dict(
+                folder="printed",
+                sdk="web",
+                test_plan_name="plan",
+                capture_env_lighting="office_dark",
+                capture_device="phone",
+                expected_count_per_identity="2",
+                expected_count_by_subject='{"returning":4,"new":2,"zero":0}',
+            )
+        ]
+        captures = [
+            record(f"{subject}-{n}", subject=subject)
+            for subject, count in (
+                ("returning", 4),
+                ("new", 2),
+                ("zero", 1),
+                ("other", 1),
+            )
+            for n in range(count)
+        ]
+        newest = [r["key"] for r in reversed(captures)]
+        self.assertEqual(
+            possible_excess_keys(captures, plan, NAMING, newest), {"zero-0", "other-0"}
+        )
+        captures.append(record("returning-4", subject="returning"))
+        newest.insert(0, "returning-4")
+        self.assertEqual(
+            possible_excess_keys(captures, plan, NAMING, newest),
+            {"zero-0", "other-0", "returning-4"},
+        )
 
     def test_counts_per_identity_and_ignores_deleted_events(self):
         """A deleted event and a second identity cannot trigger purple."""

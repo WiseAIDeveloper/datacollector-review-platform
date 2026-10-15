@@ -6,6 +6,12 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Ingestion excess highlighting now respects per-identity matrix targets, matching the dashboard for additive collection rounds.
+
+- Ingestion now follows same-named batch links into the dataset root’s `datasets/` directory, catching up missed captures while preserving existing history and rejecting links outside the dataset root.
+
 ### Added
 
 - Support optional per-identity matrix targets so repeat collection rounds add
