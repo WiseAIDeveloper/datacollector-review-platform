@@ -425,7 +425,14 @@ def possible_excess_keys(records, plan, naming, newest_keys):
             row["sdk"],
             row.get("test_plan_name", ""),
             *(row[field] for field in fields),
-        ): int(row["expected_count_per_identity"])
+        ): (
+            int(row["expected_count_per_identity"]),
+            (
+                json.loads(row["expected_count_by_subject"])
+                if row.get("expected_count_by_subject", "").strip()
+                else None
+            ),
+        )
         for row in plan
     }
     current = {row["key"]: row for row in records}
@@ -444,6 +451,8 @@ def possible_excess_keys(records, plan, naming, newest_keys):
         if identity and requirement in requirements:
             groups.setdefault((identity, requirement), []).append(key)
     excess = set()
-    for (_, requirement), keys in groups.items():
-        excess.update(keys[: max(0, len(keys) - requirements[requirement])])
+    for (identity, requirement), keys in groups.items():
+        default, targets = requirements[requirement]
+        expected = targets.get(identity, 0) if targets is not None else default
+        excess.update(keys[: max(0, len(keys) - expected)])
     return excess

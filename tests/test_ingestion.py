@@ -66,6 +66,25 @@ class IngestionTests(unittest.TestCase):
             ("new.jpg", "dark", "web", "iphone-13"),
         )
 
+    def test_training_copy_link_is_not_live_collection(self):
+        """A training dataset must not become a live ingestion source via a link."""
+        folder = self.write_batch(["training"])
+        (self.root / "datasets").mkdir()
+        folder.rename(self.root / "datasets" / folder.name)
+        folder.symlink_to("datasets/" + folder.name, target_is_directory=True)
+        self.log.scan()
+        self.assertEqual(self.log.snapshot()["total"], 0)
+
+    def test_dataset_link_cannot_escape_root(self):
+        """An external datasets symlink must not admit outside captures."""
+        with tempfile.TemporaryDirectory() as outside:
+            folder = self.write_batch(["outside"])
+            folder.rename(Path(outside) / folder.name)
+            (self.root / "datasets").symlink_to(outside, target_is_directory=True)
+            folder.symlink_to("datasets/" + folder.name, target_is_directory=True)
+            self.log.scan()
+            self.assertEqual(self.log.snapshot()["total"], 0)
+
     def test_known_captures_skip_normalization_but_check_images(self):
         """Repeated scans preserve immutable history and still count missing images."""
         folder = self.write_batch(["old"])
