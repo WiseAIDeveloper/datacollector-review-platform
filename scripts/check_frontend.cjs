@@ -7,8 +7,8 @@ const parser = require("@babel/parser");
 
 // Naming-file fields and highlights are covered by browser scenarios.
 const featureBaselines = {
-  // Dashboard refresh, frozen panes, and additive targets have browser coverage.
-  "coverage.html": "2e0f991",
+  // Dashboard refresh, frozen panes, additive targets, and attack types have browser coverage.
+  "coverage.html": "571d6ec",
   "index.html": "0b6d6dc",
   "quality.html": "0b6d6dc",
   "search.html": "0b6d6dc",
