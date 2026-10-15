@@ -77,8 +77,17 @@ def validate_pair(plan, definitions):
                     for identity, count in counts.items()
                 )
             ):
-                raise ValueError("Identity targets must map identities to non-negative integers")
-    keys = [tuple(v for k, v in sorted(r.items()) if k != COUNT) for r in plan]
+                raise ValueError(
+                    "Identity targets must map identities to non-negative integers"
+                )
+    keys = [
+        tuple(
+            v
+            for k, v in sorted(r.items())
+            if k not in {COUNT, "expected_count_by_subject"}
+        )
+        for r in plan
+    ]
     if len(keys) != len(set(keys)):
         raise ValueError("Test plan contains duplicate capture requirements")
     return next(iter(names))

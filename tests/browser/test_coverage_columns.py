@@ -92,12 +92,36 @@ with sync_playwright() as playwright:
     expect(page.locator(".coverage-table th").first).to_be_visible()
     expect(page.locator(".coverage-table tr").first.locator("th")).to_have_text(
         [
-            "capture_env_lighting", "SDK", "capture_device", "replay_device",
-            "Expected", "Found", "Missing", "To add", "Reviewed",
+            "capture_env_lighting",
+            "SDK",
+            "capture_device",
+            "replay_device",
+            "Expected",
+            "Found",
+            "Missing",
+            "To add",
+            "Reviewed",
         ]
     )
     expect(page.locator(".coverage-table tr").nth(1).locator("td")).to_have_text(
         ["dark", "WEB", "iphone-13", "google_pixel_9a", "1", "1", "0", "—", ""]
+    )
+    # The same capture group can require more images for a returning identity.
+    data["matrix"][0]["expected_count_by_subject"] = '{"person":4,"newperson":2}'
+    page.reload()
+    page.get_by_text("Show batch grouped by capture_env_lighting").click()
+    expect(page.locator(".coverage-table tr").nth(1).locator("td")).to_have_text(
+        [
+            "dark",
+            "WEB",
+            "iphone-13",
+            "google_pixel_9a",
+            "4",
+            "1",
+            "3",
+            "Add 3 captures",
+            "",
+        ]
     )
     assert not errors, errors
     browser.close()
