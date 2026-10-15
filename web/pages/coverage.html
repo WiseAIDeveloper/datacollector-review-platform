@@ -84,6 +84,13 @@
       .batch-filter-panel > summary {
         font-weight: 600;
       }
+      .attack-type-filter {
+        display: block;
+        margin-top: 8px;
+      }
+      .attack-type-filter select {
+        max-width: 100%;
+      }
       .batch-filter {
         max-height: min(
           30dvh,
@@ -339,6 +346,12 @@
     <main>
       <details class="batch-filter-panel" open>
         <summary>Batches filter</summary>
+        <div class="attack-type-filter">
+          <label for="attack-type">Attack type</label>
+          <select id="attack-type">
+            <option value="">All attack types</option>
+          </select>
+        </div>
         <div
           id="batch-filter"
           class="batch-filter"
@@ -375,6 +388,7 @@
         decisions = {},
         qualityReviews = {},
         selectedBatch = "",
+        selectedAttackType = "",
         naming = null,
         planned = [];
       const value = window.captureFields.value;
@@ -1117,6 +1131,24 @@
         if (batch.missing === 0) return ["completed", "Completed"];
         return ["in-progress", "In progress"];
       }
+      /* Read the attack category from the shared prefix_AttackType batch convention. */
+      function attackType(batch) {
+        return batch.name.match(/^\d+_([^_]+)(?:_|$)/)?.[1] || "Other";
+      }
+      /* Preserve the chosen category while rebuilding options from current project batches. */
+      function renderAttackTypeFilter(batches) {
+        const types = [...new Set(batches.map(attackType))].sort();
+        if (!types.includes(selectedAttackType)) selectedAttackType = "";
+        const select = $("attack-type");
+        select.replaceChildren(
+          ...["", ...types].map((type) => {
+            const option = el("option", type || "All attack types");
+            option.value = type;
+            return option;
+          }),
+        );
+        select.value = selectedAttackType;
+      }
       /* Keep all batch choices available and preserve keyboard focus when redrawing. */
       function renderBatchFilter(batches) {
         if (
@@ -1162,8 +1194,13 @@
           ? requested
           : "batches";
         const allBatches = batchGroups(groups());
-        renderBatchFilter(allBatches);
-        const batches = allBatches.filter(
+        renderAttackTypeFilter(allBatches);
+        const typeBatches = allBatches.filter(
+          (batch) =>
+            !selectedAttackType || attackType(batch) === selectedAttackType,
+        );
+        renderBatchFilter(typeBatches);
+        const batches = typeBatches.filter(
             /* Apply the batch selection to cards, totals, and status counts. */ (
               b,
             ) => !selectedBatch || b.name === selectedBatch,
@@ -1420,6 +1457,11 @@
               : ""),
         );
       }
+      /* Narrow batch choices and dashboard totals without changing identity or view. */
+      $("attack-type").onchange = () => {
+        selectedAttackType = $("attack-type").value;
+        render();
+      };
       let loading = false;
       let lastSnapshot = "";
       let lastRefreshed = null;
