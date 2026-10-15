@@ -76,38 +76,101 @@
         top: var(--dashboard-header-height, 0px);
         z-index: 20;
         margin: 0 0 16px;
-        padding: 10px 12px;
+        padding: 14px 16px;
         background: #10171b;
-        border-bottom: 1px solid #34434c;
-        box-shadow: 0 4px 12px #0003;
+        border: 1px solid #29363e;
+        border-radius: 10px;
+        box-shadow: 0 8px 20px #0002;
       }
       .batch-filter-panel > summary {
         font-weight: 600;
+        cursor: pointer;
+        color: #dce5e9;
       }
       .attack-type-filter {
-        display: block;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 0;
         margin-top: 8px;
+        border-bottom: 1px solid #29363e;
       }
-      .attack-type-filter select {
+      .attack-type-filter label {
+        color: #96a7af;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      body.terminal.dashboard .attack-type-filter select {
+        width: 240px;
         max-width: 100%;
+        min-height: 38px;
+        padding: 8px 34px 8px 12px;
+        border: 1px solid #42545e;
+        border-radius: 6px;
+        background-color: #182329;
+        color: #e0ebe6;
+        font: inherit;
+        cursor: pointer;
+      }
+      #batch-filter-count {
+        margin-left: auto;
+        color: #96a7af;
       }
       .batch-filter {
-        max-height: min(
-          30dvh,
-          max(80px, calc(100dvh - var(--dashboard-header-height, 0px) - 100px))
-        );
+        max-height: 180px;
         overflow-y: auto;
         overscroll-behavior-y: contain;
-        padding: 3px;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        margin-top: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: #42545e transparent;
+        padding: 3px 6px 3px 3px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+        gap: 6px;
+        margin-top: 10px;
       }
-      .batch-filter button {
-        max-width: 100%;
+      body.terminal.dashboard .batch-filter button {
+        width: 100%;
+        min-width: 0;
+        min-height: 38px;
+        text-align: left;
+        padding: 8px 10px;
+        border-radius: 5px;
         overflow-wrap: anywhere;
+        line-height: 1.5;
+      }
+      body.terminal.dashboard .attack-type-filter select:focus-visible,
+      body.terminal.dashboard .batch-filter button:focus-visible {
+        outline: 2px solid #96e6b3;
+        outline-offset: 2px;
+      }
+      @media (max-width: 600px) {
+        .batch-filter-panel {
+          padding: 12px;
+        }
+        .attack-type-filter {
+          gap: 8px;
+        }
+        .attack-type-filter label {
+          flex: 1;
+        }
+        #batch-filter-count {
+          order: 1;
+          font-size: 11px;
+        }
+        body.terminal.dashboard .attack-type-filter select {
+          order: 2;
+          width: 100%;
+          min-height: 42px;
+        }
+        .batch-filter {
+          grid-template-columns: minmax(0, 1fr);
+          max-height: 150px;
+        }
+        body.terminal.dashboard .batch-filter button {
+          min-height: 42px;
+        }
       }
       .stat,
       .group,
@@ -351,6 +414,7 @@
           <select id="attack-type">
             <option value="">All attack types</option>
           </select>
+          <span id="batch-filter-count" aria-live="polite"></span>
         </div>
         <div
           id="batch-filter"
@@ -1199,6 +1263,8 @@
           (batch) =>
             !selectedAttackType || attackType(batch) === selectedAttackType,
         );
+        $("batch-filter-count").textContent =
+          `${typeBatches.length} of ${allBatches.length} batches`;
         renderBatchFilter(typeBatches);
         const batches = typeBatches.filter(
             /* Apply the batch selection to cards, totals, and status counts. */ (

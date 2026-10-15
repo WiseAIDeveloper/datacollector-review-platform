@@ -8,7 +8,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Filter dashboard batches by attack type, with matching summaries and status counts. Category selection is preserved during automatic refresh.
+- Filter dashboard batches by attack type, with matching summaries and status counts. Category selection is preserved during automatic refresh. A compact toolbar, matching-batch count, and aligned scrollable choices keep the filter readable on desktop and mobile.
 
 ### Fixed
 
