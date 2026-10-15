@@ -6,6 +6,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Filter dashboard batches by attack type, with matching summaries and status counts. Category selection is preserved during automatic refresh.
+
 ### Fixed
 
 - Ingestion excess highlighting now respects per-identity matrix targets, matching the dashboard for additive collection rounds.
