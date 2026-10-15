@@ -206,9 +206,7 @@ class IngestionLog:
                 if folder.name in EXCLUDED or not path.is_file():
                     continue
                 resolved_folder = folder.resolve()
-                if resolved_folder.parent != self.root and resolved_folder != (
-                    self.root / "datasets" / folder.name
-                ):
+                if resolved_folder.parent != self.root:
                     continue
                 try:
                     rows = read_stable_rows(path)

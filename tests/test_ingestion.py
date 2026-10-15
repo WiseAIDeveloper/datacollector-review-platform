@@ -66,22 +66,14 @@ class IngestionTests(unittest.TestCase):
             ("new.jpg", "dark", "web", "iphone-13"),
         )
 
-    def test_dataset_batch_link_keeps_history_and_ingests_new_rows(self):
-        """Moving a batch into datasets must preserve keys and detect new captures."""
-        folder = self.write_batch(["old"])
-        self.log.scan()
-        original = self.log.snapshot()["events"][0]
+    def test_training_copy_link_is_not_live_collection(self):
+        """A training dataset must not become a live ingestion source via a link."""
+        folder = self.write_batch(["training"])
         (self.root / "datasets").mkdir()
         folder.rename(self.root / "datasets" / folder.name)
         folder.symlink_to("datasets/" + folder.name, target_is_directory=True)
-        self.write_batch(["old", "new"])
         self.log.scan()
-        self.log.scan()
-        state = self.log.snapshot()
-        self.assertEqual((state["total"], state["ingested"]), (2, 1))
-        self.assertEqual(state["events"][1], original)
-        self.assertEqual(state["events"][0]["key"], "genuine/new/new.jpg")
-        self.assertEqual(state["errors"], [])
+        self.assertEqual(self.log.snapshot()["total"], 0)
 
     def test_dataset_link_cannot_escape_root(self):
         """An external datasets symlink must not admit outside captures."""
