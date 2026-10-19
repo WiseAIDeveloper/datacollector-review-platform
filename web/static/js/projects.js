@@ -45,8 +45,8 @@ async function loadProjects() {
 async function readCSV(id) {
   /* Decode uploaded CSV bytes strictly so invalid encodings cannot be silently saved. */
   const file = document.getElementById(id).files[0];
-  if (!file || file.size > 400000 || !file.size)
-    throw new Error("Select two nonempty CSV files, up to 400 KB each.");
+  if (!file || file.size > 1000000 || !file.size)
+    throw new Error("Select two nonempty CSV files, up to 1 MB each.");
   return new TextDecoder("utf-8", { fatal: true }).decode(
     await file.arrayBuffer(),
   );

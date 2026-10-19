@@ -19,7 +19,7 @@ For the separate service that automatically discovers project directories, see
 [folder-based projects](docs/folder-projects.md).
 
 Open **Projects** in the sidebar to enter a project name and upload its test-plan
-and batches CSVs (UTF-8, up to 400 KB each). Creating a project requires the existing
+and batches CSVs (UTF-8, up to 1 MB each). Creating a project requires the existing
 write PIN. Both files are validated together; invalid uploads create nothing.
 Project names must be unique. The page lists the required CSV columns.
 

@@ -17,8 +17,8 @@ BATCH_FIELDS = {"batch_name", "test_plan_name"}
 
 def parse_csv(value, required, label):
     """Reject malformed, empty, oversized, or incomplete plan files."""
-    if not isinstance(value, str) or not value or len(value.encode("utf-8")) > 400_000:
-        raise ValueError(f"{label}: select a UTF-8 CSV file up to 400 KB")
+    if not isinstance(value, str) or not value or len(value.encode("utf-8")) > 1_000_000:
+        raise ValueError(f"{label}: select a UTF-8 CSV file up to 1 MB")
     if "\x00" in value:
         raise ValueError(f"{label}: invalid CSV text")
     try:
