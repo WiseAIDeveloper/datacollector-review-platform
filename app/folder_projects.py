@@ -50,10 +50,10 @@ class FolderProjects:
             )
         matrix_path, batches_path = pairs[0]
         if any(
-            path.is_symlink() or path.stat().st_size > 400_000
+            path.is_symlink() or path.stat().st_size > 10_000_000
             for path in (matrix_path, batches_path)
         ):
-            raise ValueError("Project CSVs must be regular files up to 400 KB")
+            raise ValueError("Project CSVs must be regular files up to 10 MB")
         matrix = parse_csv(
             matrix_path.read_text(encoding="utf-8-sig"), MATRIX_FIELDS, "Test plan"
         )

@@ -464,7 +464,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(b"Invalid deletion PIN", "text/plain", 403)
             size = int(self.headers.get("Content-Length", "0"))
             limit = (
-                5 * MAX_REQUEST_BYTES if path == "/api/projects" else MAX_REQUEST_BYTES
+                25 * MAX_REQUEST_BYTES if path == "/api/projects" else MAX_REQUEST_BYTES
             )
             if not 1 <= size <= limit:
                 return self.send(b"Invalid request size", "text/plain", 400)

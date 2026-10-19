@@ -8,6 +8,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Allow collection-plan CSVs up to 10 MB so expanded colour and device matrices remain in one project.
+
 - Ingestion excess highlighting now respects per-identity matrix targets, matching the dashboard for additive collection rounds.
 
 - Keep training dataset links excluded from live ingestion; collection folders must remain outside `datasets/`.
