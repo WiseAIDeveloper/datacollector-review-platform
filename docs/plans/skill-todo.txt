@@ -1,0 +1,16 @@
+Skills to create
+
+We need to create two skills for setting up data collection projects:
+
+1. Matrix creator skill
+   Create and validate matrix.csv from the project's collection requirements,
+   expected coverage, and capture counts.
+
+2. Batch creator skill
+   Create and validate batches.csv from the project's batch definitions and
+   collection settings.
+
+Both skills should follow the agreed project CSV schemas and produce files
+that work together for the selected project.
+
+Status: TODO - recorded for future implementation.
