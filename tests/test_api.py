@@ -64,7 +64,7 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual({key: rows[0][key] for key in expected}, expected)
         self.assertEqual(
-            set(rows[0]) - set(expected), {"fields", "annotation", "naming"}
+            set(rows[0]) - set(expected), {"fields", "annotation", "naming", "label_issue"}
         )
         self.assertEqual(rows[0]["fields"]["capture_env_lighting"], "dark")
         self.assertEqual(rows[0]["annotation"]["capture_env_lighting"], "office-white")

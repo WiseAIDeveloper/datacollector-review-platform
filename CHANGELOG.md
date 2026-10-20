@@ -7,6 +7,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- Flag MyKad26 batch/label contradictions in review and reject conflicting metadata edits or moves. Preserve existing datasets for explicit, backed-up repair.
+
+### Fixed
 
 - Allow collection-plan CSVs up to 10 MB so expanded colour and device matrices remain in one project.
 
