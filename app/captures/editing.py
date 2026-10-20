@@ -4,6 +4,7 @@ import csv
 import io
 from pathlib import Path
 
+from .label_policy import validate_label
 from .catalog import EXCLUDED
 from .deletion import INDEXES, SAFE_FOLDER, atomic_write
 
@@ -58,6 +59,7 @@ def prepare_edit(path, folder, uuid, filename, changes, expected):
     if primary and selected != expected:
         raise Conflict("Metadata changed since you opened it; reopen it")
     selected.update(changes)
+    validate_label(folder.name, selected, require=True)
     fields.extend(key for key in changes if key not in fields)
     output = io.StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=fields)

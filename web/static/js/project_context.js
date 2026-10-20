@@ -140,9 +140,10 @@ window.namingIssueNote = (record) => {
       /* Label each issue with the field it belongs to. */ ([field, v]) =>
         field + ": " + v.issue,
     );
+  if (record?.label_issue) issues.push("Label conflict: " + record.label_issue);
   if (!issues.length) return null;
   const note = document.createElement("p");
   note.className = "naming-issue";
-  note.textContent = "Not in naming file — " + issues.join("; ");
+  note.textContent = "Metadata issues — " + issues.join("; ");
   return note;
 };

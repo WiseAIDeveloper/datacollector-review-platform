@@ -1,5 +1,7 @@
 """Read capture metadata and dashboard definitions from the dataset."""
 
+from .label_policy import validate_label
+
 import ast
 import csv
 import json
@@ -87,7 +89,14 @@ def capture_record(folder, line, row, naming):
     annotation = collection_annotation(folder, row.get("uuid", ""))
     sdk, standard = capture_fields(naming, row, annotation)
     values = {key: value["value"] for key, value in standard.items()}
+    try:
+        validate_label(folder.name, row, require=True)
+        validate_label(folder.name, annotation)
+        label_issue = None
+    except ValueError as error:
+        label_issue = str(error)
     return dict(
+        label_issue=label_issue,
         key="/".join((folder.name, row.get("uuid", ""), row.get("filename", ""))),
         folder=folder.name,
         line=line,

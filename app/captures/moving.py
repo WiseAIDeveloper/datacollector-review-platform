@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
+from .label_policy import validate_label
 from .catalog import EXCLUDED, annotation_path
 from .deletion import INDEXES, SAFE_FOLDER, atomic_write, capture_images, remove_row
 from .editing import Conflict, prepare_edit, validate_changes
@@ -103,6 +104,7 @@ def move_capture(
         if name == INDEXES[0] and row != expected:
             raise Conflict("Metadata changed since you opened it; reopen it")
         row.update(changes)
+        validate_label(destination, row, require=True)
         for field in ("batch", "batch_name"):
             if field in row:
                 row[field] = destination
